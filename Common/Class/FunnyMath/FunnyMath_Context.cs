@@ -1,0 +1,53 @@
+﻿
+using B2_Data.Funny;
+using Common_Robot2;
+using Test1;
+
+namespace FunnyMath
+{
+    public class FunnyMath_Context : IContext
+    {
+        private C_Space space;
+        private C_Node pNode;
+
+        public FunnyMath_Context(C_Space space, C_Node pNode)
+        {
+            this.space = space;
+            this.pNode=pNode;
+        }
+
+        public double ResolveVariable(string name)
+        {
+            switch (name)
+            {
+                case "pi": return Math.PI;
+            }
+
+            Object obj= space.read_vars(space.pTrain,pNode,name);
+            double value= Main.get_double_from_obj(pNode, obj);
+            return value;
+        }
+
+
+        public double CallFunction(string name, double[] arguments)
+        {
+            if (name == "矩形面积")
+            {
+                return arguments[0] * arguments[1];
+            }else if (name == "sin")
+            {
+                return  Math.Sin(arguments[0]);
+            }
+            else if (name == "cos")
+            {
+                return Math.Cos(arguments[0]);
+            }
+            else if (name == "tan")
+            {
+                return Math.Tan(arguments[0]);
+            }
+
+            throw new InvalidDataException($"未知函数: '{name}'");
+        }
+    }
+}

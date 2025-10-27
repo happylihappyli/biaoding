@@ -1,0 +1,57 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //模型最小路径
+    public class S_Model_Min_Distance : C_Node
+    {
+        //读取模型变量
+        public string key_read = "";
+        //最短路径保存变量
+        public string key_save = "";
+
+        public S_Model_Min_Distance(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> model1 = (List<C_Point3D>)this.read_var(key_read, "Bitmap");
+
+            double min_distance = 10000;
+            for(var i=0; i<model1.Count; i++)
+            {
+                C_Point3D p1 = model1[i];
+                for (var j = i+1; j < model1.Count; j++)
+                {
+                    C_Point3D p2 = model1[j];
+                    double distance= p1.distance(p2);
+                    if (distance < min_distance)
+                    {
+                        min_distance = distance;
+                    }
+                }
+            }
+
+            this.save_var(key_save, "string", min_distance);
+        }
+
+        public void init()
+        {
+
+        }
+    }
+}

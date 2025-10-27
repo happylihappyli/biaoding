@@ -1,0 +1,51 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Planet_Catch_To_Point3D : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string type = "center";
+
+        public S_Planet_Catch_To_Point3D(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            C_Planet_Catch? pCatch = (C_Planet_Catch?)this.read_var(this.key_read, "C_Planet_Catch");
+
+            if (pCatch != null  && pCatch.center!=null)
+            {
+                if (this.type== "center")
+                {
+                    this.save_var(this.key_save, "C_Point3D", pCatch.center);
+                }
+                else if(this.type == "arm_a")
+                {
+                    this.save_var(this.key_save, "C_Point3D", pCatch.arm_a);
+                }
+                this.Next_Step = Node_Next.True;
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+        }
+
+    }
+}

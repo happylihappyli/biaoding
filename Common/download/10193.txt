@@ -1,0 +1,119 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    public class F_Bridge : C_Node
+    {
+        private int _count = 0;//Count>0就可以继续，否则就停止了
+        public int Count
+        {
+            get { return _count; }
+            set
+            {
+                if (this.Name == "桥put")
+                {
+                    Console.WriteLine(this.Name + ":  count=" + value);
+                }
+                _count = value;
+            }
+        }
+
+        private string _time_max = "5";
+        public string time_max { get => _time_max; set => _time_max = value; }
+
+        public int time_count = 0;
+        public bool stop=false;
+
+        public F_Bridge(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+            
+        }
+
+        private void run_sub_main()
+        {
+            Main.WriteLine(this, "，启动了");
+            //S_TTS.speak_async(this.Name + "，启动了");
+
+            int i_time_max = int.Parse(time_max);
+
+            if (_count < 0)
+            {
+                this.Next_Step = Node_Next.False;
+                Main.WriteLine(this," 退出桥");
+                //S_TTS.speak_async(this.Name + " 退出桥");
+                return;
+            }
+            if (_count == 0)
+            {
+                Main.WriteLine(this, " 开始循环 count=" + this.Count +", time_count=" + time_count);
+                //S_TTS.speak_async(this.Name+" 开始循环");
+            }
+
+            while (_count == 0)
+            {
+                Thread.Sleep(100);
+                time_count += 1;
+                if (time_count > 10 * i_time_max) //暂时默认等待5秒
+                {
+                    break;
+                }
+                if (this.stop)
+                {
+                    this.Next_Step = Node_Next.None;
+                    return ;
+                }
+            }
+
+            if (this.Name == "桥发送放置位置")
+            {
+                Main.WriteLine(this, ":  count=" + this.Count + " time_count=" + time_count + " i_time_max=" + i_time_max);
+            }
+
+            if (_count > 0)
+            {
+                if (this.Name == "桥发送给机械臂")
+                {
+                    Main.WriteLine(this, "Train_State=" + pTrain.get_ID() + "=" + this.state);
+                    Main.WriteLine("D");
+                }
+
+                _count -= 1;
+                this.Next_Step = Node_Next.True;
+                Main.WriteLine(this, " 通过了 :  count = " + this.Count + " time_count = " + time_count + " i_time_max = " + i_time_max);
+                //S_TTS.speak_async(this.Name + " 通过了");
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+                Main.WriteLine(this, " 断开了 :  count = " + this.Count + " time_count = " + time_count + " i_time_max = " + i_time_max);
+                //S_TTS.speak_async(this.Name+" 断开了");
+            }
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

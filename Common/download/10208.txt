@@ -1,0 +1,62 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Point_Range_Fit : C_Node
+    {
+        public string key_read = "";
+        public string xyz = "y";
+        public string min = "0";
+        public string max = "100";
+
+
+        public S_Point_Range_Fit(string Name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            C_Point3D pPoint = (C_Point3D)space.vars.read_vars(pTrain, this, this.key_read, "C_Point3D");
+
+            if (xyz == "x")
+            {
+                float f_min = float.Parse(min);
+                float f_max = float.Parse(max);
+                if (pPoint.x < f_min) pPoint.x = f_min;
+                if (pPoint.x > f_max) pPoint.x = f_max;
+            }
+            else if (xyz == "y")
+            {
+                float f_min = float.Parse(min);
+                float f_max = float.Parse(max);
+                if (pPoint.y < f_min) pPoint.y = f_min;
+                if (pPoint.y > f_max) pPoint.y = f_max;
+            }
+            else if (xyz == "z")
+            {
+                float f_min = float.Parse(min);
+                float f_max = float.Parse(max);
+                if (pPoint.z < f_min) pPoint.z = f_min;
+                if (pPoint.z > f_max) pPoint.z = f_max;
+            }
+
+        }
+    }
+}

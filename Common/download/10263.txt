@@ -1,0 +1,71 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1 
+{ 
+    public class F_Match_Distance1 : C_Node
+    {
+        public string key_pos = "#盒子信息";
+        public string key_match1 = "#箱子类型近";
+        public string key_match2 = "#箱子类型远";
+
+
+        public F_Match_Distance1(string name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public void init()
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string line1 = (string)this.read_var(this.key_match1, "string");
+            string line2 = (string)this.read_var(this.key_match2, "string");
+
+            string pos = (string)this.read_var(key_pos, "string");
+
+            string[] strSplit = pos.Split(",");
+            string[] strSplit1 = line1.Split(",");
+            string[] strSplit2 = line2.Split(",");
+
+            if (strSplit.Length == strSplit1.Length && strSplit.Length ==  strSplit2.Length)
+            {
+                double min1 = 0;
+                double min2 = 0;
+                for (var i = 0; i < strSplit.Length; i++)
+                {
+                    min1 += Math.Abs(double.Parse(strSplit[i]) - double.Parse(strSplit1[i]));
+                    min2 += Math.Abs(double.Parse(strSplit[i]) - double.Parse(strSplit2[i]));
+                }
+                if (min1 < min2)
+                {
+                    this.Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    this.Next_Step = Node_Next.False;
+                }
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+        }
+    }
+}

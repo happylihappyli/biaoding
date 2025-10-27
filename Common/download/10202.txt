@@ -1,0 +1,302 @@
+﻿using B2_Array.Funny;
+using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Windows.UI.Composition.Interactions;
+using static B2_Data.Funny.C_FunnyNode;
+
+namespace Test1
+{
+    public class C_Cloud_Search : C_Node
+    {
+        public string key_jarray = "";
+        public string jarray_index = "";
+
+        public string key_read = "cloud1";
+        public string key_save = "cloud2";
+        public string key_save_length = "cloud_count";
+        public string key_save_point = "";
+
+        public string x = "1000";
+        public string y = "-100";
+        public string z = "100";
+
+        public string x_len = "200";
+        public string y_len = "300";
+        public string z_len = "200";
+        public string y_range_max= "600";
+
+        public C_Cloud_Search(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_index= space.tools.var_read(pTrain, this, this.jarray_index);
+
+            JObject main = new JObject();
+            JArray jArray=new JArray();
+            if (this.key_jarray != "")
+            {
+                string strJson = (string)space.vars.read_vars(pTrain, this, this.key_jarray, "string");
+                JObject data = JObject.Parse(strJson);
+                jArray = (JArray)data["data"];
+                main = (JObject)data["main"];
+            }
+
+
+            int index = int.Parse(str_index);
+            bool bFind = false;
+            List<C_Point3D> pList2 = new List<C_Point3D>();
+            C_Point3D center=null;
+            string m_x_len = "200" ;
+            string m_y_len = "400";
+            string m_z_len = "200";
+            float max_y = -10000;
+
+            while (bFind == false)
+            {
+                if (index < jArray.Count && index >= 0)
+                {
+                    JObject jObject = (JObject)jArray[index];
+                    try
+                    {
+                        key_read = main["key_read"].ToString();
+                        key_save = main["key_save"].ToString();
+                        key_save_length = main["key_save_length"].ToString();
+
+
+                        //string strX_len = main["x_len"].ToString();
+                        //string strZ_len = main["z_len"].ToString();
+                        string strMax_y = main["max_y"].ToString();
+
+                        max_y = float.Parse(strMax_y);
+
+
+                        string strX = jObject["x"].ToString();
+                        string strY = jObject["y"].ToString();
+                        string strZ = jObject["z"].ToString();
+
+
+                        string strY_len = jObject["y_len"].ToString();
+
+                        if (strX != "") this.x = strX; 
+                        if (strY != "")  this.y = strY; 
+                        if (strZ != "")  this.z = strZ;
+                        //if (strX_len != "") this.x_len = strX_len;
+                        if (strY_len != "") this.y_len = strY_len;
+                        //if (strZ_len != "") this.z_len = strZ_len;
+
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.ToString());
+                    }
+                }
+                if (index>jArray.Count)
+                {
+                    break;
+                }
+
+
+                List<C_Point3D> pList;
+                if (this.key_read == "%main.3d")
+                {
+                    C_Data pData = (C_Data)space.vars.read_vars(pTrain, this, "main", "C_Data");
+                    pList = pData.list_3D_Point;
+                }
+                else
+                {
+                    pList = (List<C_Point3D>)space.vars.read_vars(pTrain, this, this.key_read, "List<C_Point3D>");
+                }
+
+                string m_x = space.tools.var_read(pTrain, this, this.x);
+                string m_y = space.tools.var_read(pTrain, this, this.y);
+                string m_z = space.tools.var_read(pTrain, this, this.z);
+
+                m_x_len = space.tools.var_read(pTrain, this, this.x_len);
+                m_y_len = space.tools.var_read(pTrain, this, this.y_len);
+                m_z_len = space.tools.var_read(pTrain, this, this.z_len);
+                try
+                {
+                    float f_x = float.Parse(m_x);//这个是中心点x距离，（墙面-x_len/2的距离）
+                    float f_y = float.Parse(m_y);
+                    float f_z = float.Parse(m_z);
+
+                    double x_min = f_x - double.Parse(m_x_len) / 2 - 50;
+                    double x_max = f_x + double.Parse(m_x_len) / 2 - 50;
+                    double y_min = f_y - double.Parse(m_y_len) * 0.8 / 2;
+                    double y_max = f_y + double.Parse(m_y_len) * 0.8 / 2;
+                    double z_min = f_z - double.Parse(m_z_len) * 0.8 / 2;
+                    double z_max = f_z + double.Parse(m_z_len) * 0.8 / 2;
+
+
+                    //找到y的最大值
+                    float y_max_search = -10000;
+                    bool bFind_y = false;
+                    for (var i = 0; i < pList.Count; i++)
+                    {
+                        C_Point3D p = pList[i];
+
+                        if (p.x > x_min && p.x < x_max)
+                        {
+                            if (p.z > z_min && p.z < z_max)
+                            {
+                                if (p.y > y_min - 100 && p.y < y_max + 2000)
+                                {
+                                    if (p.y > y_max_search)
+                                    {
+                                        if (y_max_search< max_y)
+                                        {
+                                            //找到的必须比max_y小
+                                            y_max_search = p.y;
+                                            bFind_y = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    //Main.save_cloud( "D:\\search.txt", pList);
+
+                    if (bFind_y)
+                    {
+                        f_y = y_max_search + float.Parse(m_y_len) / 2 + 10;
+                        //center = new C_Point3D(catch_x, f_y, f_z);
+
+                        y_min = f_y - double.Parse(m_y_len) * 0.8 / 2;
+                        y_max = f_y + double.Parse(m_y_len) * 0.8 / 2;
+                    }
+
+                    C_Point3D pMin = find_x_min(pList, y_min, y_max, z_min, z_max);
+
+                    if (pMin == null)
+                    {
+                        space.vars.save_vars(pTrain, this, this.key_save, "List<C_Point3D>", null);
+                        space.vars.save_vars(pTrain, this, this.key_save_length, "string", "-1");
+                        space.vars.save_vars(pTrain, this, this.key_save_point, "C_Point", null);
+                        break;
+                    }
+
+                    float catch_x = pMin.x - float.Parse(m_x_len) +20;
+
+                    center = new C_Point3D(catch_x, f_y, f_z);
+
+                    x_min = f_x - double.Parse(m_x_len) / 2 - 50;
+                    x_max = f_x + double.Parse(m_x_len) / 2 - 50;
+
+                    pList2 = new List<C_Point3D>();
+
+                    Console.WriteLine(this.Name + " x_min=" + x_min);
+                    Console.WriteLine(this.Name + " x_max=" + x_max);
+                    Console.WriteLine(this.Name + " y_min=" + y_min);
+                    Console.WriteLine(this.Name + " y_max=" + y_max);
+                    Console.WriteLine(this.Name + " z_min=" + z_min);
+                    Console.WriteLine(this.Name + " z_max=" + z_max);
+
+
+
+
+                    for (var i = 0; i < pList.Count; i++)
+                    {
+                        C_Point3D p = pList[i];
+
+                        if (p.x > x_min && p.x < x_max)
+                        {
+                            if (p.y > y_min && p.y < y_max)
+                            {
+                                if (p.z > z_min && p.z < z_max)
+                                {
+                                    pList2.Add(p);
+                                }
+                            }
+                        }
+                    }
+
+                    if (pList2.Count > 0)
+                    {
+                        bFind = false;//如果有碰撞的点云，就说明这个位置不能放置
+                        Main.save_cloud("D:\\error_" + index + ".txt", pList2);
+                        index++;
+                    }
+                    else
+                    {
+                        bFind = true;
+                    }
+                }
+                catch(Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                    MessageBox.Show(this.Name + " " + e.Message);
+                }
+                
+            }
+
+
+            if (bFind)
+            {
+                if (center.y+ double.Parse(m_y_len)/2> double.Parse(this.y_range_max))
+                {
+                    space.vars.save_vars(pTrain, this, this.key_save_length, "string", "-1");
+                }
+                else
+                {
+                    space.vars.save_vars(pTrain, this, this.key_save, "List<C_Point3D>", pList2);
+                    space.vars.save_vars(pTrain, this, this.key_save_length, "string", pList2.Count + "");
+                    if (center != null)
+                    {
+                        space.vars.save_vars(pTrain, this, this.key_save_point, "C_Point", center);
+                    }
+                }
+            }
+            else
+            {
+                space.vars.save_vars(pTrain, this, this.key_save_length, "string", "-1");
+            }
+        }
+
+
+        private C_Point3D find_x_min(List<C_Point3D> pList,double y_min, double y_max, double z_min, double z_max)
+        {
+            C_Point3D pMin = null;
+            float x_min = 1000000;
+            List<C_Point3D> pList2 = new List<C_Point3D>();
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+
+                if (p.y > y_min && p.y < y_max)
+                {
+                    if (p.z > z_min && p.z < z_max)
+                    {
+                        if (p.x <x_min)
+                        {
+                            x_min = p.x;
+                            pMin = p;
+                        }
+                    }
+                }
+            }
+            return pMin;
+        }
+    }
+}

@@ -1,0 +1,518 @@
+﻿
+using Common_Robot2;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Test1.Common.Data;
+
+namespace Test1
+{
+
+    public class S_Calculate1 : C_Node
+    {
+        public string key_space = "";//C_Space
+        public string key_3d = "";
+        public string key_cloud = "";
+        public string key_save = "catch";
+        public string max_ry = "70";
+        public string key_array_main = "mains";
+
+        public I_Train pTrain_Old = null;
+        public I_Train pTrain_Finished = null;
+        //public bool 找到未变化区域 = false;
+        public string similar = "30";
+        public string debug = "1";
+        public string key_compare = "";
+        public string key_split_cloud = "cloud_split";
+        public string use_last = "0";
+
+
+        private int similar_avg = 30;
+
+        public List<C_Data> not_move;
+
+        public S_Calculate1(
+            string name,
+            C_Space space_parent,
+            C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            if (pTrain_Old != null)
+            {
+                if (use_last == "0")
+                {
+                    S_TTS.speak_async("新+++" + pTrain.get_ID());
+                    run_sub_main1();
+                }
+                else
+                {
+                    object obj = space.read_vars(pTrain, this, this.key_split_cloud, "");
+                    if (obj == null)//是否有切割点云的数据
+                    {
+                        //this.Train_ID = pTrain.ID;
+                        S_TTS.speak_async("旧+++" + pTrain.get_ID());
+                        run_sub_main_last();//用上次计算结果
+                    }
+                    else
+                    {
+                        S_TTS.speak_async("新+++" + pTrain.get_ID());
+                        run_sub_main1();
+                    }
+                }
+            }
+            else
+            {
+                //run_sub_main1();
+                //this.Next_Step = Node_Next.None;
+
+                S_TTS.speak_async("新+++" + pTrain.get_ID());
+                run_sub_main1();
+            }
+            pTrain_Old = pTrain;
+
+
+        }
+
+        private void run_sub_main_last()
+        {
+            similar_avg = int.Parse(similar);
+
+            if (pTrain_Old != null)
+            {
+                查找没有更改可以抓取的面(pTrain, pTrain_Old);
+                if (this.not_move != null && this.not_move.Count > 0) //用上一次计算结果
+                {
+                    space.console.WriteLine(">>>>>>> 用上次的计算结果 ", Level_Enum.Info, this.log_index, this.Name);
+                    选择最上面的一个抓取面2(pTrain);
+                }
+                else
+                {
+                    this.Next_Step = Node_Next.None;
+                }
+            }
+            else
+            {
+                MessageBox.Show(this.Name + " error");
+                this.Next_Step = Node_Next.None;
+            }
+            //this.找到未变化区域 = true;
+        }
+
+
+        public void 选择最上面的一个抓取面2(I_Train pTrain)
+        {
+            space.console.WriteLine("选择最上面的一个抓取面2 1", Level_Enum.Info, this.log_index, this.Name);
+
+            if (this.not_move.Count == 0)
+            {
+                S_TTS.speak_async("未变化的抓取面为空！");
+                this.Next_Step = Node_Next.None;
+                return;
+            }
+
+
+            this.not_move.Sort((x, y) => {
+                int tmp = (int)(x.pCenter.z - y.pCenter.z);
+
+                if (tmp > 0)
+                {
+                    return 1;
+                }
+                else if (tmp < 0)
+                {
+                    return -1;
+                }
+                return 0;
+            });
+
+
+            space.save_vars(pTrain, this, this.key_save, "C_Planet_Catch", ((C_Data)this.not_move[0]).planet);
+            space.save_vars(pTrain, this, "_finished", "string", "1");
+            S_TTS.speak_async("用上次计算结果");
+            this.Next_Step = Node_Next.True;
+        }
+
+
+        private void run_sub_main1()
+        {
+            space.remove_var(pTrain, this, this.key_save, "C_Planet_Catch");
+
+            Main.WriteLine(this,"计算模块1 start");
+            if (C_Data.tasks == null)
+            {
+                Console.WriteLine("C_Data.tasks == null  第一次启动计算，点云还没读取到");
+                this.Next_Step = Node_Next.None;
+                return;
+            }
+
+            {
+
+                List<C_Data> arrMain = (List<C_Data>)space.read_vars(pTrain, this, this.key_array_main, "List<C_Data>");
+                if (arrMain == null)
+                {
+                    Console.WriteLine(this.Name + ",arrMain为空  key_array_main 设置不对！", Level_Enum.Info, this.log_index, this.Name);
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+
+                List<C_Space> spaces = new List<C_Space>();
+                for (var i = 0; i < arrMain.Count; i++)
+                {
+                    C_Data pData2 = arrMain[i];
+                    Main.WriteLine(this,"i=" + i + ",gid=" + pData2.Group_ID);
+
+                    if (i < C_Data.tasks.Length &&
+                        pData2.list_3D_Point != null &&
+                        pData2.list_3D_Point.Count > 0)  //pData2.bCover == false
+                    {
+                        string tag = i + "";
+                        C_Thread_Data TD = new C_Thread_Data(this, spaces, space, pData2, this.key_space, tag);
+                        TD.space_new.save_vars(TD.space_new.pTrain, this, "main", "C_Data", pData2);
+
+                        Thread thread = new Thread(TD.ThreadFun);
+                        thread.Start();
+                        C_Data.threads.Add(thread);
+                    }
+                    else
+                    {
+                        pData2.Filter_Conidtion.Append("点云为空");
+                        Main.WriteLine(this,"点云为空 count=0");
+                    }
+                }
+
+
+                int task_count = 0;
+                for (var i = 0; i < C_Data.tasks.Length; i++)
+                {
+                    if (C_Data.tasks[i] != null)
+                    {
+                        task_count++;
+                    }
+                }
+
+                ArrayList Mains2 = new ArrayList();//所有的识别结果
+                task_count = 0;
+
+                for (var i = 0; i < arrMain.Count; i++)
+                {
+                    if (arrMain[i] != null)
+                    {
+                        Mains2.Add(arrMain[i]);
+                        task_count++;
+                    }
+                }
+                if (Mains2.Count == 0)
+                {
+                    Console.WriteLine("Mains2.Count == 0");
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+
+                Thread.Sleep(1);
+                while (check_finished(spaces) == false)
+                {
+                    Thread.Sleep(1);
+                }
+
+
+                List<C_Data> Mains3 = new List<C_Data>();//所有的识别结果
+                for (var i = 0; i < Mains2.Count; i++)
+                {
+                    C_Data pMain = (C_Data)Mains2[i];
+                    if (pMain.bFilter == false && pMain.planet != null)
+                    {
+                        Mains3.Add(pMain);
+                    }
+                    else
+                    {
+                        if (pMain.planet == null)
+                        {
+                            Main.WriteLine(this,"【】 pMain.pPlanet_Top==null G=" + pMain.Group_ID);
+                        }
+                        else
+                        {
+                            Main.WriteLine(this,"【】 pMain.bFilter==false G=" + pMain.Group_ID);
+                        }
+                    }
+                }
+
+                Mains3.Sort(delegate (C_Data p1, C_Data p2)
+                {
+                    if (p1.bCover)
+                    {
+                        if (p2.bCover == false)
+                        {
+                            return 1;
+                        }
+                    }
+                    else
+                    {
+                        if (p2.bCover)
+                        {
+                            return -1;
+                        }
+                    }
+
+                    if (this.key_compare == "area")
+                    {
+                        double d1 = p1.calculate_area();//计算面积，面积大的排前面
+                        double d2 = p2.calculate_area();
+
+                        return Math.Sign(d2 - d1);
+                    }
+                    else
+                    {
+                        //先比较x
+                        double d1 = Math.Round(p1.planet.arm_a.x / 100);
+                        double d2 = Math.Round(p2.planet.arm_a.x / 100);
+                        if (d1 == d2)
+                        {
+                            //先比较z
+                            d1 = Math.Round(p1.planet.arm_a.z / 100);
+                            d2 = Math.Round(p2.planet.arm_a.z / 100);
+                            if (d1 == d2)
+                            {
+                                //如果z一样，就比较y
+                                //y大的先抓取
+                                d1 = p1.planet.arm_a.y;
+                                d2 = p2.planet.arm_a.y;
+                                return Math.Sign(d2 - d1);//从大到小
+                            }
+                            else
+                            {
+                                return Math.Sign(d2 - d1);//从大到小
+                            }
+                        }
+                        else
+                        {
+                            return Math.Sign(d1 - d2);//从小到大
+                        }
+
+                    }
+                });
+
+
+                C_Data pMain3 = null;
+                bool bFind = false;
+                for (var i = 0; i < Mains3.Count; i++)
+                {
+                    pMain3 = Mains3[i];//选择第一个
+                    if (pMain3.bFilter == false && pMain3.planet != null)
+                    {
+                        bFind = true;
+                        break;
+                    }
+                }
+                if (bFind == false)
+                {
+                    S_TTS.speak_async("没有");//合适的抓取面
+                    Console.WriteLine("没有");
+                    this.Next_Step = Node_Next.False;
+                }
+                else
+                {
+                    this.save_var(this.key_save, "C_Planet_Catch", pMain3.planet);
+                    Console.WriteLine(this.Name + " Train.ID=" + pTrain.get_ID() + " 保存抓取面=" + this.key_save + "===" + pMain3.planet.center.ToString());
+                    string finished = (string)this.read_var("_finished", "string");
+
+                    if (finished == "1")
+                    {
+                        S_TTS.speak_async("已用");
+                        Console.WriteLine("已用");
+                        this.Next_Step = Node_Next.None;
+                    }
+                    else
+                    {
+                        this.Next_Step = Node_Next.True;
+                    }
+                }
+            }
+            space.console.WriteLine("计算模块1 end", Level_Enum.Info, this.log_index, this.Name);
+        }
+
+        public void 查找没有更改可以抓取的面(
+            I_Train pTrain,
+            I_Train pTrain_old)
+        {
+            this.not_move = new List<C_Data>();
+
+            List<C_Data> arrMain = (List<C_Data>)space.read_vars(pTrain_old, this, this.key_array_main, "List<C_Data>");// "Mains");
+
+            Bitmap pBitmapRGB_Compare = (Bitmap)space.read_vars(pTrain, this, this.key_compare, "Bitmap");//
+
+            if (arrMain == null) return;
+
+            for (var i = 0; i < arrMain.Count; i++)
+            {
+                C_Data pMain_Old = arrMain[i];
+
+                if (pMain_Old.bCatch == false && pMain_Old.bFilter == false)
+                {
+                    C_Data pOld = 判断新的图片和旧的是否相同并且是没有抓过的区域(pBitmapRGB_Compare, pMain_Old);
+                    if (pOld != null)
+                    {
+                        if (pOld.planet != null)
+                        {
+                            this.not_move.Add(pOld);
+                        }
+                        else
+                        {
+                            Console.WriteLine("none");
+                        }
+                    }
+                }
+            }
+            space.save_vars(pTrain, this, "_not_move", "", this.not_move);
+
+            space.console.WriteLine("not_move.Count=" + this.not_move.Count, Level_Enum.Info, this.log_index, this.Name);
+        }
+
+
+        /// <summary>
+        /// 如果有就返回
+        /// </summary>
+        /// <param name="pMain_Old"></param>
+        /// <returns></returns>
+        public C_Data 判断新的图片和旧的是否相同并且是没有抓过的区域(
+            Bitmap pBitmapRGB_Compare,
+            C_Data pData_Old)
+        {
+
+            if (pData_Old.pRect_No_Move == null) return null;
+
+            if (pData_Old.bCatch == false && pData_Old.bCover == false)//没有抓过的区域
+            {
+                Bitmap pBmp = new Bitmap(pData_Old.pRect_No_Move.width(), pData_Old.pRect_No_Move.height());
+
+                Graphics g = Graphics.FromImage(pBmp);
+                if (pBitmapRGB_Compare == null) return null;
+
+                Bitmap pBitmap2;
+                lock (pBitmapRGB_Compare)
+                {
+                    pBitmap2 = Main.CopyBmp(pBitmapRGB_Compare);
+                }
+
+                //先缩小
+                int width = (int)(pBitmapRGB_Compare.Width * space.vars.draw_scale_tuyang);
+                int height = (int)(pBitmapRGB_Compare.Height * space.vars.draw_scale_tuyang);
+                Bitmap pBitmap_Tmp = new Bitmap(pBitmap2, width, height);
+
+
+                //复制区域图片
+                g.DrawImage(pBitmap_Tmp,//new Bitmap(const_arm.file_send),
+                    new Rectangle(0, 0, pData_Old.pRect_No_Move.width(), pData_Old.pRect_No_Move.height()),
+                    new Rectangle((int)pData_Old.pRect_No_Move.pPoint1.x, (int)pData_Old.pRect_No_Move.pPoint1.y,
+                        pData_Old.pRect_No_Move.width(), pData_Old.pRect_No_Move.height()),
+                    GraphicsUnit.Pixel);
+
+                if (check_if_not_change(pBmp, pData_Old.pBmp))
+                {
+                    return pData_Old;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+
+
+        public bool check_if_not_change(Bitmap bmp_old, Bitmap bmp_new)
+        {
+            if (this.debug == "1")
+            {
+                bmp_old.Save("D:\\dif_1.png");
+                bmp_new.Save("D:\\dif_2.png");
+            }
+
+            C_Bmp pOld_byte = Tools.ImageTo_C_BMP(bmp_old);
+            C_Bmp pNew_byte = Tools.ImageTo_C_BMP(bmp_new);
+
+            Bitmap pBitmap = new Bitmap(bmp_old.Width, bmp_old.Height);
+
+            int max_dif = 0;
+            long sum_dif = 0;
+            int count_dif = 0;
+            for (var y = 0; y < pOld_byte.height; y++)
+            {
+                for (var x = 0; x < pOld_byte.width; x++)
+                {
+                    //BGRA
+                    for (var k = 0; k < 1; k++)
+                    {
+
+                        int dif = pOld_byte.buffer[(pOld_byte.stride * y) + (x * 4) + k] - pNew_byte.buffer[(pNew_byte.stride * y) + (x * 4) + k];
+                        dif = Math.Abs(dif);
+                        if (dif > this.similar_avg)
+                        {
+                            if (space.vars.bDebug_Mode) pBitmap.SetPixel(x, y, Color.FromArgb(dif, 0, 0));
+                            //Console.WriteLine(dif);
+                            sum_dif += dif;
+                            count_dif += 1;
+                            if (dif > max_dif) max_dif = dif;
+                        }
+                        else
+                        {
+                            if (space.vars.bDebug_Mode) pBitmap.SetPixel(x, y, Color.FromArgb(0, 0, 0));
+                        }
+                    }
+
+                }
+            }
+
+
+            if (space.vars.bDebug_Mode)
+            {
+                pBitmap.Save("D:\\dif.png");
+            }
+
+            if (100 * count_dif < 5 * (bmp_old.Width * bmp_old.Height))  // <3%
+            {
+                //avg_dif < space.cs1.similar_avg && avg_dif_avg < space.cs1.similar_avg_dif_avg)
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        public bool check_finished(List<C_Space> spaces)
+        {
+            for (var i = 0; i < spaces.Count; i++)
+            {
+                var space2 = spaces[i];
+                if (space2 != null && space2.finished == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

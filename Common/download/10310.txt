@@ -1,0 +1,76 @@
+﻿
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace Common_Robot2
+{
+    public class C_Vars
+    {
+        public static string log_path = "D:\\data\\logs";
+
+        public bool bClosingWindows = false;
+        public bool b_No_Log = false;
+
+        //public double distance_last;
+
+        public bool bDebug_Mode = false;
+
+        public int step_now = 0;
+        public int index = 1;
+        public int count_put = -1;
+        public bool count_put_change;
+        public TimeSpan pTimeStart;
+        //public double match_percent = 0.7;
+        //public double catch_z;
+        //public double tool_z = -81.2;//标定针和吸盘的距离差，一般是负数，如 -81.2
+
+        public double match_area_percent;
+        public int min_height = 30;//点云的最小高度
+        public int min_width;//点云的最小宽度
+
+        public int step_x = 5;
+        public int step_y = 5;
+        public bool bDebug = false;//调试,调试模式把像素点的中心作为原点
+
+        public bool bAutoMode = false;
+
+        public List<C_Planet_Catch> Position_History = new List<C_Planet_Catch>();
+
+
+        public double draw_scale_tuyang = 0.5;
+        public double draw_offset_x_tuyang = 0;
+        public double draw_offset_y_tuyang = 0;
+
+
+        public bool debug_mode = false;
+
+        C_Space space;
+
+
+        public C_Vars(C_Space space)
+        {
+            this.space = space;
+
+        }
+
+
+        /// <summary>
+        /// 复制全局变量
+        /// </summary>
+        /// <param name="space"></param>
+        public void copy_from(C_Space space2,C_Node pNode)
+        {
+
+            CommonMain.WriteLine(space.ID + " copy_from " + space2.ID);//);
+            space.vars_new = space2.vars_new;
+        }
+
+
+    }
+}

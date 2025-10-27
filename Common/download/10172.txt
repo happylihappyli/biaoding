@@ -1,0 +1,1279 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Spatial.Euclidean;
+using MathNet.Spatial.Units;
+using Newtonsoft.Json.Linq;
+using pcammls;
+using System.Collections;
+using System.Text;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 这个模块计算过程可以获得箱子的长和宽的尺寸
+    /// </summary>
+    public class S_Main2 : C_Node
+    {
+        public C_Data pData;
+        public C_Camera_Const camera1;
+        public C_Robot robot;
+        public TY_VECT_3F_ARRAY p3dArray;
+        public string key_matrix = "";
+
+        //箱子类型，主要是大小数据
+        public C_Box_Type BoxType;
+        public string ball_radius="50";
+        public int draw_scale_tuyang = 1;
+        public C_Planet bottom=null;
+
+        public S_Main2(string Name,C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            try
+            {
+                this.run_sub_main(pTrain, this.camera1, this.robot);//,this.p3dArray);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+            return Task.CompletedTask;
+        }
+
+
+
+
+
+        public void run_sub_main(
+            I_Train pTrain,
+            C_Camera_Const camera1,
+            C_Robot pRobot)
+        {
+
+            pData.Filter_Conidtion = new StringBuilder();
+            if (pData.list_3D_Point == null)
+            {
+                MessageBox.Show(this.Name + "pData.list_3D_Point == null");
+                return;
+            }
+
+            if (space_parent.vars.bDebug_Mode)
+            {
+                string file_debug = @"d:\debug.txt";//space_parent.vars.path_web + 
+                space_parent.console.WriteLine("调试文件=" + file_debug,Level_Enum.Info,this.log_index,this.Name);
+                pData.fs_debug = new FileStream(file_debug, FileMode.Create, FileAccess.Write);
+                pData.w_debug = new StreamWriter(pData.fs_debug, Encoding.UTF8);
+            }
+            if (this.show_log == "1")
+                Console.WriteLine(this.Name+"3D计算开始 ");
+
+            //this.bottom = (C_Planet)space.vars.read_vars(pTrain, this, this.key_bottom, "C_Planet");
+
+
+            pData.pList_Point_Filter = pData.list_3D_Point;
+
+
+            pData.centerAll = Tools.计算中心点坐标(pData.pList_Point_Filter);
+
+            C_Point3D[] arr = Tools.计算最大最小值(pData.pList_Point_Filter);//计算x，y，z最大，最小值
+
+            pData.pMin_Relative = arr[0];
+            pData.pMax_Relative = arr[1];
+
+            pData.point_width = pData.pMax_Relative.x - pData.pMin_Relative.x;
+            pData.point_height = pData.pMax_Relative.y - pData.pMin_Relative.y;
+
+            
+
+            if (pData.w_debug != null) pData.w_debug.WriteLine(
+                "min==" + pData.pMin_Relative.ToString() + " ; max==" + pData.pMax_Relative.ToString());
+
+            if (space_parent.vars.bDebug_Mode)
+            {
+                pData.w_debug.Close();
+                pData.fs_debug.Close();
+            }
+
+            C_Planet_Catch pPlanet = new C_Planet_Catch(space, pData.Group_ID, pData);
+            pPlanet.center = new C_Point3D(pData.centerAll.x, pData.centerAll.y, pData.centerAll.z);
+
+            C_Matrix matrix = (C_Matrix)space_parent.read_vars(pTrain,this, this.key_matrix, "C_Matrix");
+
+
+            List<C_Point3D> pListPoint2 = new List<C_Point3D>();
+            for (var i = 0; i < pData.pList_Point_Filter.Count; i++)
+            {
+                C_Point3D item = pData.pList_Point_Filter[i];// pListPoint[i];
+
+                C_Point3D item2 = Tools.摄像头坐标转到机械臂坐标(camera1, item);
+                pListPoint2.Add(item2);
+            }
+
+            //Main.save_cloud("D:\\cloud\\catch_" + pData.Group_ID + ".txt", pListPoint2);
+
+
+            pListPoint2.Sort(delegate (C_Point3D x, C_Point3D y) {
+                if (x.z > y.z) return 1;
+                if (x.z < y.z) return -1;
+                return 0;
+            });
+
+            int index = pListPoint2.Count / 2;
+            double z_mid = pListPoint2[index].z;//高度的中位数
+
+            List<C_Point3D> list3 = new List<C_Point3D>();
+            for (var i = 0; i < pListPoint2.Count; i++)
+            {
+                C_Point3D item = pListPoint2[i];
+                if (Math.Abs(item.z - z_mid) < 20)
+                {
+                    list3.Add(item);
+                }
+                else
+                {
+                    //item.convert.deleted = true;
+                }
+            }
+
+            Console.WriteLine(list3.Count);
+
+            (List<C_Point3D> rect, double rect_angle, double alen1,double alen2) = m1.计算外接矩形(list3);
+
+            List<C_Point3D> rect_points = new List<C_Point3D>();
+
+            if (rect.Count == 4)
+            {
+                C_Point3D p0 = rect[0];
+                C_Point3D p1 = rect[1];
+                C_Point3D p2 = rect[2];
+                C_Point3D p3 = rect[3];
+                pPlanet.pp0 = p0;
+                pPlanet.pp1 = p1;
+                pPlanet.pp2 = p2;
+
+                {
+                    this.BoxType.x_len = (int)alen1;
+                    this.BoxType.y_len = (int)alen2;
+
+                    pPlanet.dbAngle = rect_angle / Math.PI * 180.0; //+90
+                    //Console.WriteLine(this.Name+ ">>>>>>>>>>>> GID=" + pData.Group_ID + ", 计算角度=" + pPlanet.dbAngle);
+                }
+                if (pPlanet.dbAngle < 0)
+                {
+                    Console.WriteLine(this.Name + ">>>>>>>>>>>> GID=" + pData.Group_ID + ", dbAngle角度 < 0, dbAngle = " + pPlanet.dbAngle);
+                    pPlanet.dbAngle += 180;
+                }
+                pPlanet.rect_angle = rect_angle;
+
+                Console.WriteLine(this.Name + ">>>>>>>>>>>> GID=" + pData.Group_ID + ", 计算dbAngle角度=" + pPlanet.dbAngle);
+
+            }
+
+            Console.WriteLine(this.Name + ">>> Group_ID=" + pData.Group_ID + "矩形角度(弧度)=" + rect_angle);
+            pData.rect = rect_points;
+            pData.rect_angle = rect_angle;// rect.Angle;
+
+
+
+            pData.list_3D_Point_arm = list3;
+
+            list3.Sort(delegate (C_Point3D x, C_Point3D y)
+            {
+                return Math.Sign(x.z - y.z);
+            });
+
+            C_Point3D p_z = list3[list3.Count/2];
+
+
+            Matrix<double> m = Tools.平面拟合计算法向量等_sub(list3);
+            pPlanet.arm_a = Tools.计算中心点坐标(list3);
+            pPlanet.arm_a.z = p_z.z;// +20;
+
+            double a = m[0, 0];
+            double b = m[1, 0];
+            double c = m[2, 0];
+            double c_z = -1;
+            double len = Math.Sqrt(a * a + b * b + c_z * c_z);
+            double a2 = a / len;
+            double b2 = b / len;
+            double c_z2 = -1 / len;
+
+            C_Point3D fa = new C_Point3D(a2, b2, c_z2);
+
+            if (fa.z < 0)
+            {
+                fa = fa.scale(-1);//法向量取反
+            }
+
+            if (double.IsNaN(fa.x) || double.IsNaN(fa.y) || double.IsNaN(fa.z))
+            {
+                return;
+            }
+
+            UnitVector3D z2 = new Vector3D(fa.x, fa.y, fa.z).Normalize();
+            pPlanet.z_faxiangliang = new C_Point3D(z2.X, z2.Y, z2.Z);
+            pPlanet.percent = 1;// 计算匹配度(group_id, pPlanet.center.subtract(centerAll), x2, y2);
+
+
+            if (pPlanet != null)
+            {
+                //计算ABD_v2(camera1, Bottom, pRobot, pTrain, pPlanet);
+
+                double ry = 0;// pPlanet.rot_y.Degrees;// 计算倾角(pPlanet);
+                //C_Point3D arm_A = pPlanet.center;// Tools.摄像头坐标转到机械臂坐标(camera1, pPlanet.center);
+                //pPlanet.arm_a = arm_A;
+                计算ABD_v2(camera1, pRobot, pTrain, pPlanet);
+
+                pData.planet = this.判断过滤条件2(pRobot, pTrain, pPlanet.arm_a, pPlanet, ry);//1,
+
+                {
+                    pData.Filter_Conidtion.Append(
+                        "碰撞其他包裹=" + pPlanet.collision + ";" +
+                        "碰撞障碍物=" + pPlanet.collision_obj + "\r\n\r\n");
+
+                    space_parent.console.WriteLine(pData.Filter_Conidtion.ToString(), Level_Enum.Info, this.log_index, this.Name);
+                }
+            }
+
+
+            if (pData.planet != null)
+            {
+                C_Point3D arm_bottom_center=  Tools.摄像头坐标转到机械臂坐标(camera1, bottom.center);
+                pData.planet.len1 = alen1;
+                pData.planet.len2 = alen2;
+                pData.planet.len3 = pPlanet.arm_a.z - arm_bottom_center.z;
+
+                C_Planet_Catch pPlanet_Top = pData.planet;
+                pPlanet_Top.rect = pData.rect;
+                pPlanet_Top.rect = pData.rect;
+            }
+            else
+            {
+                Console.WriteLine(this.Name+pData.pLast.ToString());
+            }
+            Console.WriteLine(this.Name + ",3D计算结束 Group_ID=" + pData.Group_ID);
+
+            space.finished = true;
+            space.finished_exit = true;
+        }
+
+
+
+
+
+        public C_Point3D[] 计算D和C2_C以及是否超范围_v2(
+            C_Robot pRobot,
+            C_Point3D B)
+        {
+            C_Planet_Catch pCatch = new C_Planet_Catch(space, 0, null);
+            C_Point3D D = C_Planet_Catch.计算D坐标(pRobot, B);
+
+            C_Point3D[] arr = pCatch.计算C2坐标_v2(this, pRobot, B, D);
+
+            if (arr == null)
+            {
+                return null;//超范围
+            }
+            return arr;
+        }
+
+
+
+        public double 计算最小外接正矩形面积(List<C_Point3D> currentPolygon)
+        {
+            C_Planet pPlanet = 计算最大最小值(currentPolygon);
+
+            return Math.Abs(pPlanet.x0y0.x - pPlanet.x1y1.x) * Math.Abs(pPlanet.x0y0.y - pPlanet.x1y1.y);
+        }
+
+
+        public double 计算最小外接矩形(List<C_Point3D> currentPolygon)
+        {
+            C_Point3D a = currentPolygon[0];
+            C_Point3D b = currentPolygon[1];
+            List<C_Point3D> currentPolygon2;
+
+            double min_angle = Math.Atan2(b.y - a.y, b.x - a.x);
+            currentPolygon2 = 旋转点云(min_angle, currentPolygon);
+            double min_area = 计算最小外接正矩形面积(currentPolygon2);
+
+            C_Point3D c, d;
+            double angle2, min_area2;
+            for (int i = 0; i < currentPolygon.Count - 1; i++)
+            {
+                c = currentPolygon[i];
+                d = currentPolygon[i + 1];
+                angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+                currentPolygon2 = 旋转点云(angle2, currentPolygon);
+                min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+                if (min_area2 < min_area)
+                {
+                    min_area = min_area2;
+                    min_angle = angle2;
+                }
+            }
+            c = currentPolygon[currentPolygon.Count - 1];
+            d = currentPolygon[0];
+            angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+            currentPolygon2 = 旋转点云(angle2, currentPolygon);
+            min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+            if (min_area2 < min_area)
+            {
+                min_area = min_area2;
+                min_angle = angle2;
+            }
+
+            return min_angle;
+        }
+
+
+        public List<C_Point3D> 旋转点云(double angle, List<C_Point3D> currentPolygon)
+        {
+            List<C_Point3D> polygon2 = new List<C_Point3D>();
+
+            for (int i = 0; i < currentPolygon.Count; i++)
+            {
+                C_Point3D a = currentPolygon[i];
+                double angle2 = Math.Atan2(a.y, a.x);
+
+                double distance = a.distance(new C_Point3D(0, 0, 0));
+                if (distance > 0)
+                {
+                    double x = distance * Math.Cos(angle2 - angle);
+                    double y = distance * Math.Sin(angle2 - angle);
+                    C_Point3D b = new C_Point3D(x, y, 0);
+                    polygon2.Add(b);
+                }
+                else
+                {
+                    polygon2.Add(a);
+                }
+            }
+            return polygon2;
+        }
+
+
+
+        public float get_z_from_xy(C_Point3D center)
+        {
+            int x1 = (int)Math.Round(center.x);
+            int y1 = (int)Math.Round(center.y);
+            int Read_Count = 0;
+            Random pRnd = new Random();
+            while (double.IsNaN(center.z) || center.z == 0)
+            {
+                Read_Count++;
+                if (Read_Count > 20)
+                {
+                    MessageBox.Show("Read_Count > 20");
+                    return -99999;
+                }
+
+                int x2 = x1 + pRnd.Next(20) - 10;
+                int y2 = y1 + pRnd.Next(20) - 10;
+
+                center = Main.图像转3D点云(p3dArray, 1280, x2, y2);
+            }
+
+            return center.z;
+        }
+
+
+
+        public C_Planet_Catch 判断过滤条件2(
+            C_Robot pRobot,
+            I_Train pTrain,
+            C_Point3D A,
+            C_Planet_Catch pPlanet, double ry)
+        {
+
+            space_parent.console.WriteLine(">>>" + pPlanet.Group_ID + " z=" + pPlanet.arm_a.z, Level_Enum.Info, this.log_index, this.Name);
+
+            if (pData.point_width < space_parent.vars.min_width)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "点云宽度太小\r\n");
+                pData.pLast = C_Mp3.Play_State.点云宽度太小;
+                return null;
+            }
+
+            if (pData.point_height < space_parent.vars.min_height)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "点云高度太小\r\n");
+                pData.pLast = C_Mp3.Play_State.点云高度太小;
+                return null;
+            }
+
+            //MODIFIED
+            Func<Vector3D, Vector3D, double> CalAngle = (vec1, vec2) =>
+            {
+                double dot_product = vec1.DotProduct(vec2);
+
+                double len1 = vec1.Length;
+                double len2 = vec2.Length;
+
+                double cos_angle = dot_product / (len1 * len2);
+
+                double angle = Math.Acos(cos_angle) / Math.PI * 180;
+
+                return angle;
+            };
+
+            //MODIFIED
+            Vector3D normal = new Vector3D(pPlanet.z_faxiangliang.x, pPlanet.z_faxiangliang.y, pPlanet.z_faxiangliang.z);
+            Vector3D axis = new Vector3D(0, 0, 1);
+            if(CalAngle(normal,axis) > 10)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "法向量不正\r\n");
+                pData.pLast = C_Mp3.Play_State.y倾角超出范围; //TODO
+                return null;
+            }
+
+
+            if (ry > 60) //space_parent.vars.max_ry)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "ry过滤\r\n");
+                pData.pLast = C_Mp3.Play_State.y倾角超出范围;
+                //bError = true;
+                return null;
+            }
+            //if (pPlanet.percent < space_parent.vars.match_percent)
+            //{
+
+            //    pData.Filter_Conidtion.Append(pPlanet.Group_ID + "匹配率过滤\r\n");
+            //    pData.pLast = C_Mp3.Play_State.抓取匹配度太低;
+            //    //bError = true;
+            //    return null;
+            //}
+
+            pPlanet.index_x = (int)Math.Round((pPlanet.center.x + pPlanet.pMain.centerAll.x - pPlanet.pMain.pMin.x) / 10);//space_parent.vars.x_step);
+            pPlanet.index_y = (int)Math.Round((pPlanet.center.y + pPlanet.pMain.centerAll.y - pPlanet.pMain.pMin.y) / 10);//space_parent.vars.y_step);
+            pPlanet.index_z = (int)Math.Round((pPlanet.center.z + pPlanet.pMain.centerAll.z - pPlanet.pMain.pMin.z) / 10);//space_parent.vars.z_step);
+
+            //zzz happyli test
+
+            //pPlanet.arm_b = new C_Point3D(1265.38, 728.16, -40.22);
+
+            C_Point3D[] arr = 计算D和C2_C以及是否超范围_v2(pRobot, pPlanet.arm_b);
+
+            if (arr == null)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "超出机械臂的长度！非底座超出范围\r\n");
+                pData.pLast = C_Mp3.Play_State.超出机械臂的长度;
+                return null;
+            }
+
+            if (double.IsNaN(pPlanet.center.x))
+            {
+
+                pData.Filter_Conidtion.Append("读到了NAN");
+                pData.pLast = C_Mp3.Play_State.未识别到包裹;
+                return null;
+            }
+
+            double height_minus = 0;
+            var tmp = space_parent.read_vars(pTrain, this,"#height_minus", "string");
+
+
+            if (tmp != null)
+            {
+                height_minus = Main.get_double_from_obj(this, tmp);
+                //height_minus = double.Parse((string)tmp);
+            }
+
+            C_Point3D A2 = A.subtract(new C_Point3D(0, 0, height_minus));
+
+            C_Point3D B = C_Planet_Catch.计算B_v2(A2);
+
+            C_Point3D D = C_Planet_Catch.计算D坐标(pRobot, B); //pPlanet.计算D坐标();
+
+            C_Result pResult = pPlanet.根据坐标计算3轴角度(pTrain,this, pRobot, B, D, pPlanet.dbAngle);
+
+            string[] strSplit = pResult.strLine.Split(',');
+
+            if (strSplit.Length > 3)
+            {
+                double angle1 = double.Parse(strSplit[0]);
+                double angle2 = double.Parse(strSplit[1]);
+                double angle3 = double.Parse(strSplit[2]);
+                double angle4 = double.Parse(strSplit[3]);
+                if (angle1 < -180 || angle1 > 180)
+                {
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "A=" + A.ToString(),Level_Enum.Info,this.log_index,this.Name);
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "角度1超范围" + angle1, Level_Enum.Info, this.log_index, this.Name);
+                    pData.pLast = C_Mp3.Play_State.y倾角超出范围;
+                    S_TTS.speak_async("角度1超范围");
+
+                    return null;
+                }
+                if (angle2 < -40 + 2 || angle2 > 85 - 2)
+                {
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "A=" + A.ToString(), Level_Enum.Info, this.log_index, this.Name);
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "角度2超范围" + angle2, Level_Enum.Info, this.log_index, this.Name);
+                    S_TTS.speak_async("角度2超范围");
+                    pData.pLast = C_Mp3.Play_State.y倾角超出范围;
+
+                    return null;
+                }
+                if (angle3 < -105 + 2 || angle3 > 70 - 2)
+                {
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "A=" + A.ToString(), Level_Enum.Info, this.log_index, this.Name);
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "角度3超范围" + angle3, Level_Enum.Info, this.log_index, this.Name);
+                    S_TTS.speak_async("角度3超范围");
+                    pData.pLast = C_Mp3.Play_State.y倾角超出范围;
+
+                    return null;
+                }
+                if (angle4 < -360 || angle4 > 360)
+                {
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "A=" + A.ToString(), Level_Enum.Info, this.log_index, this.Name);
+                    space_parent.console.WriteLine(pPlanet.Group_ID + "角度4超范围" + angle4, Level_Enum.Info, this.log_index, this.Name);
+                    S_TTS.speak_async("角度4超范围");
+                    pData.pLast = C_Mp3.Play_State.y倾角超出范围;
+
+                    return null;
+                }
+
+            }
+
+
+
+            pPlanet.collision = false;// 计算是否碰撞到其他包裹(pPicture,pPlanet); //false;// 
+
+            if (pPlanet.collision)
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "机械臂可能会碰撞！\r\n");
+                pData.pLast = C_Mp3.Play_State.机械臂可能会碰撞;
+
+                return null;
+            }
+            else
+            {
+                pData.Filter_Conidtion.Append(pPlanet.Group_ID + "满足条件\r\n");
+                return pPlanet;
+            }
+
+        }
+
+
+
+
+
+        public void 计算ABD_v2(
+            C_Camera_Const camera1,
+            C_Robot pRobot, I_Train pTrain, C_Planet_Catch pPlanet)
+        {
+            Main.计算抓取面坐标和欧拉角等(this,camera1, pPlanet);
+            //space_parent.main.计算抓取面坐标和欧拉角等(this, camera1, Bottom, pTrain, pPlanet);
+
+            //pPlanet.arm_a = Tools.FromA_To_Real_A(pPlanet.arm_pCenter);
+
+            pPlanet.arm_b = Tools.A_To_B(pPlanet.arm_a);
+            pPlanet.arm_d = C_Planet_Catch.计算D坐标(pRobot, pPlanet.arm_b);
+
+
+        }
+
+        public void 计算ABD(
+            C_Robot pRobot,
+            C_Planet_Catch pPlanet)
+        {
+            double x = 0;
+            double y = 0;
+            double z = 0;
+
+            ////这个接触点的位置
+            //x = pPlanet.arm_pCenter.x;
+            //y = pPlanet.arm_pCenter.y;
+            //z = pPlanet.arm_pCenter.z;
+            //if (space_parent.vars.bDebug_Mode) space_parent.console.WriteLine("针尖的位置：x,y,z=" + x + "," + y + "," + z);
+
+            ////这个是有吸盘的时候，针尖的位置
+            x = pPlanet.arm_pCatchCenter.x;
+            y = pPlanet.arm_pCatchCenter.y;
+            z = pPlanet.arm_pCatchCenter.z;
+            if (space_parent.vars.bDebug_Mode) space_parent.console.WriteLine("有吸盘的时候针尖的位置：x,y,z=" + x + "," + y + "," + z,Level_Enum.Info,this.log_index,this.Name);
+
+            pPlanet.arm_a = new C_Point3D(x, y, z);
+
+            if (space_parent.vars.bDebug_Mode) space_parent.console.WriteLine(
+                "法向量 x,y,z=" + pPlanet.arm_faxiangliang.x + "," + pPlanet.arm_faxiangliang.y + "," + pPlanet.arm_faxiangliang.z, Level_Enum.Info, this.log_index, this.Name);
+
+            //315是标定针的位置，
+            double length = -315;// + (const_arm.tool_z + pPlanet.z_add);
+
+            x = pPlanet.arm_pCatchCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * length;
+            y = pPlanet.arm_pCatchCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * length;
+            z = pPlanet.arm_pCatchCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * length;
+
+            pPlanet.arm_b = new C_Point3D(x, y, z);
+            pPlanet.arm_d = C_Planet_Catch.计算D坐标(pRobot, pPlanet.arm_b);
+
+        }
+
+        ////计算x，y，z最大，最小值
+        public static C_Planet 计算最大最小值(List<C_Point3D> pList)
+        {
+            double x_min = 100000;
+            double x_max = -100000;
+            double y_min = 100000;
+            double y_max = -100000;
+            double z_min = 100000;
+            double z_max = -100000;
+
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = (C_Point3D)pList[i];
+                if (p.x < x_min) x_min = p.x;
+                if (p.y < y_min) y_min = p.y;
+                if (p.z < z_min) z_min = p.z;
+
+                if (p.x > x_max) x_max = p.x;
+                if (p.y > y_max) y_max = p.y;
+                if (p.z > z_max) z_max = p.z;
+            }
+
+            C_Planet pPlanet = new C_Planet(-1);
+
+            pPlanet.x0y0 = new C_Point3D(x_min, y_min, z_min);
+            pPlanet.x1y1 = new C_Point3D(x_max, y_max, z_max);
+
+            return pPlanet;
+        }
+
+
+        ////计算x，y，z最大，最小值
+        public static C_Planet 计算最大最小值(ArrayList pList)
+        {
+            double x_min = 100000;
+            double x_max = -100000;
+            double y_min = 100000;
+            double y_max = -100000;
+            double z_min = 100000;
+            double z_max = -100000;
+
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = (C_Point3D)pList[i];
+                if (p.x < x_min) x_min = p.x;
+                if (p.y < y_min) y_min = p.y;
+                if (p.z < z_min) z_min = p.z;
+
+                if (p.x > x_max) x_max = p.x;
+                if (p.y > y_max) y_max = p.y;
+                if (p.z > z_max) z_max = p.z;
+            }
+
+            C_Planet pPlanet = new C_Planet(-1);
+
+            pPlanet.x0y0 = new C_Point3D(x_min, y_min, z_min);
+            pPlanet.x1y1 = new C_Point3D(x_max, y_max, z_max);
+
+            return pPlanet;
+        }
+
+
+        /// <summary>
+        /// 计算圆形吸盘抓取的法向量匹配度
+        /// </summary>
+        /// <param name="w_debug"></param>
+        private void 计算圆形吸盘抓取的法向量匹配度(int Group_ID, TextWriter w_debug)
+        {
+            space_parent.console.WriteLine("计算抓取的匹配度", Level_Enum.Info, this.log_index, this.Name);
+
+            FileStream fs_vector = null;
+            TextWriter w_vector = null;
+            if (space_parent.vars.bDebug)
+            {
+                string file_vector = @"d:\vector_catch_xyz.txt";//space_parent.vars.path_web +
+                fs_vector = new FileStream(file_vector, FileMode.Create, FileAccess.Write);
+                w_vector = new StreamWriter(fs_vector, Encoding.UTF8);
+            }
+
+            if (pData.All_Big_Surface.Count == 0)
+            {
+                space_parent.console.WriteLine("error 需要搜素的面为空，前面约束条件要放松！", Level_Enum.Info, this.log_index, this.Name);
+            }
+
+            for (int i = 0; i < Math.Min(15, pData.All_Big_Surface.Count); i++)
+            {
+                //double max_match = 0;//每个面找一个
+                if (w_debug != null) w_debug.WriteLine("==========", Level_Enum.Info, this.log_index, this.Name);
+                ArrayList pListNew = (ArrayList)pData.All_Big_Surface[i];
+                C_Planet pPlanet1 = (C_Planet)pListNew[0];//取第一个小平面
+
+                C_Point3D center = Tools.计算多个小平面的中心点坐标(pListNew);
+
+                C_Point3D fa = Tools.计算平均法向量(pListNew);
+                //if (space_parent.vars.b_auto_correct_z)
+                {
+                    if (fa.z < 0)
+                    {
+                        fa = fa.scale(-1);//法向量取反
+                    }
+                }
+                UnitVector3D z2 = new Vector3D(fa.x, fa.y, fa.z).Normalize();
+                //x2,y2,z2是盒子的坐标系
+                //x轴和法向量上叉乘
+                Vector3D z1 = new Vector3D(0, 0, 1);
+
+                UnitVector3D y2 = z1.CrossProduct(z2).Normalize();
+                UnitVector3D x2 = y2.CrossProduct(z2);
+
+                if (w_debug != null) w_debug.WriteLine("Group_ID=" + pPlanet1.Group_ID, Level_Enum.Info, this.log_index, this.Name);
+                if (w_debug != null) w_debug.WriteLine("center=" + center.ToString(), Level_Enum.Info, this.log_index, this.Name);
+
+
+                int hand_group_id;//抓取面的Group_ID
+
+                hand_group_id = pPlanet1.Group_ID;
+
+                C_Planet_Catch pPlanet = new C_Planet_Catch(space, Group_ID, pData);
+
+                pPlanet.pArray = pListNew;
+                //加上原点的位置，换算成原先坐标。下面debug显示不用加坐标变换
+                pPlanet.center = center.add(pData.centerAll);
+
+                pPlanet.Group_ID = pPlanet1.Group_ID;
+                pPlanet.x_head = new C_Point3D(x2.X, x2.Y, x2.Z);
+                pPlanet.z_faxiangliang = new C_Point3D(z2.X, z2.Y, z2.Z);
+                pPlanet.y_Direction = new C_Point3D(y2.X, y2.Y, y2.Z);
+
+                //pPlanet.percent = 计算匹配度(hand_group_id, center, x2, y2);
+                // 计算面积匹配度(hand_group_id, center, x2, y2);//面积匹配度
+                if (w_debug != null) w_debug.WriteLine(hand_group_id + "=匹配度=" + pPlanet.percent, Level_Enum.Info, this.log_index, this.Name);
+
+                //pData.pCatch_Surfaces.Add(pPlanet);
+
+
+                if (space_parent.vars.bDebug)
+                {
+                    string max_vectors = center.ToString() + "," + Math.Round(x2.X, 2) + "," + Math.Round(x2.Y, 2)
+                    + "," + Math.Round(x2.Z, 2) + "," + pPlanet.Group_ID + "," + pPlanet.pArray.Count + "\n";
+                    max_vectors += center.ToString() + "," + pPlanet.z_faxiangliang.ToString() + "," + pPlanet.Group_ID + "," + pPlanet.pArray.Count + "\n";
+                    w_vector.WriteLine(max_vectors, Level_Enum.Info, this.log_index, this.Name);
+                }
+            }
+
+            if (space_parent.vars.bDebug)
+            {
+                w_vector.Close();
+                fs_vector.Close();
+            }
+        }
+
+
+
+        public bool 计算是否碰撞到障碍物(
+            List<C_Point3D> pListArray_Objs,
+            C_Train pTrain, C_Planet_Catch pPlanet)
+        {
+            C_Camera_Const camera1 = (C_Camera_Const)space_parent.read_vars(pTrain,this, "#camera1_const", "C_Camera_Const");
+
+            //var camera1 = (C_Camera_Const)pTrain.vars["camera1_const"];
+
+            if (pListArray_Objs == null)
+            {
+                space_parent.console.WriteLine("没有设置障碍物!", Level_Enum.Info, this.log_index, this.Name   );
+                return false;
+            }
+            C_Point3D A = pPlanet.arm_a;
+            C_Point3D B = pPlanet.arm_b;
+
+            double r = 130;//130mm
+            //判断AB为轴，r为半径的圆柱是否和障碍物的点会碰撞
+            for (var i = 0; i < pListArray_Objs.Count; i++)
+            {
+                C_Point3D C_camera = (C_Point3D)pListArray_Objs[i];
+                C_Point3D C = Tools.摄像头坐标转到机械臂坐标(camera1, C_camera);
+
+                C_Point3D AB = B.subtract(A);
+                C_Point3D AC = C.subtract(A);
+                C_Point3D BC = C.subtract(AB);
+                Vector3D v_AB = new Vector3D(AB.x, AB.y, AB.z);
+                Vector3D v_AC = new Vector3D(AC.x, AC.y, AC.z);
+                Vector3D v_BC = new Vector3D(BC.x, BC.y, BC.z);
+                double alpha = v_AB.Normalize().DotProduct(v_AC);
+                double beta = -v_AB.Normalize().DotProduct(v_BC);
+                if (alpha > 0 && beta > 0)
+                {
+                    Vector3D v_AD = v_AB.Normalize().ScaleBy(alpha);
+                    Vector3D v_DC = v_AC - v_AD;
+                    if (v_DC.Length < r)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+
+
+        public bool 计算是否碰撞到其他包裹(
+            C_Train pTrain, C_Planet_Catch pPlanet)
+        {
+
+            double len = -int.Parse(this.ball_radius);// + 30);
+            var x5 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * len;
+            var y5 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * len;
+            var z5 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * len;
+            pPlanet.check_collision = new C_Point3D(x5, y5, z5);
+
+            C_Camera_Const camera1 = (C_Camera_Const)space_parent.read_vars(pTrain, this, "#camera1_const", "C_Camera_Const");
+
+            C_Point3D p1_camera = Tools.机械臂坐标到摄像头坐标(
+                camera1, pPlanet.check_collision);
+            C_Point3D p1_pic = Tools.f_3DPoint_to_depth(
+                camera1.color_calib, p1_camera);
+            //space_parent.vars.draw_test.Add(p1_pic);
+
+
+            C_Point3D p2_camera = Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.arm_pCenter);
+            C_Point3D p2_pic = Tools.f_3DPoint_to_depth(camera1.color_calib, p2_camera);
+
+            //space_parent.vars.draw_test.Add(new Some_Point(p1_pic, p2_pic));
+
+            List<C_Point3D> pList_Point3D = (List<C_Point3D>)space_parent.read_vars(pTrain,this, "#cloud1", "List<C_Point3D>");
+            List<C_Point3D> pList_Point = Tools.查找区域的点(pList_Point3D,
+                p1_camera.x - int.Parse(this.ball_radius), p1_camera.x + int.Parse(this.ball_radius),
+                p1_camera.y - int.Parse(this.ball_radius), p1_camera.y + int.Parse(this.ball_radius),
+                p1_camera.z - int.Parse(this.ball_radius), p1_camera.z + int.Parse(this.ball_radius));
+
+            // int Group_ID = -1;
+            ArrayList pCollision = new ArrayList();
+
+            //lock (pData.pList_Collision)
+            {
+
+                for (var i = 0; i < pList_Point.Count; i++)
+                {
+                    C_Point3D p2 = (C_Point3D)pList_Point[i];
+
+                    double len2 = p1_camera.distance(p2);
+                    if (len2 < int.Parse(this.ball_radius))
+                    {
+                        //Group_ID = p2.Group_ID;
+                        if (pData.Group_ID != p2.Group_ID)
+                        {
+                            //pData.pList_Collision.Add(p2);
+                            pCollision.Add(p2);
+                        }
+                    }
+                }
+            }
+
+            if (pCollision.Count > 0)
+                space_parent.console.WriteLine(pData.Group_ID + " 碰撞的点个数为：" + pCollision.Count, Level_Enum.Info, this.log_index, this.Name);
+            return pCollision.Count > 5;
+        }
+
+
+        //public ArrayList 显示结果(C_Train pTrain)
+        //{
+        //    //if (pTrain.pBitmapRGB == null) return null;
+
+        //    //space_parent.vars.bShowListView = true;
+
+        //    ArrayList pListArray = new ArrayList();
+
+        //    ArrayList arrMain = (ArrayList)space_parent.vars.read_vars(pTrain, "Mains");
+        //    {
+        //        for (var k = 0; k < arrMain.Count; k++)
+        //        {
+        //            C_Main pMain = (C_Main)arrMain[k];
+        //            if (pMain != null)
+        //            {
+        //                for (int i = 0; i < pMain.pCatch_Surfaces.Count; i++)
+        //                {
+        //                    C_Planet_Catch pPlanet = (C_Planet_Catch)pMain.pCatch_Surfaces[i];
+        //                    if (pPlanet != null)
+        //                    {
+        //                        pListArray.Add(pPlanet);
+        //                    }
+
+        //                }
+
+        //            }
+        //        }
+        //    }
+        //    return pListArray;
+        //}
+
+
+        public void 统计一个维度(double value, Dictionary<int, C_Count> pDic)
+        {
+            int value2 = (int)Math.Round(value / 100);
+
+            if (pDic.ContainsKey(value2))
+            {
+                C_Count pCount = pDic[value2];
+                pCount.count += 1;
+            }
+            else
+            {
+                C_Count pCount = new C_Count();
+                pCount.count = 1;
+                pDic.Add(value2, pCount);
+            }
+        }
+
+        //public void 合并挑选(C_Train pTrain)
+        //{
+        //    ArrayList arrMain = (ArrayList)space_parent.vars.read_vars(pTrain, "Mains");
+        //    for (var k = 0; k < arrMain.Count; k++)
+        //    {
+
+        //        C_Main pMain = (C_Main)arrMain[k];
+
+        //        while (查找可以合并的大平面(pMain))
+        //        {
+        //            //删除已经delete的大平面
+        //            for (int i = pMain.pCatch_Surfaces.Count - 1; i >= 0; i--)
+        //            {
+        //                C_Planet_Catch pPlanet = (C_Planet_Catch)pMain.pCatch_Surfaces[i];
+        //                if (pPlanet == null)
+        //                {
+        //                    pMain.pCatch_Surfaces.RemoveAt(i);
+        //                }
+        //                else
+        //                {
+        //                    if (pPlanet.bDelete)
+        //                    {
+        //                        pMain.pCatch_Surfaces.RemoveAt(i);
+        //                    }
+        //                }
+        //            }
+        //        };
+
+        //    }
+        //}
+
+
+        public void 计算抓取面坐标和欧拉角等(
+            C_Train pTrain,
+            C_Planet_Catch pPlanet)
+        {
+
+            C_Camera_Const camera1 = (C_Camera_Const)space_parent.read_vars(pTrain, this, "#camera1_const", "C_Camera_Const");
+
+
+            //var camera1 = (C_Camera_Const)pTrain.vars["camera1_const"];
+            pPlanet.arm_pCenter = Tools.摄像头坐标转到机械臂坐标(
+                camera1, pPlanet.center);
+
+            //pPlanet.arm_pCenter.x += space_parent.vars.db_p2_dx;
+            //pPlanet.arm_pCenter.y += space_parent.vars.db_p2_dy;
+            //pPlanet.arm_pCenter.z += space_parent.vars.db_p2_dz;
+
+            pPlanet.arm_faxiangliang =
+                Tools.摄像头坐标转到机械臂坐标(
+                    camera1, pPlanet.z_faxiangliang.scale(1000)).subtract(
+                Tools.摄像头坐标转到机械臂坐标(
+                    camera1, new C_Point3D(0, 0, 0)));
+
+            var vector_faxiangliang = new Vector3D(pPlanet.arm_faxiangliang.x, pPlanet.arm_faxiangliang.y, pPlanet.arm_faxiangliang.z);
+
+            pPlanet.rot_z = Angle.FromRadians(Math.Atan2(pPlanet.arm_faxiangliang.y, pPlanet.arm_faxiangliang.x));
+            pPlanet.rot_y = Angle.FromRadians(Math.Acos(-pPlanet.arm_faxiangliang.z / vector_faxiangliang.Length));
+
+            var length = pPlanet.z_add;// (space_parent.vars_new.tool_z + pPlanet.z_add);
+            var x2 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * length;
+            var y2 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * length;
+            var z2 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * length;
+
+            pPlanet.arm_pCatchCenter = new C_Point3D(x2, y2, z2);
+
+            //double minus = 0;
+            //while (Tools.到底面距离(pPlanet.arm_pCatchCenter, space_parent.vars.pPlanet_Bottom) < space_parent.vars.iFilter_z)
+            //{
+            //    //如果会碰撞到底面
+            //    minus++;
+            //    var length2 = (space_parent.vars.tool_z + pPlanet.z_add - minus);
+            //    var x22 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * length;
+            //    var y22 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * length;
+            //    var z22 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * length;
+
+            //    pPlanet.arm_pCatchCenter = new C_Point3D(x22, y22, z22);
+            //    space_parent.console.WriteLine("如果会碰撞到底面 minus=" + minus,true);
+            //}
+
+            //var x3 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * space_parent.vars.catch_z;
+            //var y3 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * space_parent.vars.catch_z;
+            //var z3 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * space_parent.vars.catch_z;
+
+            //pPlanet.arm_pCatch_Before = new C_Point3D(x3, y3, z3);
+
+            //space_parent.vars.bCatch_Prepare = true;
+        }
+
+
+
+        //public bool 查找可以合并的大平面(C_Data pMain)
+        //{
+        //    for (int i = 0; i < pMain.pCatch_Surfaces.Count; i++)
+        //    {
+        //        C_Planet_Catch pPlanet = (C_Planet_Catch)pMain.pCatch_Surfaces[i];
+        //        if (pPlanet == null) continue;
+
+
+        //        for (int j = i + 1; j < pMain.pCatch_Surfaces.Count; j++)
+        //        {
+        //            C_Planet_Catch pPlanet2 = (C_Planet_Catch)pMain.pCatch_Surfaces[j];
+        //            var a = Angle.FromRadians(Math.Acos(pPlanet.z_faxiangliang.dotProduct(pPlanet2.z_faxiangliang)));
+        //            var b = pPlanet.fa_length - pPlanet2.fa_length;
+        //            if (space_parent.vars.bDebug) space_parent.console.WriteLine(pPlanet.Group_ID + "," + pPlanet2.Group_ID + "=" + a.Degrees + "," + b);
+        //            if (a.Degrees < space_parent.vars.yuzhi_faxiangliang_angle)
+        //            {
+        //                if (Math.Abs(b) < space_parent.vars.yuzhi_surface_distance)
+        //                {
+        //                    space_parent.console.WriteLine("合并两大面" + pPlanet.Group_ID + "," + pPlanet2.Group_ID);
+
+        //                    ArrayList pListNew = 合并两个大块平面(pPlanet, pPlanet2);
+
+        //                    pPlanet.bDelete = true;
+        //                    pPlanet2.pArray = pListNew;
+
+        //                    C_Point3D center = Tools.计算多个小平面的中心点坐标(pListNew);
+
+        //                    C_Point3D fa = Tools.计算平均法向量(pListNew);
+        //                    //if (space_parent.vars.b_auto_correct_z)
+        //                    {
+        //                        if (fa.z < 0)
+        //                        {
+        //                            fa = fa.scale(-1);//法向量取反
+        //                        }
+        //                    }
+        //                    UnitVector3D z2 = new Vector3D(fa.x, fa.y, fa.z).Normalize();
+        //                    //x2,y2,z2是盒子的坐标系
+        //                    //x轴和法向量上叉乘
+        //                    Vector3D z1 = new Vector3D(0, 0, 1);
+
+        //                    UnitVector3D y2 = z1.CrossProduct(z2).Normalize();
+        //                    UnitVector3D x2 = y2.CrossProduct(z2);
+
+
+        //                    //加上原点的位置，换算成原先坐标。下面debug显示不用加坐标变换
+        //                    pPlanet2.center = center.add(pMain.centerAll);
+
+        //                    pPlanet2.z_faxiangliang = new C_Point3D(z2.X, z2.Y, z2.Z);
+        //                    pPlanet.x_head = new C_Point3D(x2.X, x2.Y, x2.Z);
+        //                    pPlanet.y_Direction = new C_Point3D(y2.X, y2.Y, y2.Z);
+
+        //                    //pPlanet2.percent = pMain.计算匹配度(pPlanet2.Group_ID, center, x2, y2);
+
+        //                    return true;
+        //                }
+        //            }
+        //        }
+        //    }
+        //    return false;
+        //}
+
+        public void 输出抓取面信息()
+        {
+            FileStream fs_vector = null;
+            TextWriter w_vector = null;
+            {
+                string file_vector = @"d:\vector_catch_xyz.txt";//space_parent.vars.path_web + 
+                fs_vector = new FileStream(file_vector, FileMode.Create, FileAccess.Write);
+                w_vector = new StreamWriter(fs_vector, Encoding.UTF8);
+            }
+
+            //for (int i = 0; i < pData.pCatch_Surfaces.Count; i++)
+            //{
+            //    C_Planet_Catch pPlanet = (C_Planet_Catch)pData.pCatch_Surfaces[i];
+            //    if (pPlanet == null) continue;
+
+            //    C_Point3D center = Tools.计算多个小平面的中心点坐标(pPlanet.pArray);
+
+            //    C_Point3D fa = Tools.计算平均法向量(pPlanet.pArray);
+            //    //if (space_parent.vars.b_auto_correct_z)
+            //    {
+            //        if (fa.z < 0)
+            //        {
+            //            fa = fa.scale(-1);//法向量取反
+            //        }
+            //    }
+            //    UnitVector3D z2 = new Vector3D(fa.x, fa.y, fa.z).Normalize();
+            //    //x2,y2,z2是盒子的坐标系
+            //    //x轴和法向量上叉乘
+            //    Vector3D z1 = new Vector3D(0, 0, 1);
+
+            //    UnitVector3D y2 = z1.CrossProduct(z2).Normalize();
+            //    UnitVector3D x2 = y2.CrossProduct(z2);
+
+            //    //加上原点的位置，换算成原先坐标。下面debug显示不用加坐标变换
+            //    pPlanet.center = center.add(pData.centerAll);
+
+            //    //pPlanet.x_head = new C_Point(x2.X, x2.Y, x2.Z);
+            //    pPlanet.z_faxiangliang = new C_Point3D(z2.X, z2.Y, z2.Z);
+
+            //    //pPlanet.percent = 计算匹配度(pPlanet.Group_ID, center, x2, y2);
+
+            //    //pMain.计算圆形吸盘抓取的法向量匹配度();
+            //    string max_vectors = center.ToString() + "," + Math.Round(x2.X, 2) + "," + Math.Round(x2.Y, 2)
+            //        + "," + Math.Round(x2.Z, 2) + "," + pPlanet.Group_ID + "," + pPlanet.pArray.Count + "\n";
+            //    max_vectors += center.ToString() + "," + pPlanet.z_faxiangliang.ToString() + "," + pPlanet.Group_ID + "," + pPlanet.pArray.Count + "\n";
+            //    w_vector.WriteLine(max_vectors, Level_Enum.Info, this.log_index, this.Name  );
+            //}
+            w_vector.Close();
+            fs_vector.Close();
+        }
+
+        private static ArrayList 合并两个大块平面(
+            C_Planet_Catch pPlanet, C_Planet_Catch pPlanet2)
+        {
+            ArrayList pListNew = new ArrayList();
+            for (var i = 0; i < pPlanet.pArray.Count; i++)
+            {
+                C_Planet p1 = (C_Planet)pPlanet.pArray[i];
+                p1.Group_ID = pPlanet2.Group_ID;
+                pListNew.Add(p1);
+            }
+            for (var i = 0; i < pPlanet2.pArray.Count; i++)
+            {
+                pListNew.Add(pPlanet2.pArray[i]);
+            }
+
+            return pListNew;
+        }
+
+        public ArrayList 根据深度神经网络识别框过滤点云(
+            C_Train pTrain, ArrayList pList, JObject pItem, C_Rect pRect)
+        {
+            //C_Camera_Const camera1 = (C_Camera_Const)space_parent.vars.read_vars(pTrain, "#camera1_const", "C_Camera_Const");
+
+            //C_Camera_Const camera1 = this.camera1;// (C_Camera_Const)space_parent.vars.read_vars(pTrain,this.camera1, "C_Camera_Const");
+
+            //var camera1 = (C_Camera_Const)pTrain.vars["camera1_const"];
+            ArrayList pList2 = new ArrayList();
+
+
+            JArray pJArray;
+
+            //if (space_parent.vars.server_url_index == 1)
+            {
+                //pJArray = (JArray)pItem.SelectToken("contour");
+                pJArray = (JArray)pItem.SelectToken("vertex");
+            }
+
+
+            double x_min = pRect.pPoint1.x;
+            double x_max = pRect.pPoint2.x;
+            double y_min = pRect.pPoint1.y;
+            double y_max = pRect.pPoint2.y;
+
+            if (pJArray == null)
+            {
+                space_parent.console.WriteLine("test", Level_Enum.Info, this.log_index, this.Name);
+                return null;
+            }
+
+            List<C_Point3D> Points = 简化边框读取边框里的点(pJArray);//, ref x_max, ref x_min, ref y_max, ref y_min);
+
+            //Bitmap pDebugBitmap = new Bitmap(1024, 768);
+
+
+            C_Planet Bottom = (C_Planet)space_parent.read_vars(pTrain, this, "#pPlanet_Bottom", "C_Planet");
+
+
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = (C_Point3D)pList[i];
+
+                C_Point3D p2 = Bottom.投影到一个面后的坐标(p);
+
+                C_Point3D uv = Tools.f_3DPoint_to_depth(
+                    camera1.color_calib, p2);
+
+                if (uv.x >= x_min && uv.x <= x_max)
+                {
+                    if (uv.y >= y_min && uv.y <= y_max)
+                    {
+                        if (Tools.判断是否在多边形内(Points, uv.x, uv.y))
+                        {
+                            if (uv.x > 0 && uv.y > 0)
+                            {
+                                p.Group_ID = pData.Group_ID;
+                                pList2.Add(p);
+                                //if (space_parent.vars.bDebug_Mode)
+                                //    pDebugBitmap.SetPixel((int)uv.x, (int)uv.y, Color.Green);
+                            }
+                        }
+                        else
+                        {
+                            if (uv.x > 0 && uv.y > 0)
+                            {
+                                //if (space_parent.vars.bDebug_Mode)
+                                //    pDebugBitmap.SetPixel((int)uv.x, (int)uv.y, Color.Red);
+                            }
+                        }
+                    }
+                }
+            }
+
+            //if (space_parent.vars.bDebug_Mode)
+            //    pDebugBitmap.Save("D:\\debug.png");
+
+            return pList2;
+        }
+
+
+        public List<C_Point3D> 简化边框读取边框里的点(
+            JArray pJArray,
+            bool bModify = true)
+        {
+            List<C_Point3D> pList_Points = new List<C_Point3D>();
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)pJArray[j][0];
+                int y1 = (int)pJArray[j][1];
+
+                if (bModify)
+                {
+                    x1 = (int)Math.Round(x1 / this.draw_scale_tuyang + space_parent.vars.draw_offset_x_tuyang);
+                    y1 = (int)Math.Round(y1 / this.draw_scale_tuyang + space_parent.vars.draw_offset_y_tuyang);
+                }
+                C_Point3D pPoint = new C_Point3D(x1, y1, 0);
+                pList_Points.Add(pPoint);
+            }
+
+
+            //化简点
+            //if (space_parent.vars.b_simplify)
+            //{
+            //    for (var j = 0; j < pList_Points.Count - 2; j++)
+            //    {
+            //        var x1 = pList_Points[j].x;
+            //        var y1 = pList_Points[j].y;
+
+            //        var x2 = pList_Points[j + 1].x;
+            //        var y2 = pList_Points[j + 1].y;
+
+            //        var x3 = pList_Points[j + 2].x;
+            //        var y3 = pList_Points[j + 2].y;
+
+            //        var area = 0.5 * Math.Abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1));
+
+            //        if (area < space_parent.vars.max_area)
+            //        {
+            //            pList_Points.RemoveAt(j + 1);
+            //            j -= 1;
+            //        }
+            //    }
+            //}
+
+            return pList_Points;
+        }
+
+    }
+}

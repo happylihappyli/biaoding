@@ -1,0 +1,56 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Threading;
+using Common_Robot2;
+using System.Net.Sockets;
+using System.Net;
+
+namespace Test1
+{
+    public class E_TCP_CallBack2 : C_Node
+    {
+
+        public string key_control = "";
+
+        public string msg = "";
+        public string hex = "";
+
+
+        public E_TCP_CallBack2(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            //Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            Main.WriteLine(this, " 事件激活 " + this.GetType().Name);
+            Main.WriteLine(this, "《《《《《《 " + this.msg);
+
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        { 
+        }
+
+        public override void init()
+        {
+            I_TCP pServer = (I_TCP)space.vars_step[key_control];
+            pServer.pCallBack.Add(new C_CallBack_Item(Name, msg, hex));
+        }
+
+    }
+
+
+}

@@ -1,0 +1,40 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 停止摄像头采集图片
+    /// </summary>
+    public class S_Camera_Stop : C_Node
+    {
+
+        public string key_step = "";
+        public S_Camera_Stop(string name,C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+
+            run_sub_main();
+            return Task.CompletedTask;
+
+        }
+
+        private void run_sub_main()
+        {
+
+            S_Camera pItem = (S_Camera)space.vars_step[key_step];
+            pItem.Stop = true;
+
+        }
+    }
+}

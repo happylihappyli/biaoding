@@ -1,0 +1,45 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Three.Net.Math;
+
+namespace Test1
+{
+    public class File_UnZip : C_Node
+    {
+        public string file_zip = "";//zip文件名
+        public string path = "";//解压缩路径
+
+
+        public File_UnZip(string Name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+        public void run_sub_main()
+        {
+
+            string file_zip2 = space.tools.var_read(pTrain, this, this.file_zip);
+
+            string path2 = space.tools.var_read(pTrain, this, this.path);
+
+
+            ZipFile.ExtractToDirectory(file_zip2, path2);
+        }
+    }
+
+
+}

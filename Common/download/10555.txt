@@ -1,0 +1,68 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using Swan;
+
+namespace Test1
+{
+    public class S_Switch_Call : C_Node
+    {
+
+        public string read = "";
+        public string cases = "1:调用相机\r\n" +
+            "2:调用相机2";
+
+        public S_Switch_Call(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+
+
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_read=this.read_string(this.read);
+            string str_cases=this.read_string(this.cases);
+
+
+            str_cases = str_cases.Replace("\r\n", "\n");
+
+            string[] strSplit=str_cases.Split(new char[] {'\n' });
+
+            for(var i=0;i<strSplit.Length;i++)
+            {
+                string[] strSplit2 = strSplit[i].Split(new char[] { ':' });
+                if (str_read == strSplit2[0])
+                {
+                    string str_step = strSplit2[1];
+                    C_Node? pStep = space.vars_step[str_step];
+                    {
+
+                        Random rnd = new Random();
+                        int train_id = rnd.Next(100, 900);
+                        space.pTrain = CommonMain.create_train("Mouse_" + train_id);
+
+                        pStep?.Run(space.pTrain);
+                    }
+                    break;
+                }
+            }
+            
+        }
+
+    }
+
+
+
+}

@@ -1,0 +1,68 @@
+﻿
+using B2_XML.Funny;
+using Common_Robot2;
+using DiffPlex.DiffBuilder.Model;
+using DiffPlex.DiffBuilder;
+using Newtonsoft.Json.Linq;
+
+
+namespace Test1
+{
+    //文件比较模块","inPorts": ["in"],"outPorts": ["out"],"image_url": "","image": "","content":"说明信息"}
+    public class File_Compare: C_Node
+    {
+        //文件1
+        public string file1 = "";
+        //文件2
+        public string file2 = "";
+        //JSON字符串变量
+        public string key_save = "";
+
+
+        public override void init()
+        {
+        }
+
+        public File_Compare(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_file1 = this.read_string(this.file1);
+            string str_file2 = this.read_string(this.file2);
+            string str1=File.ReadAllText(str_file1);
+            string str2 = File.ReadAllText(str_file2);
+            string json=compare(str1, str2);
+            this.save_var(this.key_save, "string", json);
+
+        }
+
+
+        public string compare(string str1, string str2)
+        {
+            SideBySideDiffBuilder diffBuilder = new SideBySideDiffBuilder();
+            SideBySideDiffModel diff = diffBuilder.BuildDiffModel(str1, str2);
+            JArray arr = new JArray();
+            for (var i = 0; i < diff.OldText.Lines.Count; i++)
+            {
+                JObject pObj = new JObject();
+                pObj["index"] = i;
+                pObj["old"] = diff.OldText.Lines[i].Text;
+                pObj["new"] = diff.NewText.Lines[i].Text;
+                pObj["type1"] = diff.OldText.Lines[i].Type.ToString();
+                pObj["type2"] = diff.NewText.Lines[i].Type.ToString();
+                arr.Add(pObj);
+            }
+            return arr.ToString();
+        }
+
+    }
+}

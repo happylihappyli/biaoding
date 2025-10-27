@@ -1,0 +1,70 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+	//
+    public class E_List_View_Event : C_Node
+    {
+        public ListView ui_item = null;
+        public string key_ui = "";
+        public string type = "单击";
+
+        public E_List_View_Event(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show("key_ui == null ! " + Name);
+                return;
+            }
+            if (space.vars_ui.ContainsKey(key_ui) == false)
+            {
+                MessageBox.Show("没有这个ListView key_ui=" + key_ui);
+                return;
+            }
+            S_List_View pItem = (S_List_View)space.vars_ui[key_ui];
+            if (pItem == null)
+            {
+                MessageBox.Show("没有这个ListView key_ui=" + key_ui);
+                return;
+            }
+            ui_item = pItem.ui_item;
+            if (ui_item != null)
+            {
+                if (type == "" || type == "单击")
+                {
+                    ui_item.SelectedIndexChanged += new EventHandler(Button_Click);
+                }
+                else if (type == "双击")
+                {
+                    ui_item.DoubleClick += new EventHandler(Button_Click);
+                }
+            }
+        }
+
+        public void Button_Click(object sender, EventArgs e)
+        {
+            Main.WriteLine(this, Name + " 事件激活 " + this.GetType().Name);
+
+            Random rnd = new Random();
+            string id = "Button_" + rnd.Next(100);
+            pTrain = new C_Train(id);
+
+            Run(pTrain);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+        }
+    }
+}

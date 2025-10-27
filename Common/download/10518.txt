@@ -1,0 +1,59 @@
+﻿
+using Common_Robot2;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //判断抓取的arm_a高度小于x","inPorts": ["in"],"outPorts": ["true","false"],"image_url": "","image": "","content":"说明信息"}
+    public class F_Check_Catch_Z: C_Node
+    {
+        //抓取面变量","var_type":"string","required":"1","var":"1","type_group":"","help": ""}
+        public string key_catch = "";
+        //高度","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string height = "";
+
+        
+        public override void init()
+        {
+
+        }
+
+        public F_Check_Catch_Z(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            C_Planet_Catch? pCatch=(C_Planet_Catch?)this.read_var(key_catch, "C_Planet_Catch");
+
+            if (pCatch!=null)
+            {
+                string str_height = this.read_string(height);
+                double db_height=double.Parse(str_height);
+
+                if (pCatch.arm_a.z<db_height)
+                {
+                    this.Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    this.Next_Step = Node_Next.False;
+                }
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+
+        }
+
+    }
+}

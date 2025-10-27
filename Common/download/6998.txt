@@ -1,0 +1,94 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using Test1.Common.Data;
+
+
+namespace Test1
+{
+    //从图片读取坐标
+    public class File_Read_Drone_Vertex_From_Image: C_Node
+    {
+        //bitmap变量
+        public string key_bitmap = "";
+
+        //模型变量
+        public string key_save = "";
+
+        public File_Read_Drone_Vertex_From_Image(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            Bitmap bmp = (Bitmap)this.read_var(key_bitmap, "Bitmap");
+
+            int[,] rgbArray = new int[bmp.Height, bmp.Width];
+            bmp.getRGB(0, 0, bmp.Width, bmp.Height, rgbArray,0, bmp.Width);
+
+            List<C_Point3D> list = new List<C_Point3D>();
+            for (int y=0; y< bmp.Height; y++)
+            {
+                int next_y = y;
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    if (rgbArray[y,x] >256)
+                    {
+                        C_Point3D center = scan_center(rgbArray,y, x);
+                        list.Add(center);
+                        x = (int)center.x + 30;
+                        next_y= (int)center.y + 30; 
+                    }
+                }
+                y = next_y;
+            }
+            for(var i=0; i<list.Count; i++)
+            {
+                C_Point3D point = list[i];
+                Main.WriteLine(point.ToString());
+            }
+            this.save_var(this.key_save, "List<C_Point3D>", list);
+        }
+
+        public C_Point3D scan_center(int[,] rgbArray ,int y, int x)
+        {
+            double sum_x = 0;
+            double sum_y = 0;
+            List<C_Point3D> list=new List<C_Point3D>();
+            for(var j = y - 30; j < y + 30; j++)
+            {
+                for (var i = x - 30; i < x + 30; i++)
+                {
+                    //try
+                    //{
+                        if (rgbArray[j, i] > 256)
+                        {
+                            sum_x += i;
+                            sum_y += j;
+                            list.Add(new C_Point3D(i, j, 0));
+                        }
+                    //}catch(Exception e)
+                    //{
+                    //    Main.WriteLine(e.ToString());
+                    //}
+                }
+            }
+
+            return new C_Point3D(sum_x / list.Count,sum_y/list.Count,0);
+        }
+
+        public void init()
+        {
+
+        }
+    }
+}

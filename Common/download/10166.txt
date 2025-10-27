@@ -1,0 +1,52 @@
+﻿using Common_Robot;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Array_Add : C_Node
+    {
+        /// <summary>
+        /// 数组变量
+        /// </summary>
+        public string key_array = "";
+        public string key_item = "";
+
+        public S_Array_Add(string Name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (pTrain == null) return;
+
+            ArrayList pArray = (ArrayList)space.vars.read_vars(pTrain, this, this.key_array, "ArrayList");
+            if (pArray == null)
+            {
+                pArray = new ArrayList();
+                space.vars.save_vars(pTrain, this, this.key_array, "ArrayList", pArray);
+            }
+
+            Object pItem = space.vars.read_vars(pTrain, this, this.key_item, "Object");
+            pArray.Add(pItem);
+
+        }
+    }
+}

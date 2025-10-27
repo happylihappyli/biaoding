@@ -1,0 +1,342 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Objects;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+
+namespace Test1
+{
+
+
+
+    public partial class Frm_Debug : Form
+    {
+        private ListViewColumnSorter lvwColumnSorter;
+        public C_Space space;
+        public Frm_Debug()
+        {
+            InitializeComponent();
+        }
+
+        public void TCP_Callback(byte[] RData, int status, string message)
+        {
+            switch (status)
+            {
+                case 0:
+                    string str = Encoding.GetEncoding("GBK").GetString(RData);
+                    {
+                        Main.WriteLine(str);
+                        show_log(str);
+                        if (str == "{step_next}")
+                        {
+                            space.step_next();
+                        }
+                    }
+                    break;
+                case 1: //连接成功
+                    show_log("连接成功！");
+                    Main.WriteLine("连接成功");
+                    break;
+                default: //断开连接
+                    show_log("断开连接！");
+                    Main.WriteLine("断开连接!");
+                    break;
+            }
+        }
+
+        public void show_log(string log)
+        {
+            Action act = delegate ()
+            {
+                //tx_log.Text = log;
+            };
+            this.BeginInvoke(act, null);
+        }
+
+
+        private void Frm_Debug_Load(object sender, EventArgs e)
+        {
+            //space.main.pDebug = new TCPClient(TCP_Callback);
+
+            Task.Run(() =>
+            {
+                Thread.Sleep(2000);
+                refresh();
+            });
+
+
+            lvwColumnSorter = new ListViewColumnSorter();
+            this.listView1.ListViewItemSorter = lvwColumnSorter;
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            space.step_count = 0;
+            space.step_max = int.Parse(tx_step.Text);
+            space.step_next();
+        }
+
+        private void b_connect_Click(object sender, EventArgs e)
+        {
+            //space.main.pDebug.InitSocket("127.0.0.1", 6666);
+            space.vars.debug_mode = true;
+        }
+
+        private void b_refresh_Click(object sender, EventArgs e)
+        {
+            refresh();
+
+            refresh_var();
+        }
+
+        public void refresh()
+        {
+            if (listView1.Items.Count == 0)
+            {
+                List<string> keys = new List<string>(space.vars_step.Keys);
+                for (var i = 0; i < keys.Count; i++)
+                {
+                    string key = keys[i];
+                    C_Node? pNode = space.vars_step[key];
+
+
+                    Action act = delegate ()
+                    {
+                        if (pNode != null)
+                        {
+
+                            var item = listView1.Items.Add(pNode.key);
+                            item.SubItems.Add(pNode.Name);
+                            item.SubItems.Add(pNode.state+"");
+                            item.SubItems.Add(pNode.bBreak ? "断点" : "");
+                            item.SubItems.Add(pNode.bContinue ? "继续" : "");
+                            item.SubItems.Add(pNode.time_use + "");
+
+                            if (pNode.pTrain != null)
+                            {
+                                item.SubItems.Add(pNode.pTrain.get_ID());
+                            }
+                            else
+                            {
+                                item.SubItems.Add("");
+                            }
+                            {
+                                item.SubItems.Add(pNode.GetType().Name);
+                            }
+                        }
+                    };
+                    listView1.BeginInvoke(act, null);
+
+                }
+            }
+            else
+            {
+
+                Action act = delegate ()
+                {
+
+                    lvwColumnSorter.SortColumn = 2;
+                    lvwColumnSorter.Order = SortOrder.Ascending;
+
+                    this.listView1.Sort();
+
+                    listView1.SelectedItems.Clear();
+                    for (var i = 0; i < listView1.Items.Count; i++)
+                    {
+                        string key = listView1.Items[i].SubItems[1].Text;
+                        C_Node? pState = space.vars_step[key];
+                        var item = listView1.Items[i];
+                        if (item.SubItems[2].Text != pState.state + "")
+                        {
+                            item.SubItems[2].Text = pState.state + "";
+                            item.Selected = true;
+                        }
+                        if (item.SubItems[3].Text != (pState.bBreak ? "断点" : ""))
+                            item.SubItems[3].Text = pState.bBreak ? "断点" : "";
+                        if (item.SubItems[4].Text != (pState.bContinue ? "继续" : ""))
+                            item.SubItems[4].Text = pState.bContinue ? "继续" : "";
+
+                        if (pState.pTrain != null)
+                        {
+                            if (item.SubItems[6].Text != pState.pTrain.get_ID())
+                                item.SubItems[6].Text = pState.pTrain.get_ID();
+                        }
+                        else
+                        {
+                            if (item.SubItems[6].Text != "")
+                                item.SubItems[6].Text = "";
+                        }
+
+                        if (item.SubItems[7].Text != pState.GetType().Name)
+                            item.SubItems[7].Text = pState.GetType().Name;
+
+                    }
+                };
+                listView1.BeginInvoke(act, null);
+
+
+
+            }
+
+        }
+        public void refresh_var()
+        {
+            list_var.Items.Clear();
+
+
+            List<string> keys = new List<string>(space.vars_new.Keys);
+            for (var i = 0; i < keys.Count; i++)
+            {
+                try
+                {
+                    string key = keys[i];
+                    C_Var pVar = space.vars_new[key];
+                    var item = list_var.Items.Add(pVar.name);
+                    if (pVar.pObj != null) item.SubItems.Add(pVar.pObj.ToString());
+                }
+                catch (Exception ex)
+                {
+                    Main.WriteLine(ex.ToString());
+                }
+            }
+
+            if (space.pTrain == null) return;
+            keys = new List<string>(space.pTrain.get_Vars().Keys);
+            for (var i = 0; i < space.pTrain.get_Vars().Count; i++)
+            {
+                try
+                {
+                    string key = keys[i];
+                    C_Var pVar = space.pTrain.get_Vars()[key];
+                    var item = list_var.Items.Add(pVar.name);
+                    item.SubItems.Add(pVar?.pObj?.ToString());
+                }
+                catch (Exception ex)
+                {
+                    Main.WriteLine(ex.ToString());
+                }
+            }
+        }
+
+        private void listView1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (listView1.SelectedIndices.Count == 0) return;
+
+            string Name = listView1.Items[listView1.SelectedIndices[0]].SubItems[1].Text;
+            C_Node? pState = space.vars_step[Name];
+
+            list_node.Items.Clear();
+            ListViewItem item = list_node.Items.Add("Name");
+            item.SubItems.Add(pState?.Name);
+
+
+
+            Type? type = pState?.GetType();
+
+            PropertyInfo[] ps = type.GetProperties();
+            for (var i = 0; i < ps.Length; i++)
+            {
+                PropertyInfo property = ps[i];// type.GetProperty("json");
+
+                if (property != null)
+                {
+                    object? value = property?.GetValue(pState);
+
+                    item = list_node.Items.Add(property?.Name);
+                    item.SubItems.Add(value?.ToString());
+                }
+
+            }
+
+
+        }
+
+        private void listView1_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            if (listView1.Items.Count == 0) return;
+
+            string Name = listView1.Items[e.Index].SubItems[1].Text;
+            C_Node pState = space.vars_step[Name];
+            pState.bBreak = !pState.bBreak;
+            refresh();
+        }
+
+        private void listView1_ItemChecked(object sender, ItemCheckedEventArgs e)
+        {
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (ck_refresh.Checked)
+            {
+                refresh();
+                refresh_var();
+            }
+        }
+
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void listView1_ColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            lvwColumnSorter.SortColumn = e.Column;
+            lvwColumnSorter.Order = SortOrder.Ascending;
+
+            this.listView1.Sort();
+        }
+
+        private void ck_debug_CheckedChanged(object sender, EventArgs e)
+        {
+            space.vars.debug_mode = ck_debug.Checked;
+        }
+
+        private void b_copy_Click(object sender, EventArgs e)
+        {
+
+            string code = "";
+            for (var i = 0; i < listView1.SelectedItems.Count; i++)
+            {
+                var item = listView1.SelectedItems[i];
+                string key = item.Text;
+                string name = item.SubItems[1].Text;
+                string state = item.SubItems[2].Text;
+                string train = item.SubItems[6].Text;
+                string s = space.Name;
+
+                string line = $"{{\"key\":\"{key}\",\"name\":\"{name}\",\"space\":\"{s}\",\"train\":\"{train}={state}\"}}";
+
+                code += line + ",\r\n";
+            }
+            //code += "{\"key\":\"\"}\r\n";
+            Clipboard.SetText(code);
+        }
+
+        private void list_node_SelectedIndexChanged(object sender, EventArgs e)
+        {
+        }
+
+        private void list_node_DoubleClick(object sender, EventArgs e)
+        {
+
+            if (list_node.SelectedItems.Count == 0) return;
+
+            FrmValue value = new FrmValue();
+            value.f_name = list_node.SelectedItems[0].Text;
+            value.f_value = list_node.SelectedItems[0].SubItems[1].Text;
+            value.Show();
+        }
+    }
+}

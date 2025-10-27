@@ -1,0 +1,59 @@
+﻿using Common_Robot;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class String_From_List_Points : C_Node
+    {
+
+        public string key_read = "";//List<C_Point3D>
+        public string key_save = "";//string
+        public String_From_List_Points(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> list = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+
+            JArray arr = new JArray();
+
+            for(var i=0; i<list.Count; i++)
+            {
+                JArray arr1 = new JArray();
+                var item = list[i];
+                arr1.Add(item.x);
+                arr1.Add(item.y);
+                arr1.Add(item.z);
+
+                arr.Add(arr1);
+            }
+
+            string json = arr.ToString();
+
+            this.save_var(key_save, "string", json);
+
+        }
+
+        public void init()
+        {
+        }
+    }
+}

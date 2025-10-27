@@ -1,0 +1,60 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class C_Cloud_To_Picture_Polygon : C_Node
+    {
+        public string key_read= "cloud1";
+        public string key_ui = "";
+
+        public C_Cloud_To_Picture_Polygon(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? pList = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+
+            if (pList == null)
+            {
+                MessageBox.Show(this.Name + "key_read 读取为空");
+                return;
+            }
+
+
+            S_PictureBox? pItem;
+            if (space.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_PictureBox)space.vars_ui[key_ui];
+            }
+            else
+            {
+                pItem = (S_PictureBox)space_parent.vars_ui[key_ui];
+            }
+
+            if (pItem == null)
+                return;
+
+            pItem.polygonPoints = pList;
+
+            pItem.picture_box?.Invalidate();
+
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

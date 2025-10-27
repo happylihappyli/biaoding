@@ -1,0 +1,72 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Math;
+
+namespace Test1
+{
+    public class S_Read_To_ListView : C_Node
+    {
+
+        public string file;
+        public string key_ui;
+        public string sep = "|";
+
+        public S_Read_To_ListView(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            S_List_View pItem = (S_List_View)space.vars_ui[key_ui];
+            ListView ui_item = pItem.ui_item;
+
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+
+
+                    List<C_Box_Type> list = new List<C_Box_Type>();
+                    string[] lines = File.ReadAllLines(this.file);
+
+                    for (var i = 0; i < lines.Length; i++)
+                    {
+                        int index = i + 1;
+                        string line = lines[i];
+                        string[] strSplit = line.Split(sep);
+                        if (strSplit.Length > 1)
+                        {
+
+                            ListViewItem item = ui_item.Items.Add(strSplit[0]);
+
+                            for (var k = 1; k < strSplit.Length; k++)
+                            {
+                                item.SubItems.Add(strSplit[k]);
+                            }
+                        }
+                    }
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+
+        }
+    }
+}

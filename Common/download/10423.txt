@@ -1,0 +1,345 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Net.Sockets;
+using System.Text;
+//using static Common_Robot.C_Mp3;
+
+namespace Test1
+{
+    public class C_Send
+    {
+        C_Space space;
+        public C_Send(C_Space space)
+        {
+            this.space = space;
+        }
+
+        public string send_receive(Socket clientSocket, string strLine)
+        {
+            byte[] sendBuffer;
+
+            //发送
+            sendBuffer = Encoding.ASCII.GetBytes(strLine);
+            Main.WriteLine(Tools.TimeNow() + ">>" + strLine);
+            int rc = clientSocket.Send(sendBuffer);
+
+            string strData = Socket_Receive(clientSocket);
+            Main.WriteLine(Tools.TimeNow() + "<<" + strData);
+            return strData;
+        }
+
+        public string Socket_Receive(Socket clientSocket)
+        {
+            int bufferSize = 4096;
+            byte[] recvBuffer = new Byte[bufferSize];
+            int rc = clientSocket.Receive(recvBuffer);
+            //Main.WriteLine($"Client: Sent request of ${rc} bytes");
+
+            byte[] RData = new byte[rc];
+            for (int i = 0; i < rc; i++)
+            {
+                RData[i] = recvBuffer[i];
+            }
+            string strReturn = Encoding.UTF8.GetString(RData);
+            return strReturn;
+        }
+
+
+        public string get_state(string ip)
+        {
+            Main.WriteLine("state：");
+
+            int remotePort = 80;
+
+            Socket? clientSocket = null;
+            try
+            {
+                try
+                {
+                    string strLine;
+                    clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    clientSocket.Connect(ip, remotePort);
+                    strLine = "CONNECT Robot_access Keep-Alive:-1\r\n";// 
+                    send_receive(clientSocket, strLine);
+
+
+                    strLine = "HOSTCTRL_REQUEST RPOSC 4\r\n";
+                    strLine = send_receive(clientSocket, strLine);
+                    Main.WriteLine(strLine);
+
+
+                    strLine = "2,0\r\n";
+                    strLine = send_receive(clientSocket, strLine);
+                    Main.WriteLine(strLine);
+
+
+                    clientSocket.Close();
+
+                }
+                catch (SocketException err)
+                {
+                    Main.WriteLine("Client: Error occured while sending or receiving data.");
+                    Console.WriteLine("   Error: {0}", err.Message);
+                }
+            }
+            catch (SocketException err)
+            {
+                Console.WriteLine("Client: Socket error occured: {0}", err.Message);
+            }
+            return "";
+        }
+        public void send2_receive(Socket clientSocket, string strLine)
+        {
+            byte[] sendBuffer;
+
+            //发送
+            sendBuffer = Encoding.ASCII.GetBytes(strLine);
+            Main.WriteLine(">>" + strLine);
+            int rc = clientSocket.Send(sendBuffer);
+            Main.WriteLine(">>" + strLine);
+            rc = clientSocket.Send(sendBuffer);
+
+            string strData = Socket_Receive(clientSocket);
+            Main.WriteLine("<<" + strData);
+        }
+
+
+
+        public int First_Count = 0;
+        private static void 发送位置信息(int v, object default_position)
+        {
+            
+        }
+
+
+
+        public int IO_Write_Now = 0;
+        public int Count_PIDAI = 0;
+        //private string ip;
+
+        public int Loop_Read(string ip, int remotePort, string strRead)
+        {
+            int iRead = 0;
+            Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            clientSocket.Connect(ip, remotePort);
+
+            string strLine = "CONNECT Robot_access\r\n";//  Keep-Alive:-1
+            send_receive(clientSocket, strLine);
+
+            strLine = "HOSTCTRL_REQUEST IOREAD 9\r\n";
+            send_receive(clientSocket, strLine);
+
+            strLine = strRead;
+            string strData = send_receive(clientSocket, strLine);
+            Main.WriteLine("<<" + strData);
+            if (strData == "" || strData.StartsWith("ERROR:"))
+            {
+
+            }
+            else
+            {
+                string[] strSplit = strData.Split(',');
+                try
+                {
+                    iRead = int.Parse(strSplit[0]);
+                }
+                catch (Exception ex)
+                {
+                    Main.WriteLine(ex.Message);
+                }
+            }
+
+
+            clientSocket.Close();
+            return iRead;
+        }
+
+        public void 发送给安川机械臂写IO(string ip, int value)
+        {
+            Main.WriteLine("a=" + value);
+
+            int remotePort = 80;
+
+            Socket? clientSocket = null;
+            try
+            {
+                try
+                {
+                    string strLine;
+
+                    clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    clientSocket.Connect(ip, remotePort);
+                    strLine = "CONNECT Robot_access\r\n";//  Keep-Alive:-1
+                    send_receive(clientSocket, strLine);
+
+
+                    strLine = "HOSTCTRL_REQUEST LOADV 1,0," + value + "\r\n";
+                    strLine = "HOSTCTRL_REQUEST IOWRITE 17\r\n";
+                    send_receive(clientSocket, strLine);
+
+                    strLine = "27010,24," + value + ",1,1\r";
+                    send2_receive(clientSocket, strLine);//
+
+                    clientSocket.Close();
+
+                    clientSocket.Close();
+
+                }
+                catch (SocketException err)
+                {
+                    Main.WriteLine("Client: Error occured while sending or receiving data.");
+                    Console.WriteLine("   Error: {0}", err.Message);
+                }
+
+            }
+            catch (SocketException err)
+            {
+                Console.WriteLine("Client: Socket error occured: {0}", err.Message);
+            }
+
+        }
+
+        public void 安川机械臂运行某个程序(string ip, string strProgram)
+        {
+
+            int remotePort = 80;
+
+            Socket? clientSocket = null;
+            try
+            {
+                try
+                {
+                    string strLine;
+                    clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+                    clientSocket.Connect(ip, remotePort);
+
+                    //Thread.Sleep(1000);
+
+                    Main.WriteLine(Tools.TimeNow() + " Connect");
+
+                    strLine = "CONNECT Robot_access\r\n";//  Keep-Alive:-1
+                    send_receive(clientSocket, strLine);
+
+                    strLine = "HOSTCTRL_REQUEST START " + strProgram + "\r";//运行命令
+                    //strLine = "HOSTCTRL_REQUEST START TEST1024\r";//运行命令
+                    send_receive(clientSocket, strLine);
+
+                    clientSocket.Close();
+
+                    //Thread.Sleep(2000);
+                    Thread.Sleep(5000);
+
+                    //
+
+                    clientSocket.Close();
+
+                }
+                catch (SocketException err)
+                {
+                    Main.WriteLine("Client: Error occured while sending or receiving data.");
+                    Console.WriteLine("   Error: {0}", err.Message);
+                }
+
+            }
+            catch (SocketException err)
+            {
+                Console.WriteLine("Client: Socket error occured: {0}", err.Message);
+            }
+        }
+
+
+        public void 发送给安川机械臂WriteVar(C_Node pNode,string ip, string strProgram, string angle1_to_angle6)
+        {
+            Main.WriteLine("var" + angle1_to_angle6);
+
+            int remotePort = 80;
+
+            Socket? clientSocket = null;
+            try
+            {
+                try
+                {
+                    string strLine;
+
+                    clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+                    clientSocket.Connect(ip, remotePort);
+
+                    Main.WriteLine(Tools.TimeNow() + " Connect");
+
+                    strLine = "CONNECT Robot_access\r\n";//  Keep-Alive:-1
+                    send_receive(clientSocket, strLine);
+
+                    strLine = "HOSTCTRL_REQUEST START 2\r";//运行命令
+                    send_receive(clientSocket, strLine);
+
+                    strLine = "11\r";//运行命令
+                    send_receive(clientSocket, strLine);
+
+
+                    //new Task(() =>
+                    //{
+                    //    Console.Beep();
+                    //}).Start();
+
+                }
+                catch (SocketException err)
+                {
+                    Main.WriteLine("Client: Error occured while sending or receiving data.");
+                    Console.WriteLine("   Error: {0}", err.Message);
+                }
+
+            }
+            catch (SocketException err)
+            {
+                Console.WriteLine("Client: Socket error occured: {0}", err.Message);
+            }
+        }
+
+
+        public static void 发送给CPP(string strLine)
+        {
+            //发送数据
+            {
+                byte[] gbk = Encoding.UTF8.GetBytes(strLine);
+                //发送
+                发送给CPP_Byte(gbk);
+            }
+        }
+
+        /// <summary>
+        /// 给机械臂发送包裹抓取指令
+        /// </summary>
+        /// <param name="data"></param>
+        public static void 发送给CPP_Byte(byte[] data)
+        {
+            //string message = "";
+
+            //byte[] byteCount = BitConverter.GetBytes(data.Length);
+            //if (!m1.CPP_Server.Send(byteCount, ref message))
+            //{
+            //    Main.WriteLine("发送CPP指令异常：" + message);
+            //}
+            //else
+            //{
+            //    Main.WriteLine("发送CPP指令成功...");
+            //}
+
+            ////string strbt = BitConverter.ToString(data, 0).Replace("-", " ").ToUpper();
+            //Main.WriteLine("数据发送中...");
+            ////异常信息
+            //if (!m1.CPP_Server.Send(data, ref message))
+            //{
+            //    Main.WriteLine("发送CPP指令异常：" + message);
+            //}
+            //else
+            //{
+            //    Main.WriteLine("发送CPP指令成功...");
+            //}
+        }
+
+
+    }
+}

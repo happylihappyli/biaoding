@@ -1,0 +1,67 @@
+﻿[
+  {
+    "name": "show_tip",
+    "desc": "显示通知窗口",
+    "cmd": "Notification"
+  },
+  {
+    "name": "吸盘需要的一些类",
+    "desc": "吸盘需要的一些类",
+    "cmd": "Sucker_Cup"
+  },
+
+  {
+    "name": "表达式计算",
+    "desc": "表达式计算",
+    "cmd": "FunnyMath"
+  },
+
+  {
+    "name": "图漾摄像头",
+    "desc": "图漾摄像头",
+    "cmd": "Camera"
+  },
+  {
+    "name": "C_Index",
+    "desc": "全文索引需要用的类",
+    "cmd": "C_Index.cs"
+  },
+
+  {
+    "name": "C_Method",
+    "desc": "码垛有关",
+    "cmd": "C_Method.cs"
+  },
+  {
+    "name": "C_Block_Data",
+    "desc": "码垛有关",
+    "cmd": "C_Block_Data.cs"
+  },
+  {
+    "name": "C_Block_Simple",
+    "desc": "码垛有关",
+    "cmd": "C_Block_Simple.cs"
+  },
+  {
+    "name": "C_Block_Complex",
+    "desc": "码垛有关",
+    "cmd": "C_Block_Complex.cs"
+  },
+  {
+    "name": "C_Block_Space",
+    "desc": "码垛有关",
+    "cmd": "C_Block_Space.cs"
+  },
+  {
+    "name": "IModelDocExtension",
+    "desc": "SolidWorks",
+    "cmd": "IModelDocExtension.cs"
+  },
+  {
+    "name": "ISldWorksExtension",
+    "desc": "SolidWorks",
+    "cmd": "ISldWorksExtension.cs"
+  }
+
+
+]

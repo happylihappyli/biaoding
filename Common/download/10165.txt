@@ -1,0 +1,90 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 角度转脉冲
+    /// </summary>
+    public class S_Angle_To_Pulse : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string angle_dif = "0";
+        
+        
+        public S_Angle_To_Pulse(
+            string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            try
+            {
+                run_sub_main();
+            }catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            this.Next_Step = Node_Next.True;
+            string strLine = (string)space.read_vars(pTrain, this, key_read, "string");
+            if (strLine == null)
+            {
+                this.Next_Step = Node_Next.None;
+                space.console.WriteLine(this.Name + "key_read有问题", Level_Enum.Info, this.log_index,this.Name);
+                return;
+            }
+
+            string[] strSplit = strLine.Split(',');
+
+            double[] angle = new double[strSplit.Length];
+            if (strSplit.Length < 6)
+            {
+                space.remove_var(pTrain, this, key_save, "string");
+                return;
+            }
+            for (var i = 0; i < strSplit.Length; i++)
+            {
+                angle[i] = double.Parse(strSplit[i]);
+            }
+            angle[0] = angle[0] * 1435.35;
+            angle[1] = angle[1] * 1300.32;
+            angle[2] = angle[2] * 1422.23;
+            angle[3] = angle[3] * 970;
+            angle[4] = angle[4] * 980.24;
+
+            double angle_dif = double.Parse(this.angle_dif);//-69 (string)space.vars.read_vars(pTrain, "#angle_dif", "string"));
+            var angle6 = Math.Round(angle[5]);
+            //var angle6_old = angle6;
+            angle6 += angle_dif;
+            //space.console.WriteLine("angle6=" + angle6_old + " add=" + angle6);
+            angle[5] = Math.Round((angle6) * 454.75);
+
+            for (var i = 0; i < strSplit.Length; i++)
+            {
+                angle[i] = Math.Round(angle[i]);
+            }
+
+            string strLine2 = string.Join(",", angle);
+
+
+            space.save_vars(pTrain, this, key_save, "string", strLine2);
+
+        }
+
+
+
+    }
+}

@@ -1,0 +1,93 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Camera_Select : C_Node
+    {
+        public string key_table = ""; //表格数据
+        public string angle = "0";
+        public string key_save = "";
+        public string key_camera_index = "#相机索引";
+
+        public S_Camera_Select(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public double last_angle = 0;
+        public void run_sub_main()
+        {
+            string str_angle = this.read_string(this.angle);
+            double db_angle = double.Parse(str_angle);
+
+
+            Dictionary<string, List<C_BoxInfo>>? dic =
+                (Dictionary<string, List<C_BoxInfo>>?)this.read_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>");
+
+            if (dic == null)
+            {
+                dic = new Dictionary<string, List<C_BoxInfo>>();
+                this.save_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>", dic);
+            }
+
+            string str_index=this.read_string("@"+key_camera_index);
+            int index = int.Parse(str_index);
+
+            if (db_angle > -20 && db_angle < 20)
+            {
+                this.save_var(this.key_save, "", index + "");
+            }
+            else
+            {
+                if (last_angle == db_angle)
+                {
+                    //如果同一个角度就不切换相机
+                }
+                else
+                {
+                    for (var i = 1; i <= 3; i++)
+                    {
+                        string key = db_angle + "," + i;
+                        if (dic.ContainsKey(key))
+                        {
+                            List<C_BoxInfo> pList = dic[key];
+
+                            if (pList.Count > 0)
+                            {
+                                this.save_var(this.key_save, "", i + "");
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            this.save_var(this.key_save, "", index + "");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            
+
+
+
+        }
+
+    }
+
+
+
+}

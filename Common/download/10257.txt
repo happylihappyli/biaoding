@@ -1,0 +1,73 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class C_Cloud_Mid : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_save = "min";
+        public string xyz = "0";//0=x,1=y,2=z
+        public string percent = "0.5";
+
+        public C_Cloud_Mid(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? list=null;
+
+            if (this.key_read == "%main.3d")
+            {
+                C_Data? pData = (C_Data?)this.read_var("main", "C_Data");
+                list = pData?.list_3D_Point;
+            }
+            else if (this.key_read == "%main.3d.arm")
+            {
+                C_Data? pData = (C_Data?)this.read_var("main", "C_Data");
+                list = pData?.list_3D_Point_arm;
+            }
+            else
+            {
+                list = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+            }
+
+            if (list == null)
+            {
+                MessageBox.Show(this.space.Name+","+ this.Name + " 点云为空！ 是不是前面步骤过滤条件太严了！");
+                return;
+            }
+
+
+
+            double? value = 0;
+            if (list?.Count > 30)
+            {
+                int index = (int)Math.Round(double.Parse(percent) * list.Count);
+                value = Main.cloud_get_mid(this,list,xyz,index);
+            }
+            else
+            {
+                S_TTS.speak_async(this.Name + " 个数太少 n<30 可能点云有问题，或者没有包裹!");
+                return;
+            }
+
+
+            this.save_var(this.key_save, "double", value);
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

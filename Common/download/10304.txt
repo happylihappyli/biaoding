@@ -1,0 +1,28 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class U_Console_Write : C_Node
+    {
+        public string msg = "test";
+        public U_Console_Write(string Name, C_Space space_parent, C_Space space) : 
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            Main.WriteLine(this, " run");
+            string line = this.read_string(msg);
+            Main.WriteLine(line);
+        }
+    }
+}

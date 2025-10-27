@@ -1,0 +1,281 @@
+﻿
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class C_Block_Data
+    {
+        public int x_max = 0;
+        public int y_max = 0;
+        public int z_max = 0;
+        public int palletize_Width = 120;
+
+        public ArrayList pDNA_Pool = new ArrayList();
+        public ArrayList pArrayMethod = new ArrayList();//所有的放置方法
+
+        public List<C_Box> pArrayBoxs = new List<C_Box>();//需要放置的盒子
+        public List<C_Box_Type> pArrayBoxs_Type = new List<C_Box_Type>();//需要放置的盒子的类型
+
+        public List<C_Block_Simple> block_list = new List<C_Block_Simple>();//简单方块列表
+        public List<C_Block_Complex> block_list_complex = new List<C_Block_Complex>();//复杂方块列表(几个简单方块组合而成)
+
+        public void rnd_box(int count, List<C_Box> pList)
+        {
+            Random rnd = new Random();
+            for (var i = 0; i < count; i++)
+            {
+                var index = rnd.Next(pList.Count);
+                C_Box pBox = pList[index];
+                pArrayBoxs.Add(
+                    new C_Box("", 0, 0, 0, pBox.Type, pBox.x_len, pBox.y_len, pBox.z_len, 0, 0, 0));
+            }
+        }
+
+
+
+        public double get_max_x_len(List<C_Box> pArrayBoxs)
+        {
+            double max = 0;
+            for (var i = 0; i < pArrayBoxs.Count; i++)
+            {
+                C_Box item = pArrayBoxs[i];
+                if (item.x_len > max)
+                {
+                    max = item.x_len;
+                }
+            }
+            return max;
+        }
+
+
+        public (string space, string thickness, int type_count) load_data(string strFile)
+        {
+            if (File.Exists(strFile) == false)
+            {
+                MessageBox.Show("盒子配置信息不存在");
+            }
+
+            string strSpace = "";
+            string thickness = "";
+            this.pArrayBoxs_Type.Clear();
+            {
+                string str_type = "";
+                string fileName = strFile;// open.FileName;
+                using (var file = new StreamReader(fileName))
+                {
+                    string line;
+                    while ((line = file.ReadLine()) != null)
+                    {
+                        if (line == "[space]")
+                        {
+                            str_type = "read_space";
+                        }
+                        if (line == "[boxs]")
+                        {
+                            str_type = "read_boxs";
+                            this.pArrayBoxs.Clear();
+                        }
+                        if (line == "[thickness]")
+                        {
+                            str_type = "read_thickness";
+                        }
+                        if (line == "[end]")
+                        {
+                            str_type = "";
+                        }
+
+                        if (str_type == "read_space")
+                        {
+                            if (line != "[space]")
+                            {
+                                strSpace = line;
+                            }
+                        }
+
+                        if (str_type == "read_thickness")
+                        {
+                            if (line != "[thickness]")
+                            {
+                                thickness = line;
+                            }
+                        }
+
+
+                        if (str_type == "read_boxs")
+                        {
+                            if (line != "[boxs]")
+                            {
+
+                                var strSplit = line.Split(',');
+                                if (strSplit.Length > 4)
+                                {
+                                    if (strSplit[0] == "id")
+                                    {
+                                        continue;
+                                    }
+                                    int x_len = int.Parse(strSplit[1]);
+                                    int y_len = int.Parse(strSplit[2]);
+                                    int z_len = int.Parse(strSplit[3]);
+                                    int count = int.Parse(strSplit[4]);
+
+                                    C_Box_Type pBox_Type = new C_Box_Type(-1,int.Parse(strSplit[0]),
+                                         x_len, y_len, z_len, pArrayBoxs_Type.Count);
+                                    pBox_Type.count = count;
+
+                                    pArrayBoxs_Type.Add(pBox_Type);
+
+                                    for (var i = 0; i < count; i++)
+                                    {
+                                        C_Box pBox = new C_Box("", line);
+                                        pArrayBoxs.Add(pBox);
+                                        pBox.pBox_Type = pBox_Type;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                init_space(strSpace);
+
+            }
+            return (strSpace, thickness, pArrayBoxs_Type.Count);
+        }
+
+        public void init_space(string strSpace)
+        {
+            string[] strSplit = strSpace.Split(',');
+
+            this.x_max = int.Parse(strSplit[0]);
+            this.y_max = int.Parse(strSplit[1]);
+            this.z_max = int.Parse(strSplit[2]);
+
+            Console.WriteLine("初始化完毕！");
+        }
+
+
+
+        public static List<int> DNA_Cross(ArrayList pDNA_Pool)
+        {
+            Random random = new Random();
+            int index = random.Next(pDNA_Pool.Count - 1);
+            C_Method pMethod1 = (C_Method)pDNA_Pool[index];
+            C_Method pMethod2 = (C_Method)pDNA_Pool[index + 1];
+
+            List<int> dna2 = new List<int>();
+            for (var i = 0; i < pMethod1.dna.Count; i++)
+            {
+                int value1 = (int)pMethod1.dna[i];
+                int value2 = (int)pMethod2.dna[i];
+                if (value1 == value2)
+                {
+                    dna2.Add(value1);
+                }
+                else
+                {
+                    if (random.Next(2) == 1)
+                    {
+                        dna2.Add(value1);
+                    }
+                    else
+                    {
+                        dna2.Add(value2);
+                    }
+                }
+            }
+            return dna2;
+        }
+
+        public static List<int> Get_DNA_New(C_Method pMethod1, List<int> dna2)
+        {
+            Random rnd = new Random();
+            int iCount = 1 + rnd.Next(19);
+            int index2 = pMethod1.iStart;
+            for (var k = 0; k < iCount; k++)
+            {
+                int value = (int)pMethod1.dna[index2 + k];
+                if (rnd.Next(5) > 1) //60%的概率变
+                {
+                    if (value == 1)
+                    {
+                        dna2[index2 + k] = 2;
+                    }
+                    else
+                    {
+                        dna2[index2 + k] = 1;
+                    }
+                }
+            }
+            return dna2;
+        }
+
+        public static C_Method copy_dna(C_Method pMethod2, int iStart)
+        {
+            C_Method pMethod1 = pMethod2;
+            pMethod1.dna = pMethod2.dna;
+            pMethod1.iStart = iStart;
+            if (pMethod1.iStart > 170) pMethod1.iStart = 0;
+            return pMethod2;
+        }
+
+
+
+
+
+        public static ArrayList 过滤大于这个高度的(
+            ArrayList pArrayMethod1, int iValue)
+        {
+            ArrayList pArrayMethod2 = new ArrayList();//需要放置的盒子
+
+            for (var i = 0; i < pArrayMethod1.Count; i++)
+            {
+                C_Method pMethod = (C_Method)pArrayMethod1[i];
+                if (pMethod.max_height() <= iValue)
+                {
+                    pArrayMethod2.Add(pMethod);
+                }
+            }
+            return pArrayMethod2;
+        }
+        public static int 查找最低的max(ArrayList pArrayMethod1)
+        {
+            int iMax = 100000;
+
+            for (var i = 0; i < pArrayMethod1.Count; i++)
+            {
+                C_Method pMethod = (C_Method)pArrayMethod1[i];
+                if (pMethod.max_height() < iMax)
+                {
+                    iMax = pMethod.max_height();
+                }
+            }
+            return iMax;
+        }
+		
+		
+		
+        public C_Block_Data Clone()
+        {
+            C_Block_Data p = new C_Block_Data();
+            for (var i = 0; i < block_list.Count; i++)
+            {
+                C_Box_Type box_Type = block_list[i].box_type;
+                p.block_list.Add(block_list[i].Clone(box_Type));
+            }
+
+            for (var i = 0; i < block_list_complex.Count; i++)
+            {
+                C_Box_Type box_Type = block_list_complex[i].pBox_Type;
+                p.block_list_complex.Add(block_list_complex[i].Clone(box_Type));
+            }
+            return p;
+        }
+		
+    }
+}

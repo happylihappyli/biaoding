@@ -1,0 +1,50 @@
+﻿
+using Common_Robot2;
+
+
+namespace Test1
+{
+    //字符串切换结尾字符串","inPorts": ["in"],"outPorts": ["out"],"image_url": "","image": "","content":"说明信息"}
+    public class String_Cut_End: C_Node
+    {
+        //"key_read""读取字符串变量","var_type":"string","required":"1","var":"1","type_group":"","help": ""}
+        public string key_read = "";
+        //"pattern""要切割的部分字符串","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string pattern = ".txt";
+        //"key_save""写字符串变量","var_type":"string","required":"1","var":"1","type_group":"","help": ""}
+        public string key_save = "";
+
+        
+        public override void init()
+        {
+
+        }
+
+        public String_Cut_End(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string? line = (string?)this.read_var(key_read, "string");
+
+            if (line != null)
+            {
+                if (line.EndsWith(pattern))
+                {
+                    line=line.Substring(0,line.Length-pattern.Length);
+                }
+            }
+
+            this.save_var(key_save, "string", line);
+        }
+
+    }
+}

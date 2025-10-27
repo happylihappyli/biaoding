@@ -1,0 +1,78 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class U_List_View_From_List : C_Node
+    {
+        public ListView ui_item = null;
+
+        public string key_ui = "";
+        public string key_read = "";
+        public string split=",";
+
+        public U_List_View_From_List(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+
+            S_List_View pItem = (S_List_View)space.vars_ui[key_ui];
+            ui_item = pItem.ui_item;
+
+
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+                    string text = "";
+                    int index = -1;
+                    if (ui_item.SelectedItems.Count>0)
+                    {
+                        text = ui_item.SelectedItems[0].Text;
+                        index = ui_item.SelectedItems[0].Index;
+                    }
+
+                    ui_item.Items.Clear();
+                    
+                    List<string>? lines = (List<string>?)this.read_var(this.key_read, "List<string>");
+
+                    if (lines != null)
+                    {
+                        for (var k = 0; k < lines.Count; k++)
+                        {
+                            string line = lines[k];
+                            string[] strSplit = line.Split(this.split);
+                            ListViewItem item = ui_item.Items.Add(strSplit[0]);
+
+                            for (var i = 1; i < strSplit.Length; i++)
+                            {
+                                item.SubItems.Add(strSplit[i]);
+                            }
+                        }
+                    }
+                    if (index > 0)
+                    {
+                        if (index<ui_item.Items.Count && ui_item.Items[index].Text == text)
+                        {
+                            ui_item.Items[index].Selected = true;
+                        }
+                    }
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+        }
+    }
+}

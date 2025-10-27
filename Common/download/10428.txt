@@ -1,0 +1,97 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class D_Draw_Circle : C_Node
+    {
+
+        public string color = "red";
+        public string pic_read = "camera1";
+        public string pic_save = "";
+
+
+        public string key_rgb = "";
+        public string key_rgb2 = "";
+        public string pen_width = "3";
+        public string key_center = "";
+        public string r = "";
+
+
+        public D_Draw_Circle(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+           // //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (key_rgb != "")
+            {
+                pic_read = key_rgb;
+            }
+
+            if (key_rgb2 != "")
+            {
+                pic_save = key_rgb2;
+            }
+
+            C_Point3D? center = (C_Point3D?)this.read_var(key_center, "C_Point3D");
+            if (center == null)
+            {
+                MessageBox.Show("center=null" + Name);
+                return;
+            }
+
+            if (pTrain == null) return;
+            if (this.read_var(pic_read, "Bitmap") == null)
+            {
+                MessageBox.Show("pic_read=null" + Name);
+                return;
+            }
+            Bitmap? pBitmapRGB = (Bitmap?)this.read_var(pic_read, "Bitmap");
+
+
+            if (pBitmapRGB != null)
+            {
+                lock (pBitmapRGB)
+                {
+                    int width = pBitmapRGB.Width;
+                    int height = pBitmapRGB.Height;
+                    Bitmap a = new Bitmap(width, height);
+                    Graphics g = Graphics.FromImage(a);
+                    g.DrawImage(pBitmapRGB,
+                        new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                                (int)space.vars.draw_offset_y_tuyang,
+                            pBitmapRGB.Width - (int)space.vars.draw_offset_x_tuyang,
+                            pBitmapRGB.Height - (int)space.vars.draw_offset_y_tuyang),
+                        new Rectangle(0, 0, pBitmapRGB.Width, pBitmapRGB.Height),
+                        GraphicsUnit.Pixel);
+
+                    if (color == "") color = "red";
+                    Pen pPen = new Pen(ColorTranslator.FromHtml(color), int.Parse(pen_width));
+
+                    float f_r = float.Parse(r);
+                    float w = f_r * 2;
+                    float h = f_r * 2;
+
+                    g.DrawEllipse(pPen, center.x - f_r, center.y - f_r, w, h);
+
+                    this.save_var(pic_save, "Bitmap", a);
+                }
+            }
+
+        }
+    }
+}

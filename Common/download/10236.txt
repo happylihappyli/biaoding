@@ -1,0 +1,365 @@
+﻿using Common_Robot;
+using Newtonsoft.Json.Linq;
+using pcammls;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    /// <summary>
+    /// 码垛算法模块
+    /// </summary>
+    public class S_Palletizing2 : C_Node
+    {
+        private C_Planet Bottom1 = null;
+        private C_Rect pRect1 = null;
+        private C_Camera_TuYang camera1 = null;
+
+        public string palletize_x_len = "120";
+        public string palletize_y_len = "120";
+        public string right_bottom = "0";
+
+        public string key_put = "";//放置位置信息 C_Point3D
+        public string key_put_angle = "";//放置的角度变量
+
+        public string key_cloud = "#cloud2";
+        public string key_bottom = "#Bottom2";
+        public string key_camera = "#camera2";
+        public string key_tray_center = "#托盘中心";
+        public string key_tray_angle = "#托盘角度";
+
+        public string box_height = "210";
+        public string thickness = "30";
+
+        private C_Point3D arm_center = null;//托盘中心在机械臂下坐标
+
+        public string tray_angle = "0";//托盘的角度    45";//旋转 30 度
+        public string key_boxs = "";
+        public string key_save="";//List<C_Box> 所有要放置盒子的位置信息，高度不一样了
+        public string file= "d:/data2/tray1.txt";
+
+        public int i_box_height = 0;
+        public int height_put = 1;// 比实际高2cm的位置释放
+
+        public S_Palletizing2(string v, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = v;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+    { 
+            try
+            {
+                init();
+                run_sub_main();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+            return Task.CompletedTask;
+        }
+
+
+        /// <summary>
+        /// 把点云转化为放置矩阵
+        /// </summary>
+        public void run_sub_main()
+        {
+            Console.WriteLine("------------------" + this.Name + "----------start--------");
+
+            int x_len = int.Parse(this.palletize_x_len);
+            int y_len = int.Parse(this.palletize_y_len);
+
+            C_Method pMethod1 = new C_Method(null, space, 3, 3, 1, 1);//辅助搜索用的，把0-60区域盒子放好
+
+            List<C_Point3D> pList =  (List<C_Point3D>)space.vars.read_vars(pTrain, this, this.key_cloud, "List<C_Point3D>");
+            if (pList == null)
+            {
+                MessageBox.Show(this.Name+ "key_cloud = null ");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+
+
+            //string 格式 x_len,y_len,z_len,x,y,z，这个坐标的原点是是托盘图片的左上角 x超右，y朝下的屏幕坐标
+            List<string> list_boxs = (List<string>)space.vars.read_vars(pTrain, this, this.key_boxs, "List<string>");
+            if (list_boxs == null)
+            {
+                MessageBox.Show(this.Name + " key_boxs = null ");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+
+            List<C_Point3D> list2 = new List<C_Point3D>();
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+                C_Point3D arm_p = Tools.摄像头坐标转到机械臂坐标(camera1, p);
+                list2.Add(arm_p);
+
+            }
+
+            //Main.save_cloud("D:\\p1_c.txt", pList);
+            //Main.save_cloud("D:\\p2_c.txt", list2);
+
+
+            List<C_Point3D> list3 = new List<C_Point3D>();
+            int[,] grid_height_count = new int[x_len + 30, y_len + 30];
+            bool bDebug = false;
+            for (int i = 0; i < list2.Count; i++)
+            {
+                C_Point3D p = pList[i];
+                C_Point3D arm_p = list2[i];// Tools.摄像头坐标转到机械臂坐标(camera1, p);
+
+                C_Point3D tray_p = this.arm_to_tray(arm_p);
+                list3.Add(tray_p);
+
+                C_Point3D index = Tray_Point_To_Index(tray_p);
+
+
+                int index_x = (int)Math.Round(index.x);
+                int index_y = (int)Math.Round(index.y);
+                int index_z = (int)Math.Round(index.z);
+                
+
+                if (index_x >= 0 && index_x < x_len + 30 &&
+                    index_y >= 0 && index_y < y_len + 30 && index_z >= -5)
+                {
+                    //每个格子的高度都放到数组，找最大的
+                    if (pMethod1.grid_height[index_x, index_y] == null)
+                    {
+                        pMethod1.grid_height[index_x, index_y] = new List<int>();
+                    }
+                    pMethod1.grid_height[index_x, index_y].Add(index_z);
+
+                    if (bDebug)
+                    {
+                        p.pExtend = new C_Color(255, (byte)(index_x + 100), (byte)(index_y + 100));
+                    }
+                }
+                else
+                {
+                    if (bDebug)
+                    {
+                        p.pExtend = new C_Color(0, 0, 255);
+                    }
+                }
+            }
+            //Main.save_cloud("D:\\p3.txt", list3);
+
+
+            if (bDebug)
+            {
+                StreamWriter file = new StreamWriter("d:\\cloud_color.txt");
+
+                foreach (C_Point3D p in pList)
+                {
+                    file.WriteLine(p.ToString());// + "," + p.pExtend.ToString());
+                }
+                file.Close();
+            }
+
+            for (var index_x = 0; index_x < int.Parse(this.palletize_x_len); index_x++)
+            {
+                for (var index_y = 0; index_y < int.Parse(this.palletize_y_len); index_y++)
+                {
+                    List<int> arr = pMethod1.grid_height[index_x, index_y];
+                    if (arr != null && arr.Count > 0)
+                    {
+                        List<int> arr2 = arr.OrderBy(a => a).ToList();//将数组从小到大排列
+                        int count = arr2.Count();
+                        int value = arr2[count - 1];//取最大的
+
+                        pMethod1.grid_height2[index_x, index_y] = value;
+                    }
+                    else
+                    {
+                        pMethod1.grid_height2[index_x, index_y] = 0;
+                    }
+                }
+            }
+
+
+
+            if (1==1)
+            {
+                Console.WriteLine(this.Name + "grid_print");
+                string grid = pMethod1.grid_print2();
+                //File.WriteAllText("D:\\grid2_B.txt", grid);
+            }
+
+            if (int.Parse(this.palletize_x_len) > 120 || int.Parse(this.palletize_y_len) > 120)
+            {
+                Console.Beep(2000, 1000);
+                S_TTS.speak_async("底座最大为120cm*120cm");
+                MessageBox.Show(this.Name + "底座最大为120cm*120cm");
+                return;
+            }
+
+            string box_height = space.tools.var_read(pTrain, this, this.box_height);
+            //box_height
+            this.i_box_height = int.Parse(box_height);
+            C_Box pBox_Put = pMethod1.搜索放置位置2(this, pTrain,this.key_save, list_boxs, this,
+                int.Parse(this.palletize_x_len), int.Parse(this.palletize_y_len), i_box_height);
+
+
+            if (pBox_Put == null)
+            {
+                S_TTS.speak_async("开始计算新的盒子");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            else
+            {
+                this.Next_Step = Node_Next.True;
+            }
+
+            Console.WriteLine("=================" + this.Name+ " 放置位置1=" + pBox_Put.pos.x + "," + pBox_Put.pos.y + "," + pBox_Put.pos.z);
+
+            if (pBox_Put.index_k < 0)
+            {
+                MessageBox.Show(this.Name+ " 放置高度不对 index_k<0 ");
+                this.Next_Step = 0;
+            }
+
+            //这里单位是cm
+            C_Point3D p3_tray = new C_Point3D(pBox_Put.pos.x + (pBox_Put.x_len + int.Parse(thickness)) / 2,
+                pBox_Put.pos.y + (pBox_Put.y_len + int.Parse(thickness)) / 2, pBox_Put.pos.z + height_put);//height_put=5是放置位置上面5cm
+
+            C_Point3D p3 = tray_to_arm(p3_tray);
+
+
+            space.vars.save_vars(pTrain, this, this.key_put, "C_Point3D", p3);
+
+            string angle_box = "0";
+            if (pBox_Put.x_len > pBox_Put.y_len)
+            {
+                angle_box = "90";
+            }
+
+            space.vars.save_vars(pTrain, this,this.key_put_angle, "string", (double.Parse(angle_box)) + "");
+            
+            Console.WriteLine("================="+this.Name + " 放置位置2=" + p3.ToString());
+            Console.WriteLine("=================" + this.Name + " 放置角度=" + angle_box);
+            Console.WriteLine("=================" + this.Name + " "+ pBox_Put.x_len + ", "+pBox_Put.y_len);
+            Console.WriteLine("=================");
+        }
+
+        /// <summary>
+        /// 码垛 初始化，底面信息
+        /// </summary>
+        public void init()
+        {
+            camera1 = (C_Camera_TuYang)space.vars.read_vars(pTrain, this, this.key_camera, "C_Camera_TuYang");
+            if (camera1 == null)
+            {
+                MessageBox.Show(this.Name + " camera1=null，key_camera 设置有问题");
+                return;
+            }
+
+            Bottom1 = (C_Planet)space.vars.read_vars(pTrain, this, this.key_bottom, "C_Planet");
+            if (Bottom1 == null)
+            {
+                MessageBox.Show(this.Name + " Bottom2=null，key_bottom 设置有问题");
+                return;
+            }
+
+
+            //pRect1 = (C_Rect)space.vars.read_vars(pTrain, this, this.key_rect1, "C_Rect");
+            //if (pRect1 == null)
+            //{
+            //    MessageBox.Show(this.Name + " pRect1=null, key_rect1 设置有问题");
+            //    return;
+            //}
+
+
+            C_Point3D tray_center = (C_Point3D)space.vars.read_vars(pTrain, this, key_tray_center, "C_Point3D");
+
+            if (tray_center == null)
+            {
+                MessageBox.Show(this.Name + " tray_center == null, key_tray_center 设置 有问题");
+                return;
+            }
+
+            arm_center = tray_center;
+
+            if (space.vars.contains(pTrain, this, key_tray_angle, "string"))
+            {
+                this.tray_angle = (string)space.vars.read_vars(pTrain, this, key_tray_angle, "string");
+            }
+        }
+
+
+
+        /// <summary>
+        /// 机械臂坐标转化为托盘坐标
+        /// </summary>
+        /// <param name="p1"></param>
+        /// <returns></returns>
+        public C_Point3D arm_to_tray(C_Point3D p1)
+        {
+            C_Point3D p2 = p1.subtract(arm_center);
+
+            double a = double.Parse(tray_angle) / 180 * Math.PI;
+            a = -a;
+            return new C_Point3D(p2.x * Math.Cos(a) - p2.y * Math.Sin(a), p2.x * Math.Sin(a) + p2.y * Math.Cos(a), p2.z);
+        }
+
+        /// <summary>
+        /// 托盘坐标转化机械臂坐标
+        /// </summary>
+        /// <param name="p1"></param>
+        /// <returns></returns>
+        public C_Point3D tray_to_arm(C_Point3D p1)
+        {
+            double a = double.Parse(tray_angle) / 180 * Math.PI;
+           // a = -a;
+            C_Point3D p2 = new C_Point3D(p1.x * Math.Cos(a) - p1.y * Math.Sin(a), p1.x * Math.Sin(a) + p1.y * Math.Cos(a), p1.z);
+
+            return p2.add(arm_center);
+        }
+        public C_Point3D tray_to_arm(float x, float y, float z)
+        {
+            double a = double.Parse(tray_angle) / 180 * Math.PI;
+           // a = -a;
+            C_Point3D p2 = new C_Point3D(x * Math.Cos(a) - y * Math.Sin(a), x * Math.Sin(a) + y * Math.Cos(a), z);
+
+            return p2.add(arm_center);
+        }
+
+
+        /// <summary>
+        /// 托盘坐标转化为数组下标
+        /// </summary>
+        /// <param name="p1"></param>
+        /// <returns></returns>
+        public C_Point3D Tray_Point_To_Index(C_Point3D p1)
+        {
+            int x_len = int.Parse(this.palletize_x_len) * 10;
+            int y_len = int.Parse(this.palletize_y_len) * 10;
+            C_Point3D p2 = p1.add(new C_Point3D(x_len * 0.5, y_len * 0.5, 0));
+            return p2.scale(0.1);
+        }
+
+        public C_Point3D Index_To_Tray_Point(C_Point3D p1)
+        {
+            int x_len = int.Parse(this.palletize_x_len) * 10;
+            int y_len = int.Parse(this.palletize_y_len) * 10;
+            C_Point3D p2 = p1.scale(10).subtract(new C_Point3D(x_len * 0.5, y_len * 0.5, 0));
+
+            return p2;
+        }
+
+    }
+}

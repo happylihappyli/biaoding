@@ -1,0 +1,61 @@
+﻿using Common_Robot2;
+using System;
+using System.Text;
+using System.Threading;
+using System.Net.Sockets;
+using System.Net;
+using System.Collections;
+using System.Threading.Tasks;
+using System.Timers;
+
+namespace Test1
+{
+    public class S_Timer :C_Node
+    {
+
+        public string Count = "1000";//1000 代表 1秒
+        public string key_stop = "#time1_stop";// 读取变量，如果这个变量=1就停止循环
+
+
+        public S_Timer(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            Task.Run(() => {
+                while (space.vars.bClosingWindows == false)
+                {
+                    int times = int.Parse(this.Count);
+                    Thread.Sleep(times);
+
+                    string? time_stop = (string?)this.read_var(this.key_stop, "string");
+                    if (time_stop == "1")
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        Random p = new Random();
+                        string id = p.Next(100, 999) + "";
+                        I_Train pTrain = CommonMain.Train_Factory.create(id);
+                        pTrain.mode = this.mode;
+                        this.Run(pTrain);
+                    }
+                }
+            });
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+        }
+    }
+}

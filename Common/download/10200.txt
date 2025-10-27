@@ -1,0 +1,93 @@
+﻿
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class C_Cloud_Transform : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string key_camera = "";
+
+        public C_Cloud_Transform(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            List<C_Point3D> list1;// = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+
+            if (this.key_read == "%main.3d")
+            {
+                C_Data pData = (C_Data)this.read_var("main","");
+                list1 = pData.list_3D_Point;
+            }
+            else
+            {
+                list1 = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+            }
+
+
+            if (list1 == null)
+            {
+                MessageBox.Show(this.Name + ",key_read 设置 错误");
+            }
+
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(this.key_camera, "C_Camera_TuYang");
+            if (camera1 == null )
+            {
+                MessageBox.Show(this.Name + ",key_camera 设置 错误");
+            }
+
+            List<C_Point3D> list2 = new List<C_Point3D>();
+
+            float x0 = camera1.p1_center.x;
+            float y0 = camera1.p1_center.y;
+            float z0 = camera1.p1_center.z;
+            float x1 = camera1.p2_center.x;
+            float y1 = camera1.p2_center.y;
+            float z1 = camera1.p2_center.z;
+            DenseMatrix m1=camera1.M_Rotate;
+
+            for (var i = 0; i < list1.Count; i++)
+            {
+                C_Point3D p1 = list1[i];
+                C_Point3D p2 = convert(x0, y0, z0, x1, y1, z1, m1, p1);// Tools.摄像头坐标转到机械臂坐标(camera1, p1);
+                list2.Add(p2);
+            }
+            this.save_var(this.key_save, "List<C_Point3D>", list2);
+        }
+
+
+        public C_Point3D convert(
+            float x0,float y0,float z0,float x1,float y1,float z1,
+            DenseMatrix m1,C_Point3D pPoint)
+        {
+            DenseMatrix denseMatrix = DenseMatrix.OfArray(new double[3, 1]
+            {
+                { pPoint.x - x0 },
+                { pPoint.y - y0 },
+                { pPoint.z - z0 }
+            });
+            Matrix<double> matrix = denseMatrix.Transpose().Multiply(m1);
+            return new C_Point3D(matrix[0, 0] + x1, matrix[0, 1] + y1, matrix[0, 2] + z1);
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

@@ -1,0 +1,63 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Bar: C_Node
+    {
+        public StatusStrip bar;
+        public ToolStripStatusLabel label;
+        public string value = "";
+        public string read_key = "";
+        public S_Bar(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public void init(Form pFrm)
+        {
+            bar = new StatusStrip();
+            bar.Size = new System.Drawing.Size(900, 26);
+            pFrm.Controls.Add(bar); 
+
+            label = new ToolStripStatusLabel();
+            label.Text = "hello world";
+            label.Size = new System.Drawing.Size(167, 20);
+
+            bar.Items.AddRange(
+                new ToolStripItem[] {label}
+                );
+
+            bar.SuspendLayout();
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            if (pTrain.vars.ContainsKey(read_key))
+            {
+                value = (string)pTrain.vars[read_key].pObj;
+            }
+
+            Action act = delegate ()
+            {
+                if (label != null)
+                    label.Text = value;
+            };
+            if (bar != null)
+                bar.BeginInvoke(act, null);
+        }
+    }
+}

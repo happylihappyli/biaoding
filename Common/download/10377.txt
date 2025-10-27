@@ -1,0 +1,52 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class F_Next_If_Contain : C_Node
+    {
+        public string var = "pPlanet_Top";
+        public string type = "C_Planet_Catch";
+
+        public F_Next_If_Contain(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            if (space.contains(pTrain,this, var, type)) // pTrain.vars.ContainsKey
+            {
+                if (space.read_vars(pTrain, this, var, type) != null)
+                {
+                    Main.WriteLine(this, Name + "包含某个变量 =" + var);
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Main.WriteLine(this, Name + " var=null" + var);
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else
+            {
+                Main.WriteLine(this, Name + " 不包含var！" + var);
+                Next_Step = Node_Next.False;
+            }
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

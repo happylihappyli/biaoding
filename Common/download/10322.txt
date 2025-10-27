@@ -1,0 +1,137 @@
+﻿using Common_Robot;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Math;
+
+namespace Test1
+{
+    public class S_Read_Robot_From_File : C_Node
+    {
+
+        public C_Robot pRobot = new C_Robot();
+        public string key_save = "#robot1";
+        //public string oz = "";
+        //public string dz = "";
+        //public string c2d = "";
+        //public string bc2 = "";
+        //public string tools_len = "";
+
+        //public string bottom0;
+        //public string rotate0;
+        //public string bottom1;
+        //public string rotate1;
+        //public string bottom2;
+        //public string rotate2;
+        //public string bottom3;
+        //public string rotate3;
+        //public string bottom4;
+        //public string rotate4;
+        //public string bottom5;
+        //public string rotate5;
+
+        public string file = "";//要读取的配置文件
+
+        public S_Read_Robot_From_File(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public Vector3 get_Vector3_from_string(string strLine)
+        {
+            var strSplit = strLine.Split(',');
+
+            if (strSplit.Length > 2)
+            {
+                return new Vector3(float.Parse(strSplit[0]), float.Parse(strSplit[1]), float.Parse(strSplit[2]));
+            }
+            else
+            {
+                return new Vector3(0, 0, 0);
+            }
+
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            IniFile myIni = new IniFile(file);
+            string oz = myIni.ReadString("robot", "oz", "0");
+            string dz = myIni.ReadString("robot", "dz", "0");
+            string c2d = myIni.ReadString("robot", "c2d", "0");
+            string bc2 = myIni.ReadString("robot", "bc2", "0");
+            string bc = myIni.ReadString("robot", "bc", "0");
+            string cc2 = myIni.ReadString("robot", "cc2", "0");
+            string tools_len = myIni.ReadString("robot", "tools_len", "0");
+
+
+            pRobot.init_robot(
+                double.Parse(oz),
+                double.Parse(dz),
+                double.Parse(c2d),
+                double.Parse(bc),
+                double.Parse(cc2),
+                double.Parse(tools_len));
+
+
+            {
+
+                string bottom0 = myIni.ReadString("robot", "bottom0", "0");
+                string rotate0 = myIni.ReadString("robot", "rotate0", "0");
+
+                string bottom1 = myIni.ReadString("robot", "bottom1", "0");
+                string rotate1 = myIni.ReadString("robot", "rotate1", "0");
+
+                string bottom2 = myIni.ReadString("robot", "bottom2", "0");
+                string rotate2 = myIni.ReadString("robot", "rotate2", "0");
+
+                string bottom3 = myIni.ReadString("robot", "bottom3", "0");
+                string rotate3 = myIni.ReadString("robot", "rotate3", "0");
+
+                string bottom4 = myIni.ReadString("robot", "bottom4", "0");
+                string rotate4 = myIni.ReadString("robot", "rotate4", "0");
+
+                string bottom5 = myIni.ReadString("robot", "bottom5", "0");
+                string rotate5 = myIni.ReadString("robot", "rotate5", "0");
+
+
+                pRobot.bottom_L[0] = get_Vector3_from_string(bottom0);// new Vector3(0, 0, 0);//轴1的中心
+                pRobot.obj_rotate[0] = get_Vector3_from_string(rotate0);// new Vector3(0, 0, -1);//, 0);//L1旋转的向量,和安川相反
+
+                pRobot.bottom_L[1] = get_Vector3_from_string(bottom1);// new Vector3(2.6f, 0, 0);//轴2的中心
+                pRobot.obj_rotate[1] = get_Vector3_from_string(rotate1);// new Vector3(0, 1, 0);//L2旋转的向量
+
+                pRobot.bottom_L[2] = get_Vector3_from_string(bottom2);// new Vector3(2.6f, 0, 9.45f);//轴3的中心
+                pRobot.obj_rotate[2] = get_Vector3_from_string(rotate2);//new Vector3(0, 1, 0);//L3旋转的向量,和安川相反
+
+                pRobot.bottom_L[3] = get_Vector3_from_string(bottom3);//new Vector3(2.6f, 0, 9.45f);//轴4的中心 estun机械臂，这里假设轴4是锁定的
+                pRobot.obj_rotate[3] = get_Vector3_from_string(rotate3);//new Vector3(-1, 0, 0);//L4旋转的向量
+
+                pRobot.bottom_L[4] = get_Vector3_from_string(bottom4);//new Vector3(12.85f, 0, 9.45f);//轴5的中心
+                pRobot.obj_rotate[4] = get_Vector3_from_string(rotate4);//new Vector3(0, -1, 0);//L5旋转的向量
+
+                pRobot.bottom_L[5] = get_Vector3_from_string(bottom5);//new Vector3(15.10f, 0, 9.45f);//轴6的中心
+                pRobot.obj_rotate[5] = get_Vector3_from_string(rotate5);// new Vector3(-1, 0, 0);//L6旋转的向量
+            }
+
+
+            space.vars.save_vars(pTrain, this, key_save, "C_Robot", pRobot);
+        }
+    }
+}

@@ -1,0 +1,268 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_PictureBox : S_UI
+    {
+        public PictureBox? picture_box;
+        public Panel? panel;
+        public string url = "";
+        public string read_key = "";
+        public List<C_Point3D> polygonPoints = new List<C_Point3D>();//绘制多边形的数据
+
+        public S_PictureBox(string name, C_Space space_parent, C_Space space) : 
+            base(name, space_parent, space)
+        {
+        }
+
+        public void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+
+            if (this.picture.StartsWith("@#"))
+            {
+                this.key_field = this.picture.Substring(1);
+                space.pUI_Update.TryAdd(this.key_field, this);
+            }
+
+            if (this.url == "")
+            {
+
+                picture_box = new PictureBox();
+                picture_box.Location = new System.Drawing.Point(0, 0);
+                picture_box.Size = new Size(width + 100, height + 100);
+                picture_box.SizeMode = PictureBoxSizeMode.AutoSize;
+                picture_box.BorderStyle = BorderStyle.FixedSingle;
+
+
+                if (this.picture.StartsWith("http:") || this.picture.StartsWith("https:"))
+                {
+                    string url = this.picture;
+                    string file = Application.StartupPath + "\\tmp_" + this.key + ".png";
+
+                    if (File.Exists(file) == false)
+                    {
+                        Tools.download_file(url, file);
+                    }
+
+                    this.picture = file;
+
+                    if (this.picture != "")
+                    {
+                        picture_box.Image = Bitmap.FromFile(picture);
+                    }
+                    else
+                    {
+                        picture_box.BackColor = ColorTranslator.FromHtml(this.color_bg);
+                    }
+                }
+
+                panel = new Panel();
+                panel.Location = new System.Drawing.Point(x, y);
+                panel.Size = new Size(width, height);
+                panel.AutoScroll = true;
+                panel.BorderStyle = BorderStyle.FixedSingle;
+                panel.Controls.Add(picture_box);
+                if (this.picture != "" && this.picture.StartsWith("@")==false)
+                {
+                    panel.BackgroundImage = Bitmap.FromFile(picture);
+                }
+                else
+                {
+                    panel.BackColor = ColorTranslator.FromHtml(this.color_bg);
+                }
+
+
+                Action act = delegate ()
+                {
+                    if (pFrm != null)
+                    {
+                        add_panel(pFrm);
+                        //picture_box.Width=panel.Width;
+                    }
+                };
+                if (pFrm != null)
+                    pFrm.BeginInvoke(act, null);
+            }
+            else
+            {
+                picture_box = new PictureBox();
+                picture_box.Location = new System.Drawing.Point(x, y);
+                picture_box.Size = new Size(width, height);
+                picture_box.SizeMode = PictureBoxSizeMode.AutoSize;
+
+                if (this.picture.StartsWith("@"))
+                {
+
+                }
+                else
+                {
+                    change_picture(this.picture);
+                }
+
+            }
+
+
+            this.event_change_value += S_PictureBox_event_change_value;
+        }
+
+        public void change_picture(string picture_file)
+        {
+            if (picture_file.StartsWith("http:") || picture_file.StartsWith("https:"))
+            {
+                string url = picture_file;
+                string file = Application.StartupPath + "\\tmp_" + this.key + ".png";
+
+                if (File.Exists(file) == false)
+                {
+                    Tools.download_file(url, file);
+                }
+
+                this.picture = file;
+
+                if (picture_box != null)
+                {
+                    if (this.picture != "")
+                    {
+                        picture_box.BackgroundImage = Bitmap.FromFile(picture);
+                    }
+                    else
+                    {
+                        picture_box.BackColor = ColorTranslator.FromHtml(this.color_bg);
+                    }
+                }
+            }
+
+            Action act = delegate ()
+            {
+                if (pFrm != null)
+                {
+                    add_picture_box(pFrm);
+                }
+            };
+            if (pFrm != null)
+                pFrm.BeginInvoke(act, null);
+        }
+
+
+        public void change_bmp(Bitmap pBmp)
+        { 
+
+            Action act = delegate ()
+            {
+                if (pFrm != null && picture_box!=null)
+                {
+                    picture_box.Width = pBmp.Width;
+                    picture_box.Height = pBmp.Width;
+                    picture_box.Image = pBmp;
+                    picture_box.Refresh();
+                }
+            };
+            if (pFrm != null)
+                pFrm.BeginInvoke(act, null);
+        }
+
+
+        private void S_PictureBox_event_change_value()
+        {
+            change_bmp((Bitmap)this.data);
+        }
+
+        public void add_panel(Form pFrm)
+        {
+
+            Main.Add_Panel(this.pFrm, dock, this.group, space, panel);
+
+        }
+
+        public void add_picture_box(Form pFrm)
+        {
+            if (space.vars_ui.ContainsKey(this.group) == false)
+            {
+                MessageBox.Show("没有这个group=" + this.group);
+                return;
+            }
+            var pParent = space.vars_ui[this.group];
+            if (pParent.GetType().Name == "S_Form")
+            {
+                pFrm.Controls.Add(picture_box);
+            }
+            else if (pParent.GetType().Name == "S_Panel_Map")
+            {
+                if (space.vars_ui.ContainsKey(pParent.key_parent) == false)
+                {
+                    MessageBox.Show("没有这个group=" + pParent.key_parent);
+                    return;
+                }
+                pParent = space.vars_ui[pParent.key_parent];
+                S_Panel pParent2 = (S_Panel)pParent;
+                pParent2.panel.Controls.Add(picture_box);
+            }
+            else
+            {
+                S_Panel pParent2 = (S_Panel)pParent;
+                pParent2.panel.Controls.Add(picture_box);
+            }
+
+            if (picture_box != null)
+            {
+                picture_box.BringToFront();
+
+                switch (this.dock)
+                {
+                    case "left":
+                        picture_box.Dock = DockStyle.Left;
+                        break;
+                    case "right":
+                        picture_box.Dock = DockStyle.Right;
+                        break;
+                    case "top":
+                        picture_box.Dock = DockStyle.Top;
+                        break;
+                    case "bottom":
+                        picture_box.Dock = DockStyle.Bottom;
+                        break;
+                    case "fill":
+                        picture_box.Dock = DockStyle.Fill;
+                        break;
+                }
+            }
+        }
+
+        public override Task run_sub()
+        {
+            if (pTrain.get_Vars().ContainsKey(read_key))
+            {
+                string? value = (string?)pTrain.get_Vars()[read_key].pObj;
+                url = value;
+            }
+
+            Action act = delegate ()
+            {
+                if (picture_box != null)
+                {
+                    if (url.StartsWith("@"))
+                    {
+                        var name = url.Substring(1);
+                        if (pTrain.get_Vars().ContainsKey(name))
+                        {
+                            picture_box.Image = (Image)pTrain.get_Vars()[name].pObj;
+                        }
+                    }
+                    else
+                    {
+                        picture_box.ImageLocation = url;
+                        picture_box.Refresh();
+                        picture_box.SizeMode = PictureBoxSizeMode.AutoSize;
+                        picture_box.Parent.Refresh();
+                    }
+                }
+            };
+            if (picture_box != null)
+                picture_box.BeginInvoke(act, null);
+
+            return Task.CompletedTask;
+        }
+    }
+}

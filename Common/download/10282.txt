@@ -1,0 +1,62 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Point3D_Scale : C_Node
+    {
+        public string key_read = "";
+        public string scale = "";
+        public string key_save = "";
+
+        public S_Point3D_Scale(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            //this.Name = Name;
+            ////space.vars_step.Add(name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            C_Point3D? point1 = (C_Point3D?)this.read_var(this.key_read, "C_Point3D");
+
+            if (point1 == null)
+            {
+                MessageBox.Show(this.Name + " point1==null");
+                return;
+            }
+
+            string[] strSplit= this.scale.Split(',');
+
+            float f_scaleX = float.Parse(strSplit[0]);
+            float f_scaleY = f_scaleX;// float.Parse(this.scale);
+            float f_scaleZ = f_scaleX;// float.Parse(this.scale);
+            if (strSplit.Length > 1)
+            {
+                f_scaleY = float.Parse(strSplit[1]);
+            }
+            if (strSplit.Length > 2)
+            {
+                f_scaleZ = float.Parse(strSplit[2]);
+            }
+
+            C_Point3D point2 = new C_Point3D(point1.x * f_scaleX, point1.y * f_scaleY, point1.z * f_scaleZ);
+
+            this.save_var(this.key_save,"C_Point3D", point2);
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

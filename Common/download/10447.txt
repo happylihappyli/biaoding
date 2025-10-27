@@ -1,0 +1,64 @@
+﻿
+using Common_Robot2;
+using QRCoder;
+using System.Text;
+
+namespace Test1
+{
+    public class Img_QR_From_String : C_Node
+    {
+        public string? content="";
+        public string? key_save="";
+
+        public Img_QR_From_String(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_content = this.read_string(this.content);
+            if (str_content == null || str_content == "")
+            {
+                S_TTS.speak_async("字符串为空");
+                return;
+            }
+
+
+            try
+            {
+                string enCodeString = str_content;// "https://www.mathfan.com";
+
+                string level = "M";
+                QRCodeGenerator.ECCLevel eccLevel = (QRCodeGenerator.ECCLevel)(level == "L" ? 0 : level == "M" ? 1 : level == "Q" ? 2 : 3);
+                using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
+                using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(enCodeString, eccLevel))
+                using (BitmapByteQRCode qrCode = new BitmapByteQRCode(qrCodeData))
+                {
+                    byte[] bitmapdata = qrCode.GetGraphic(20, "#000000", "#ffffff");
+
+                    MemoryStream ms = new MemoryStream(bitmapdata);
+                    Bitmap bt = new Bitmap(ms);
+                    //string path = "D:\\test3.png";
+                    //bt.Save(path);
+                    this.save_var(this.key_save, "Bitmap", bt);
+                }
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

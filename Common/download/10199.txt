@@ -1,0 +1,108 @@
+﻿using Common_Robot;
+using dll_ssh;
+using MathNet.Numerics.LinearAlgebra.Double;
+using Newtonsoft.Json.Linq;
+using SharpEXR;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Three.Net.Objects;
+
+namespace Test1
+{
+    public class Cloud_From_EXR : C_Node
+    {
+        public string file = "";// C:\\Users\\Administrator\\Desktop\\test.png\\Image0009.exr";
+        public string file_camera = "D:\\Data\\intrinsics.txt";
+        public string file_save = "";// C:\\Users\\Administrator\\Desktop\\test.txt";
+
+        public Cloud_From_EXR(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+
+            string file2 = space.tools.var_read(pTrain, this, file);
+
+            //var filePath = "C:\\Users\\Administrator\\Desktop\\test.png\\Image0009.exr";
+
+            var exrFile = EXRFile.FromFile(file2);
+            var part = exrFile.Parts[0];
+
+            int width = part.DataWindow.Width;
+            int height = part.DataWindow.Height;
+
+            // read pixel data for first part in file
+            // synchronously, slower
+            //part.Open(filePath);
+
+            // open part while reading pixel data in parallel
+            part.OpenParallel(file2);
+
+            // get pixel data as an array of RGBA 32 bit floats,
+
+            Console.WriteLine("w=" + width);
+            Console.WriteLine("h=" + height);
+
+            float[] data = part.GetFloats(ChannelConfiguration.RGB, true, GammaEncoding.Linear, true);
+
+            part.Close();
+
+            DenseMatrix m = Main.Read_Camera(file_camera);
+
+
+
+            using (StreamWriter outputFile = new StreamWriter(this.file_save))
+            {
+
+                for (var j=0;j<height; j++)
+                {
+                    for (var i = 0; i < width; i++)
+                    {
+                        int index = (j * width  + i) * 4;
+                        double value = data[index];
+                        if (value < 65504)
+                        {
+                            int u = i;
+                            int v = j;
+                            double cx = m.Row(0)[2];
+                            double cy = m.Row(1)[2];
+                            double fx=  m.Row(0)[0];
+                            double fy = m.Row(1)[1];
+
+                            double Z = value;
+                            double X = (u - cx) / fx * Z;
+                            double Y = (v - cy) / fy * Z;
+
+                            //Console.WriteLine(X + "," + Y + "," + Z);
+                            outputFile.WriteLine(X + "," + Y + "," + Z);
+                        }
+                    }
+                }
+
+            }
+
+            /*
+             * fx * X/Z + cx = U
+             * fy * Y/Z + cy = V
+            */
+        }
+
+    }
+
+    
+}

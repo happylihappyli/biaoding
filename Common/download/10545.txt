@@ -1,0 +1,152 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    //根据分区01状态，检测0的位置是否会碰撞
+    public class Cloud_Filter_By_Cup: C_Node
+    {
+        //比如分区状态为 0,1,0
+        public string cup_string = "";
+
+        //"key_cloud" 点云变量
+        public string key_cloud="";
+        //"key_cloud" 保存点云变量
+        public string key_cloud_save = "";
+
+        //"key_a" 点云变量
+        public string key_a = "";
+
+        public string min = "0";
+        public string dz = "0";
+
+
+        public override void init()
+        {
+
+        }
+
+        public Cloud_Filter_By_Cup(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            //True代表碰撞货没有抓取位置
+
+
+            List<C_Point3D>? cloud1 = (List<C_Point3D>?)this.read_var(this.key_cloud, "List<C_Point3D>");
+            C_Point3D? A = (C_Point3D?)this.read_var(this.key_a, "C_Point3D");
+
+            if (A == null)
+            {
+                Main.WriteLine(this, "要处理的对象为key_a空！");
+                this.Next_Step = Node_Next.True;
+                return;
+            }
+            Main.WriteLine(this, "A=" + A.ToString());
+
+
+            if (cloud1 == null || cloud1?.Count == 0)
+            {
+                Main.WriteLine(this, "点云为空！");
+                this.Next_Step = Node_Next.True;
+                return;
+            }
+
+            string str_cup_string = this.read_string(cup_string);
+            Main.WriteLine(this, "cups=" + str_cup_string);
+
+            string[] strSplit= str_cup_string.Split(',');
+
+            int cup1 = int.Parse(strSplit[0]);
+            int cup2 = int.Parse(strSplit[1]);
+            int cup3 = int.Parse(strSplit[2]);
+
+
+
+            if (cup2 == 0)
+            {
+                C_Point3D min = A.add(new C_Point3D(-90, -80,20));
+                C_Point3D max = A.add(new C_Point3D(90, 80, 500));
+
+                Main.WriteLine("x=" + min.x + "," + max.x);
+                Main.WriteLine("y=" + min.y + "," + max.y);
+                Main.WriteLine("z=" + min.z + "," + max.z);
+                this.save_var("_min", "C_Point3D", min);
+                this.save_var("_max", "C_Point3D", max);
+
+                List<C_Point3D> cloud2 = Main.cloud_filter(cloud1, "x", min.x, max.x);
+                List<C_Point3D> cloud3 = Main.cloud_filter(cloud2, "y", min.y, max.y);
+                List<C_Point3D> cloud4 = Main.cloud_filter(cloud3, "z", min.z, max.z);
+
+                if (cloud4.Count > 0)
+                {
+                    Main.WriteLine(this, "碰撞了 cloud4.Count >0 ");
+                    this.save_var(this.key_cloud_save, "List<C_Point3D>", cloud4);
+                    this.Next_Step = Node_Next.True;
+                    return;
+                }
+            }
+            if (cup1 == 0)
+            {
+                C_Point3D min = A.add(new C_Point3D(-90  , -80 - 193, 20));
+                C_Point3D max = A.add(new C_Point3D(90 , 80 - 193, 500));
+                Main.WriteLine("x=" + min.x + "," + max.x);
+                Main.WriteLine("y=" + min.y + "," + max.y);
+                Main.WriteLine("z=" + min.z + "," + max.z);
+                this.save_var("_min", "C_Point3D", min);
+                this.save_var("_max", "C_Point3D", max);
+
+                List<C_Point3D> cloud2 = Main.cloud_filter(cloud1, "x", min.x, max.x);
+                List<C_Point3D> cloud3 = Main.cloud_filter(cloud2, "y", min.y, max.y);
+                List<C_Point3D> cloud4 = Main.cloud_filter(cloud3, "z", min.z, max.z);
+
+
+                if (cloud4.Count > 10)
+                {
+                    Main.WriteLine(this, "碰撞了!!! cloud4.Count >10 ");
+                    this.save_var(this.key_cloud_save, "List<C_Point3D>", cloud4);
+                    this.Next_Step = Node_Next.True;
+                    return;
+                }
+            }
+
+            if (cup3 == 0)
+            {
+                C_Point3D min = A.add(new C_Point3D(-90 , -80 + 193, 20));
+                C_Point3D max = A.add(new C_Point3D(90 , 80 + 193, 500));
+                Main.WriteLine("x=" + min.x + "," + max.x);
+                Main.WriteLine("y=" + min.y + "," + max.y);
+                Main.WriteLine("z=" + min.z + "," + max.z);
+                this.save_var("_min", "C_Point3D", min);
+                this.save_var("_max", "C_Point3D", max);
+
+                List<C_Point3D> cloud2 = Main.cloud_filter(cloud1, "x", min.x, max.x);
+                List<C_Point3D> cloud3 = Main.cloud_filter(cloud2, "y", min.y, max.y);
+                List<C_Point3D> cloud4 = Main.cloud_filter(cloud3, "z", min.z, max.z);
+
+
+                if (cloud4.Count > 0)
+                {
+                    Main.WriteLine(this, "碰撞了 cloud4.Count >0 ");
+                    this.save_var(this.key_cloud_save, "List<C_Point3D>", cloud4);
+                    this.Next_Step = Node_Next.True;
+                    return;
+                }
+            }
+
+            this.Next_Step = Node_Next.False;
+        }
+
+    }
+}

@@ -1,0 +1,38 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_List_Add : C_Node
+    {
+
+        public string key_save = "";
+        public string text = "";
+
+        public S_List_Add(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            List<string>? pList = (List<string>?)this.read_var(key_save, "List<string>");
+            if (pList == null)
+            {
+                pList = new List<string>();
+                this.save_var(key_save, "List<string>",pList);
+            }
+            string value = this.read_string(text);
+            pList.Add(value);
+        }
+    }
+}

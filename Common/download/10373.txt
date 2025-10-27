@@ -1,0 +1,50 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    
+    public class U_Menu_Event_Init : C_Node
+    {
+
+        public string event_name = "";
+
+
+        public U_Menu_Event_Init(string name, C_Space space_parent, C_Space space) : base(name, space_parent,space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            //init2
+
+            foreach(KeyValuePair<string, C_Node> kv in space.vars_step)
+            {
+
+                C_Node item = kv.Value;
+
+                if (item is E_Menu_Event)
+                {
+                    E_Menu_Event? pEvent = (E_Menu_Event?)item;
+                    pEvent?.init_event();
+                }
+                
+            }
+            //space.vars_menu.Add("menu/" + sub_item.key, sub_item);
+
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

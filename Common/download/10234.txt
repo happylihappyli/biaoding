@@ -1,0 +1,54 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Windows.Media.Playback;
+
+namespace Test1
+{
+    public class U_Tip : C_Node
+    {
+        public string title = "提醒";
+        public string msg = "alert!";
+        public string template = "提醒模板={0}";
+
+        public U_Tip(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            Main.WriteLine(this," run");
+            string msg =this.read_string(this.msg);
+
+            try
+            {
+                string value = template;
+                value = value.Replace("{0}", msg);
+                Main.show_tip(this, title, value,3);
+
+            }
+            catch(Exception ex)
+            {
+                Main.WriteLine(ex.ToString());
+            }
+        }
+    }
+}

@@ -1,0 +1,106 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Read_Box_Space : C_Node
+    {
+        public string file = "";
+        public string key_space = "";
+        public string key_data = "";
+        public string key_save;
+
+        public S_Read_Box_Space(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+
+            C_Block_Data pBlockData = new C_Block_Data();
+
+            if (this.file.StartsWith("@"))
+            {
+                List<C_Box_Type> list = (List<C_Box_Type>)space.read_vars(pTrain, this, this.file.Substring(1), "List<C_Box_Type>");
+                List<C_Box_Type> list2 = new List<C_Box_Type>();
+
+                for (var i = 0; i < list.Count; i++)
+                {
+                    list2.Add(list[i].Clone());
+                }
+
+                pBlockData.pArrayBoxs_Type = list2;
+
+                if (list2.Count == 1)
+                {
+                    C_Box_Type type = list2[0];
+                    if (type.file != "")
+                    {
+                        //S_TTS.speak_async("2D码垛文件"+type.file);
+
+                        string[] lines = File.ReadAllLines(type.file);
+                        List<string> items = new List<string>();
+                        for(var i = 0; i < lines.Length; i++)
+                        {
+                            string line = lines[i];
+                            if (line.Trim() != "")
+                            {
+                                items.Add(line);
+                            }
+                        }
+                        space.save_vars(pTrain, this, this.key_save, "List<string>", items);
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                    else
+                    {
+                        S_TTS.speak_async("2D码垛计算");
+                    }
+                }
+                else
+                {
+                    S_TTS.speak_async("不是一种盒子，可能有错误");
+                }
+                this.Next_Step = Node_Next.True;
+
+                {
+                    for (var i = 0; i < pBlockData.pArrayBoxs_Type.Count; i++)
+                    {
+                        C_Box_Type item = pBlockData.pArrayBoxs_Type[i];
+                        string line = item.ID + "," + item.x_len + "," + item.y_len + "," + item.z_len;
+                        C_Box pBox = new C_Box("", line);
+                        pBlockData.pArrayBoxs.Add(pBox);
+                        pBox.pBox_Type = item;
+                    }
+                }
+            }
+            else
+            {
+                this.Next_Step = Node_Next.True;
+                (string strSpace, string thickness, int type_count) = pBlockData.load_data(this.file);
+                space.save_vars(pTrain, this, this.key_space, "string", strSpace);
+
+            }
+            space.save_vars(pTrain, this, this.key_data, "C_Block_Data", pBlockData);
+
+        }
+    }
+}

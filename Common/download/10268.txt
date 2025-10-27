@@ -1,0 +1,51 @@
+﻿
+using Common_Robot2;
+using pcammls;
+using System;
+using System.Drawing;
+using System.Threading.Tasks;
+
+namespace Test1
+{
+    public class Data_Save_Grid : C_Node
+    {
+        public string key_grid = "#grid";
+        public string row = "0";
+        public string col = "0";
+        public string value = "0";
+
+        public Data_Save_Grid(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            C_Grid grid = (C_Grid)this.read_var(this.key_grid, "C_Grid");
+
+            string str_row = this.read_string(this.row);
+            if (str_row == "") 
+            {
+                return ;
+            }
+            string str_col = this.read_string(this.col);
+            string str_value = this.read_string(this.value);
+
+            int i_row = (int)Math.Round(double.Parse(str_row));
+
+            grid.save(i_row, str_col, str_value);
+
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

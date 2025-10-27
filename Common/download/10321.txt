@@ -1,0 +1,91 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Read_Robot : C_Node
+    {
+        public C_Robot pRobot = new C_Robot();
+        public string key_save = "#robot1";
+        public string oz = "";
+        public string dz = "";
+        public string c2d = "";
+        public string bc = "";
+        public string cc2 = "";
+        public string bc2 = "";
+        public string tools_len = "";
+
+        public string bottom0;
+        public string rotate0;
+        public string bottom1;
+        public string rotate1;
+        public string bottom2;
+        public string rotate2;
+        public string bottom3;
+        public string rotate3;
+        public string bottom4;
+        public string rotate4;
+        public string bottom5;
+        public string rotate5;
+        public string bottom6;
+        public string rotate6;
+
+        public S_Read_Robot(string name, C_Space space_parent, C_Space space) : base(name, space_parent,space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            string str_oz = this.read_string(this.oz);
+            string str_dz = this.read_string(this.dz);
+            string str_c2d = this.read_string(this.c2d);
+            string str_bc = this.read_string(this.bc);
+            string str_cc2 = this.read_string(this.cc2);
+            string str_tools_len = this.read_string(this.tools_len);
+
+            pRobot.init_robot(
+                double.Parse(str_oz),
+                double.Parse(str_dz),
+                double.Parse(str_c2d),
+                double.Parse(str_bc),
+                double.Parse(str_cc2),
+                double.Parse(str_tools_len)
+            );
+
+            pRobot.bottom_L[0] = Main.get_Vector3_from_string(this.bottom0);// new Vector3(0, 0, 0);//轴1的中心
+            pRobot.obj_rotate[0] = Main.get_Vector3_from_string(this.rotate0);// new Vector3(0, 0, -1);//, 0);//L1旋转的向量,和安川相反
+
+            pRobot.bottom_L[1] = Main.get_Vector3_from_string(this.bottom1);// new Vector3(2.6f, 0, 0);//轴2的中心
+            pRobot.obj_rotate[1] = Main.get_Vector3_from_string(this.rotate1);// new Vector3(0, 1, 0);//L2旋转的向量
+
+            pRobot.bottom_L[2] = Main.get_Vector3_from_string(this.bottom2);// new Vector3(2.6f, 0, 9.45f);//轴3的中心
+            pRobot.obj_rotate[2] = Main.get_Vector3_from_string(this.rotate2);//new Vector3(0, 1, 0);//L3旋转的向量,和安川相反
+
+            pRobot.bottom_L[3] = Main.get_Vector3_from_string(this.bottom3);//new Vector3(2.6f, 0, 9.45f);//轴4的中心 estun机械臂，这里假设轴4是锁定的
+            pRobot.obj_rotate[3] = Main.get_Vector3_from_string(this.rotate3);//new Vector3(-1, 0, 0);//L4旋转的向量
+
+            pRobot.bottom_L[4] = Main.get_Vector3_from_string(this.bottom4);//new Vector3(12.85f, 0, 9.45f);//轴5的中心
+            pRobot.obj_rotate[4] = Main.get_Vector3_from_string(this.rotate4);//new Vector3(0, -1, 0);//L5旋转的向量
+
+            pRobot.bottom_L[5] = Main.get_Vector3_from_string(this.bottom5);//new Vector3(15.10f, 0, 9.45f);//轴6的中心
+            pRobot.obj_rotate[5] = Main.get_Vector3_from_string(this.rotate5);// new Vector3(-1, 0, 0);//L6旋转的向量
+
+
+            pRobot.bottom_L[6] = Main.get_Vector3_from_string(this.bottom6); //轴7的中心
+            pRobot.obj_rotate[6] = Main.get_Vector3_from_string(this.rotate6);//L7旋转的向量
+
+            pRobot.rotate7 = true;
+
+            this.save_var(key_save, "C_Robot", pRobot);
+        }
+    }
+}

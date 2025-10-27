@@ -1,0 +1,55 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class U_List_View_Add : C_Node
+    {
+        public ListView ui_item = null;
+
+        public string key_ui = "";
+        public string text = "";
+        public string split=",";
+
+        public U_List_View_Add(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+
+            S_List_View pItem = (S_List_View)space.vars_ui[key_ui];
+            ui_item = pItem.ui_item;
+
+
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+                    string line = this.read_string(this.text);// space.tools.var_read(pTrain, this, this.text);
+
+                    string[] strSplit = line.Split(split);
+                    ListViewItem item = ui_item.Items.Add(strSplit[0]);
+
+                    for (var i = 1; i < strSplit.Length; i++)
+                    {
+                        item.SubItems.Add(strSplit[i]);
+                    }
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+        }
+    }
+}

@@ -1,0 +1,184 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using OuelletConvexHull;
+using pcammls;
+namespace Test1
+{
+    public class Main_Camera
+    {
+        public static C_Point3D 图像转3D点云(
+            TY_VECT_3F_ARRAY p3dArray,
+            int img_width,
+            int u, int v)
+        {
+
+            int offset = img_width * v + u;
+            //读取点云数据
+            float p3d_fx = p3dArray.getitem(offset).x;
+            float p3d_fy = p3dArray.getitem(offset).y;
+            float p3d_fz = p3dArray.getitem(offset).z;
+
+            return new C_Point3D(p3d_fx, p3d_fy, p3d_fz);
+        }
+
+        public static List<C_Cup> 计算匹配的吸嘴数(
+            List<C_Cup> list_all,
+            C_Camera_TuYang camera1,
+            C_Sucker sucker,
+            C_Planet_Catch pPlanet_Catch,
+            string direction)
+        {
+            List<C_Cup> list = new List<C_Cup>();
+            List<C_Point3D>? edge_points = pPlanet_Catch.pData.edge_points;
+
+
+            foreach (KeyValuePair<string, List<C_Cup>> kv in sucker.regions)
+            {
+
+                List<C_Cup> list2 = kv.Value;
+                for (var i = 0; i < list2.Count; ++i)
+                {
+                    C_Cup cup = list2[i];
+
+
+                    float x;// 吸嘴的坐标
+                    float y;//
+                    float z;// 
+
+                    if (direction == "z")
+                    {
+                        x = sucker.x + cup.y;// 
+                        y = sucker.y + cup.x;
+                        z = sucker.z;
+                    }
+                    else
+                    {
+                        //if (direction == "x")
+                        {
+                            x = sucker.x;// cup.x;
+                            y = sucker.y + cup.x; //(吸嘴的x就是实际的y，方向一致)
+                            z = sucker.z + cup.y; //(吸嘴的y就是实际的z，方向一致)
+                        }
+                    }
+
+
+                    float dd = 20;
+
+
+                    if (direction == "z")
+                    {
+                        if (edge_points != null && check_xyz(edge_points, x - dd, y, z, camera1) &&
+                                check_xyz(edge_points, x + dd, y, z, camera1) &&
+                                check_xyz(edge_points, x, y - dd, z, camera1) &&
+                                check_xyz(edge_points, x, y + dd, z, camera1))
+                        {
+                            Main.WriteLine("add " + kv.Key);
+                            list.Add(cup);
+                            list_all.Add(cup);
+                        }
+                    }
+                    else
+                    {
+                        if (check_xyz(edge_points, x, y - dd, z, camera1) &&
+                                check_xyz(edge_points, x, y + dd, z, camera1) &&
+                                check_xyz(edge_points, x, y, z - dd, camera1) &&
+                                check_xyz(edge_points, x, y, z + dd, camera1))
+                        {
+                            Main.WriteLine("add " + kv.Key);
+                            list.Add(cup);
+                            list_all.Add(cup);
+                        }
+                    }
+                }
+            }
+
+            return list;
+        }
+
+        public static bool check_xyz(List<C_Point3D>? edge_points, float x, float y, float z, C_Camera_TuYang camera1)
+        {
+            if (edge_points == null)
+            {
+                return false;
+            }
+
+            C_Point3D tmp = new C_Point3D(x, y, z);
+            C_Point3D? tmp2 = Tools.机械臂坐标到摄像头坐标(camera1, tmp);
+            if (tmp2 != null)
+            {
+                C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, tmp2);
+                return Main.判断是否在多边形内(edge_points, uv.x, uv.y);
+            }
+            else
+            {
+                return false;
+            }
+
+        }
+
+
+        public static RotatedRect 计算外接矩形2(C_Camera_TuYang camera1, List<C_Point3D> pList)
+        {
+
+            int n = pList.Count;
+            C_Point3D[] points = new C_Point3D[n];
+            for (int j = 0; j < n; j++)
+            {
+
+                C_Point3D p = pList[j];
+                C_Point3D p2 = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p);//.add(centerAll));
+                points[j] = p2;
+
+            }
+            var windowsPoints = points.Select(p => new ConverxHull.Point(p.x, p.y)).ToList();
+
+            var ouelletConvexHull = new ConvexHull(windowsPoints);
+            ouelletConvexHull.CalcConvexHull(ConvexHullThreadUsage.OnlyOne);
+
+            List<C_Point3D> ouelletAsVertices = ouelletConvexHull.GetResultsAsArrayOfPoint()
+                .Select(p => new C_Point3D(p.X, p.Y, 0)).ToList();
+
+            Polygon currentPolygon = new Polygon();
+            for (var i = 0; i < ouelletAsVertices.Count - 1; i++)
+            {
+                var p1 = ouelletAsVertices[i];
+                var p2 = ouelletAsVertices[i + 1];
+                //e.DrawLine(new Pen(Color.Yellow), (float)p1.x, (float)p1.y, (float)p2.x, (float)p2.y);
+                //currentPolygon.AddPoint(new System.Drawing.Point((int)p1.x, (int)p1.y));
+                //Polygon.Add(p1);
+            }
+            currentPolygon.CompletePolygon = true;
+
+
+            double min_angle = Main.计算最小外接矩形(ouelletAsVertices);
+
+
+            List<C_Point3D> currentPolygon2 = Main.旋转点云(min_angle, ouelletAsVertices);
+
+            (C_Point3D a, C_Point3D c) = Tools.计算最大最小值(currentPolygon2);
+
+
+            //C_Point3D a = pPlanet.x0y0;
+            //C_Point3D c = pPlanet.x1y1;
+            C_Point3D b = new C_Point3D(a.x, c.y, 0);
+            C_Point3D d = new C_Point3D(c.x, a.y, 0);
+
+            List<C_Point3D> result = new List<C_Point3D>();
+            result.Add(a);
+            result.Add(b);
+            result.Add(c);
+            result.Add(d);
+
+            List<C_Point3D> result2 = Main.旋转点云(-min_angle, result);
+            a = result2[0];
+            b = result2[1];
+            c = result2[2];
+            d = result2[3];
+
+            return new RotatedRect(a, b, c, d);
+
+        }
+
+    }
+}

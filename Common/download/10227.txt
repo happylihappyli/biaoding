@@ -1,0 +1,108 @@
+﻿
+using MathNet.Spatial.Euclidean;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class C_Filter_Position_Angle2 : C_Node
+    {
+        public C_Data that = null;
+
+        public string key_data = "";
+        public string key_polygon = "";
+        public string key_camera = "";
+
+        public string fa_x_min = "-0.1";
+        public string fa_x_max = "0.1";
+        public string fa_y_min = "-0.1";
+        public string fa_y_max = "0.1";
+
+        public float f_fa_x_min = -0.1f;
+        public float f_fa_x_max = 0.1f;
+        public float f_fa_y_min = -0.1f;
+        public float f_fa_y_max = 0.1f;
+
+
+        public C_Filter_Position_Angle2(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public override void init()
+        {
+            f_fa_x_min = float.Parse(this.fa_x_min);
+            f_fa_x_max = float.Parse(this.fa_x_max);
+            f_fa_y_min = float.Parse(this.fa_y_min);
+            f_fa_y_max = float.Parse(this.fa_y_max);
+        }
+
+
+        private void run_sub_main()
+        {
+
+            that = (C_Data)space.read_vars(pTrain, this, this.key_data, "C_Data");
+            if (that.planet == null)
+            {
+                return;
+            }
+
+            List<C_Point3D> pPoints = (List<C_Point3D>)space.read_vars(pTrain, this, this.key_polygon, "C_Rect");
+
+            
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)space.read_vars(pTrain, this, this.key_camera, "C_Camera_TuYang");
+            C_Point3D p_camera= Tools.机械臂坐标到摄像头坐标(camera1, that.planet.arm_a);
+            C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p_camera);
+
+            if (Main.判断是否在多边形内(pPoints, uv.x, uv.y))
+            {
+                if (that.planet.arm_faxiangliang.normalize().x < f_fa_x_min
+                        || that.planet.arm_faxiangliang.normalize().x > f_fa_x_max
+                        || that.planet.arm_faxiangliang.normalize().y < f_fa_y_min
+                        || that.planet.arm_faxiangliang.normalize().y > f_fa_y_max)
+                {
+                    that.bFilter = true;
+                    that.bFilter_Angle = true;
+                }
+                else
+                {
+                    that.bFilter = false;
+                    that.bFilter_Angle = false;
+                }
+            }
+            else
+            {
+                that.bFilter = true;
+                that.bFilter_Angle = true;
+            }
+
+
+
+
+            if (that.bFilter)
+            {
+                this.Next_Step = Node_Next.True;
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+
+        }
+         
+    }
+}

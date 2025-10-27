@@ -1,0 +1,76 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Collections;
+
+using System.Runtime.InteropServices;
+using System.Drawing.Imaging;
+using pcammls;
+using System.Collections.Generic;
+using System.Drawing;
+
+
+namespace Test1
+{
+    /// <summary>
+    /// 历史相机，测试用模块
+    /// </summary>
+    public class S_Camera_History_Save : C_Node
+    {
+        private string _key_cloud = "";//点云变量
+        public string key_cloud { get => _key_cloud; set => _key_cloud = value; }
+
+        public string key_pic = "";
+
+        public S_Camera_History_Save(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+
+        }
+
+
+        public override void init()
+        {
+
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main(); 
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            Main.WriteLine(this,"---------------------------开始记录");
+            
+            List<C_Point3D>? list=(List<C_Point3D>?)this.read_var(this.key_cloud, "List<C_Point3D>");
+            Bitmap? bmp = (Bitmap?)this.read_var(this.key_pic, "Bitmap");
+
+            string path = "D:\\cloud\\history\\";
+            if (Directory.Exists(path)==false)
+            {
+                Directory.CreateDirectory(path);
+            }
+
+            string train_id = pTrain.get_ID();
+            File.AppendAllText("D:\\cloud\\history\\history.txt",train_id);
+
+            Main.save_cloud("D:\\cloud\\history\\" + train_id + ".cloud",list);
+
+            Bitmap bmp2 = Main.CopyBmp(bmp);
+            lock (bmp2)
+            {
+                string path_image = "D:\\cloud\\history\\" + train_id + ".png";
+                if (Directory.Exists(path_image) == false)
+                {
+                    Directory.CreateDirectory(path_image);
+                }
+                bmp2.Save(path_image);
+            }
+
+        }
+
+
+
+    }
+}

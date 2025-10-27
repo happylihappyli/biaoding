@@ -1,0 +1,168 @@
+﻿
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System.Text;
+
+namespace Test1
+{
+
+
+    //POST
+    public class W_Http_Post : C_Node
+    {
+        public string url = "";
+        public string jarray = "";
+        public string json = "";
+        public string key_save = "http_post_save";
+        public string key_vars = "";
+
+        public W_Http_Post(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+
+        public override async Task run_sub()
+        {
+            await run_sub_main();
+        }
+
+        public async Task run_sub_main()
+        {
+            try
+            {
+                await http_post();
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this,ex.ToString());
+            }
+        }
+
+
+        public async Task http_post()
+        {
+            string str_url=this.read_string(this.url);
+
+            if (key_vars != "")
+            {
+                string[] strSplit = key_vars.Split(",");
+                for(var i=0; i < strSplit.Length; i++)
+                {
+                    string value=this.read_string("@"+strSplit[i]);
+
+                    str_url = str_url.Replace("{"+i+"}", value);
+                }
+            }
+
+            Dictionary<string,string> values=new Dictionary<string,string>();
+
+            string result = "";
+            if (jarray != "")
+            {
+                JArray array = JArray.Parse(jarray);
+                for (int i = 0; i < array.Count; i++)
+                {
+                    JObject item = (JObject)array[i];
+                    string? key = item.read("key");
+                    if (key == null) continue;
+                    string value = this.read_string(item.read("value"));
+                    values[key] = value;
+                    Main.WriteLine(this, $"{key}={value}");
+                }
+                result = await http_post_form(str_url, values);
+            }
+            else
+            {
+                string str_json = this.read_string(json);
+                result = await http_post_json(str_url, str_json);
+            }
+            this.save_var(this.key_save, "string", result);
+
+        }
+
+
+        public static string FileToBase64Str(Bitmap bmp)
+        {
+            byte[]? bt;
+            lock (bmp)
+            {
+                bt = Tools.ImageToByte(bmp);
+            }
+            if (bt == null) return "";
+            string base64Str = Convert.ToBase64String(bt);
+
+            return base64Str;
+        }
+
+
+        public async Task<string> http_post_form(string url, Dictionary<string, string> values)
+        {
+            HttpClient client = new HttpClient();
+            var content = new FormUrlEncodedContent(values);
+            var response = await client.PostAsync(url, content);
+            var responseString = await response.Content.ReadAsStringAsync();
+            return responseString;
+        }
+
+
+        public async Task<string> http_post_json(string url, string json)
+        {
+
+            HttpClient client = new HttpClient();
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await client.PostAsync(url, content);
+            var responseString = await response.Content.ReadAsStringAsync();
+            return responseString;
+
+        }
+
+
+        public async Task http_post_json(Bitmap pBitmap_Send)
+        {
+            try
+            {
+                Main.WriteLine(this,"POST Start ");
+
+                string content2 = "";// this.content;//post 模板
+
+                if (content2 == "")
+                {
+                    content2 = "{\"img_info\":{\"img_data\":\"@{data}\"}}";
+                }
+                string strData = pBitmap_Send == null ? "" : FileToBase64Str(pBitmap_Send);
+                content2 = content2.Replace("@{data}", strData);
+
+                var data_post = new StringContent(content2, Encoding.UTF8, "application/json");
+                string responseString = "";
+                try
+                {
+                    HttpClient client = new HttpClient();
+                    var response = await client.PostAsync(url, data_post);
+                    responseString = await response.Content.ReadAsStringAsync();
+                    Main.WriteLine(responseString);
+                }
+                catch (Exception ex)
+                {
+                    Main.WriteLine(this,ex.ToString());
+                }
+
+
+                Main.WriteLine(this,"POST End ");
+
+                this.save_var(this.key_save, "string", responseString);
+
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this,ex.ToString());
+            }
+        }
+
+
+    }
+}

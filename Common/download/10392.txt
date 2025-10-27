@@ -1,0 +1,128 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class D_Draw_Z_Line : C_Node
+    {
+        public string pic_read = "";
+        public string pic_save = "";
+        public string z = "";
+        public string key_cloud = "";
+        public string key_camera = "";
+        public string scale = "2";
+
+
+        public D_Draw_Z_Line(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            // this.Name = name;
+            //space.vars_step.Add(name, this);
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (this.contain_var(pic_read, "Bitmap") == false)
+            {
+                Main.WriteLine(this,pic_read + " 读取图片为空！");
+                S_TTS.speak_async(pic_read + " 读取图片为空！");
+                return;
+            }
+            Bitmap pBitmapRGB = (Bitmap)this.read_var(pic_read, "Bitmap");
+
+
+            float db_Scale = float.Parse(this.scale);// 2f;//缩放比
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(key_camera, "C_Camera_TuYang");
+            double db_z = 0;
+            string str_Z= this.read_string(this.z);
+            if (str_Z=="")
+            {
+                Main.WriteLine(this, "Z");
+            }
+            db_z = double.Parse(str_Z);
+
+            if (pBitmapRGB != null)
+            {
+                lock (pBitmapRGB)
+                {
+                    int width = pBitmapRGB.Width;
+                    int height = pBitmapRGB.Height;
+                    Bitmap a = new Bitmap(width, height);
+                    Graphics g = Graphics.FromImage(a);
+
+                    g.DrawImage(pBitmapRGB,
+                        new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                                (int)space.vars.draw_offset_y_tuyang,
+                        pBitmapRGB.Width - (int)space.vars.draw_offset_x_tuyang, pBitmapRGB.Height - (int)space.vars.draw_offset_y_tuyang),
+                        new Rectangle(0, 0, pBitmapRGB.Width, pBitmapRGB.Height),
+                        GraphicsUnit.Pixel);
+
+
+                    List<C_Point3D> pList = (List<C_Point3D>)this.read_var(key_cloud, "List<C_Point3D>");
+
+                    if (pList == null)
+                    {
+                        MessageBox.Show(this.Name + "：" + key_cloud + "== null!");
+                        this.Next_Step = Node_Next.False;
+                        S_TTS.speak_async("点云分块为空！");
+                        return;
+                    }
+
+                    List<C_Point3D> list_uv = new List<C_Point3D>();
+                    
+                    List<C_Point3D> pList3 = new List<C_Point3D>();
+
+                    for (int i = 0; i < pList.Count; i++)
+                    {
+                        C_Point3D p1 = pList[i];
+
+                        if (Math.Abs(p1.z- db_z) <30)
+                        {
+                            C_Point3D p2 = Tools.机械臂坐标到摄像头坐标(camera1, p1);
+                            C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p2);
+                            if (uv == null) continue;
+                            uv.x = uv.x / db_Scale;
+                            uv.y = uv.y / db_Scale;
+                            list_uv.Add(uv);
+                        }
+                    }
+
+                    list_uv.Sort(delegate (C_Point3D p1, C_Point3D p2)
+                    {
+                        //先比较y
+                        double d1 = Math.Round(p1.y);
+                        double d2 = Math.Round(p2.y);
+                        return Math.Sign(d1 - d2);//z从小到小
+                    });
+
+                    for (int i = 0; i < list_uv.Count-1; i++)
+                    {
+                        C_Point3D uv1 = list_uv[i];
+                        C_Point3D uv2 = list_uv[i+1];
+                        if (uv1.distance(uv2) < 200)
+                        {
+                            g.DrawLine(new Pen(Brushes.Blue,3), uv1.x, uv1.y, uv2.x, uv2.y);
+                        }
+                    }
+
+                    this.save_var(pic_save, "Bitmap", a);
+                }
+            }
+
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

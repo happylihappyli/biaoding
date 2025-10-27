@@ -1,0 +1,63 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class F_Bridge_Set : C_Node
+    {
+        public string key_step = "";
+        public string count = "";
+        public string clear ="0";
+
+        public F_Bridge_Set(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            if (space.vars_step.ContainsKey(this.key_step))
+            {
+                F_Bridge pNode=(F_Bridge)space.vars_step[this.key_step];
+
+                Main.WriteLine(this,"设置 "+ this.key_step+" count="+ this.count);
+
+                if (this.clear == "1")
+                {
+                    pNode.stop = true;//去掉之前的等待
+                }
+
+                Thread.Sleep(100);
+
+                if (this.clear == "1")
+                {
+                    pNode.stop = false;
+                }
+
+                pNode.time_count = 0;
+                pNode.Count = int.Parse(this.count);
+            }
+        }
+    }
+}

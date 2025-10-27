@@ -1,0 +1,79 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class String_To_List : C_Node
+    {
+        public string string_read1 = "";
+        public string string_read2 = "";
+        public string string_read3 = "";
+        public string string_read4 = "";
+        public string string_read5 = "";
+        public string string_read6 = "";
+        public string string_read7 = "";
+        public string string_read8 = "";
+        public string list_save = "";
+
+        public String_To_List(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            string str1 = this.read_string("@" + this.string_read1);
+            string str2 = this.read_string("@" + this.string_read2);
+
+            List<string> list=new List<string>();
+            list.Add(str1);
+            list.Add(str2);
+            if (string_read3 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read3);
+                list.Add(str3);
+            }
+            if (string_read4 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read4);
+                list.Add(str3);
+            }
+            if (string_read5 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read5);
+                list.Add(str3);
+            }
+            if (string_read6 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read6);
+                list.Add(str3);
+            }
+            if (string_read7 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read7);
+                list.Add(str3);
+            }
+            if (string_read8 != "")
+            {
+                string str3 = this.read_string("@" + this.string_read8);
+                list.Add(str3);
+            }
+
+
+            this.save_var(this.list_save, "List<string>", list);
+        }
+
+        public override void init()
+        {
+
+        }
+    }
+}

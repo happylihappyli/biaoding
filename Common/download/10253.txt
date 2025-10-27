@@ -1,0 +1,105 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    public class S_List_View : S_UI
+    {
+        public ListView ui_item;
+        
+        public string url = "";
+        public string key_read = "";
+        public string text = "...";
+        public string heads = "ID,Name";
+
+        public S_List_View(string Name, C_Space space_parent, C_Space space):
+            base(Name, space_parent, space)
+        {
+            this.Name = Name; 
+        }
+
+        public override void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+
+
+            ui_item = new ListView();
+            ui_item.Location = new System.Drawing.Point(x, y);
+            ui_item.Size = new Size(width, height);
+            ui_item.View = View.Details;
+            ui_item.Columns.Add("x1");
+            ui_item.Columns.Add("x2");
+            ui_item.Columns.Add("x3");
+            ui_item.FullRowSelect = true;
+
+
+            //ui_item.NavigationCompleted += webView2_NavigationCompleted;
+
+            Action act = delegate ()
+            {
+                if (pFrm != null)
+                {
+                    Main.Add_Panel(this.pFrm, dock, this.group, space, ui_item);
+
+                    //if (space.vars_ui.ContainsKey(this.group) == false)
+                    //{
+                    //    MessageBox.Show("没有这个group=" + this.group);
+                    //    return;
+                    //}
+                    //var pParent = space.vars_ui[this.group];
+                    //if (pParent.GetType().Name == "S_Form")
+                    //{
+                    //    pFrm.Controls.Add(ui_item);
+                    //}
+                    //else if (pParent.GetType().Name == "S_Panel_Map")
+                    //{
+                    //    if (space.vars_ui.ContainsKey(pParent.key_parent) == false)
+                    //    {
+                    //        MessageBox.Show("没有这个group=" + pParent.key_parent);
+                    //        return;
+                    //    }
+                    //    pParent = space.vars_ui[pParent.key_parent];
+                    //    S_Panel pParent2 = (S_Panel)pParent;
+                    //    pParent2.panel.Controls.Add(ui_item);
+                    //}
+                    //ui_item.BringToFront();
+                    //switch (this.dock)
+                    //{
+                    //    case "left":
+                    //        ui_item.Dock = DockStyle.Left;
+                    //        break;
+                    //    case "right":
+                    //        ui_item.Dock = DockStyle.Right;
+                    //        break;
+                    //    case "top":
+                    //        ui_item.Dock = DockStyle.Top;
+                    //        break;
+                    //    case "bottom":
+                    //        ui_item.Dock = DockStyle.Bottom;
+                    //        break;
+                    //    case "fill":
+                    //        ui_item.Dock = DockStyle.Fill;
+                    //        break;
+                    //}
+
+                }
+            };
+            if (pFrm != null)
+                pFrm.BeginInvoke(act, null);
+        }
+
+        //ScriptCallbackObject external ;
+        private void Button_Click(object sender, EventArgs e)
+        {
+            this.Run(pTrain);
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+}

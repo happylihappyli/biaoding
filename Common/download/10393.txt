@@ -1,0 +1,73 @@
+﻿
+using Newtonsoft.Json.Linq;
+using Common_Robot2;
+
+namespace Test1
+{
+    public class File_Read_Ini : C_Node
+    {
+        public string file = "";
+        public string str_read = ""; 
+
+        public File_Read_Ini(string name, C_Space space_parent, C_Space space) : base(name, space_parent,space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string file2 = this.read_string(file);
+            file2 = file2.Replace(".\\", Application.StartupPath + "\\");
+            file2 = file2.Replace("./", Application.StartupPath + "\\");
+
+
+            if (File.Exists(file2) ==false)
+            {
+                MessageBox.Show("ini文件不存在："+ file2);
+            }
+
+            IniFile myIni = new IniFile(file2);
+            if (this.code == "")
+            {
+                MessageBox.Show("INI读取模块，Code不能为空！Code是一个JArray");
+                return;
+            }
+            try
+            {
+                JArray pArray = JArray.Parse(this.code);
+                for (var i = 0; i < pArray.Count; i++)
+                {
+                    JObject pItem = (JObject)pArray[i];
+                    var section = pItem.GetValue("section").ToString();
+                    var key = pItem.GetValue("key").ToString();
+                    var key_save = "";
+                    if (pItem.GetValue("key_save")!=null)
+                    {
+                        key_save = pItem.GetValue("key_save").ToString();
+                    }
+                    else
+                    {
+                        MessageBox.Show("ini读取模块，key_save为空");
+                    }
+
+                    var value = myIni.ReadString(section, key, "");
+
+                    this.save_var(key_save, "string", value);
+                }
+            }catch (Exception ex)
+            {
+                MessageBox.Show("ini读取模块，配置有问题"+ex.ToString());
+            }
+        }
+    }
+}

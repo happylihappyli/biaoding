@@ -1,0 +1,36 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_List_Clear : C_Node
+    {
+        public string key_read = "";
+
+        public S_List_Clear(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            List<string>? pList = (List<string>?)this.read_var(this.key_read, "");
+            if (pList != null)
+            {
+                pList.Clear();
+            }
+        }
+
+    }
+
+    
+}

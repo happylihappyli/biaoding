@@ -1,0 +1,76 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+using pcammls;
+using SDK = pcammls.pcammls;
+using SDK_ISP = pcammls_isp.pcammls_isp_api;//TYISP.cs
+using System.Runtime.InteropServices;
+using System.Drawing.Imaging;
+using System.Windows.Forms;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 拍照步骤，按模块化思路来做
+    /// </summary>
+    public class S_Camera_Set : C_Node
+    {
+
+        public string key_step = "";
+        public string exposure_time = "0.8";
+
+
+        public S_Camera_Set(string name,C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+
+
+            run_sub_main();
+            return Task.CompletedTask;
+
+        }
+
+        private void run_sub_main()
+        {
+
+            S_Camera pItem = (S_Camera)space.vars_step[key_step];
+
+            //调整曝光度
+            ////shutdown the Auto Exposure time function of the rgb image
+            SDK.TYSetBool(pItem.dev_handle, SDK.TY_COMPONENT_RGB_CAM, SDK.TY_BOOL_AUTO_EXPOSURE, false);
+
+            ////Adjust the Exposure time of the rgb image
+            TY_INT_RANGE range = new TY_INT_RANGE();
+            SDK.TYGetIntRange(pItem.dev_handle, SDK.TY_COMPONENT_RGB_CAM, SDK.TY_INT_EXPOSURE_TIME, range);
+            int tmp;
+
+            string exposure_time2 = space.tools.var_read(pTrain, this, exposure_time);
+
+            double dbValue = double.Parse(exposure_time2);
+            double value_range = range.min * (1 - dbValue) + range.max * dbValue;
+            SDK.TYSetInt(pItem.dev_handle, SDK.TY_COMPONENT_RGB_CAM, SDK.TY_INT_EXPOSURE_TIME, (int)value_range);
+            SDK.TYGetInt(pItem.dev_handle, SDK.TY_COMPONENT_RGB_CAM, SDK.TY_INT_EXPOSURE_TIME, out tmp);
+
+        }
+    }
+}

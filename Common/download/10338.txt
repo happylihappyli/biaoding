@@ -1,0 +1,67 @@
+﻿using Common_Robot2;
+using System.Speech.Synthesis;
+
+namespace Test1
+{
+    public class S_TTS : C_Node
+    {
+        public string msg = "";
+
+        public S_TTS(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        { 
+        }
+        public override void init()
+        {
+
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string msg2 = space.tools.var_read(pTrain,this, this.msg);
+            Main.WriteLine(this,msg2);
+            S_TTS.speak(msg2);
+        }
+
+
+
+
+        public static void speak(string msg)
+        {
+            SpeechSynthesizer synth = new SpeechSynthesizer();
+            
+            try
+            {
+                //synth.SelectVoiceByHints(VoiceGender.Male);
+                synth.Speak(msg);
+            }
+            catch(Exception ex)
+            {
+                Main.WriteLine(ex.ToString());
+            }
+        }
+
+
+        public static void speak_async(string msg)
+        {
+            Task.Run(() =>
+            {
+                Main.WriteLine(DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss.ff")+" TTS=" + msg);
+                int index = msg.IndexOf("+++");
+                if (index > 0)
+                {
+                    S_TTS.speak(msg.Split("+++")[0]);
+                }
+                else
+                {
+                    S_TTS.speak(msg);
+                }
+            });
+        }
+    }
+}

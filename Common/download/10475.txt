@@ -1,0 +1,40 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class File_Save_Setting: C_Node
+    {
+        public string section = "";
+        public string strkey = "";
+        public string value ="";
+
+        public File_Save_Setting(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            IniFile myIni = new IniFile(Application.StartupPath + "\\Main.ini");
+            string str_section = this.read_string(this.section);
+            string str_key = this.read_string(this.strkey);
+            string str_Value = this.read_string(this.value);
+
+            myIni.WriteString(str_section, str_key, str_Value);
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+}

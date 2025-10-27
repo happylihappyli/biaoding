@@ -1,0 +1,53 @@
+﻿using Common_Robot2;
+using FunnyMath;
+
+namespace Test1
+{
+    public class Cal_Math : C_Node
+    {
+
+        public string read = "var1";
+
+        public string string_read = "";//要读取的string变量
+        public string key_save = "var1";
+
+
+        public override void init()
+        {
+            this.init_setting();
+
+        }
+
+        public Cal_Math(string name, C_Space space_parent,C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string line=this.read_string(read);
+            if (this.string_read != "")
+            {
+                line = this.read_string("@"+ string_read);
+            }
+            try
+            {
+                var ctx = new FunnyMath_Context(this);
+                double a = Parser.Parse(line).Eval(ctx);//"2 * A * 矩形面积(10,20)"
+
+                string result = a + "";
+                this.save_var(key_save, "string", result);
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(ex.ToString());
+            }
+
+        }
+    }
+}

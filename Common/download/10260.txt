@@ -1,0 +1,43 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class String_To_JArray : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public String_To_JArray(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string? content = (string?)this.read_var(this.key_read,"string");
+            JArray item = JArray.Parse(content);
+            this.save_var(key_save, "JArray", item);
+        }
+    }
+}

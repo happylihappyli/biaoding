@@ -1,0 +1,126 @@
+﻿using B2_File.Funny;
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class File_New_Sync_ID: C_Node
+    {
+        public string path = "";
+        public string file = "";
+        public string id ="";
+        public string site="www.sndvision.cn";
+
+        public File_New_Sync_ID(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_path = this.read_string(path);
+            string str_file = this.read_string(file);
+
+
+            string str_site = this.read_string(this.site);
+
+            str_site = str_site.Replace("https://", "");
+            str_site = str_site.Replace("http://", "");
+            str_site = str_site.Replace("/", "");
+
+
+            string file_json = str_path + "\\"+ str_site + ".sync.id.json";
+
+            string json = "";
+            if (File.Exists(file_json) == false)
+            {
+                json = @"
+{
+  ""main"": {
+    ""site"": ""#1""
+  },
+  ""files"": [
+    {
+      ""id"": ""0"",
+      ""path"": ""000""
+    }
+  ]
+}
+";
+                json = json.Replace("{#1}",str_site);
+            }
+            else
+            {
+                json = File.ReadAllText(file_json);
+            }
+            JObject obj = JObject.Parse(json);
+
+            JArray? arr = (JArray?)obj["files"];
+
+            if (arr == null)
+            {
+                return;
+            }
+            Dictionary<int, C_File> dic = new Dictionary<int, C_File>();
+            Dictionary<string, C_File> dic_path = new Dictionary<string, C_File>();
+            for (var i = 0; i < arr.Count; i++)
+            {
+                JObject item = (JObject)arr[i];
+                int id2 = item.read_int("id");
+                string? path = item.read("path");
+                string? encode2 = item.read("encode");
+                C_File pFile = new C_File(id2, path, path,encode2);
+                if (dic.ContainsKey(id2) == false)
+                {
+                    dic.Add(id2, pFile);
+                }
+                else
+                {
+                    MessageBox.Show(this.Name + "id重复 id=" + id);
+                }
+
+                if (dic_path.ContainsKey(path) == false)
+                {
+                    dic_path.Add(path, pFile);
+                }
+                else
+                {
+                    MessageBox.Show(this.Name + "path重复 path=" + path);
+                }
+            }
+
+            if (dic_path.TryGetValue(str_file,out C_File pfile))
+            {
+                MessageBox.Show(this.Name + "，这个文件已经存在 path=" + str_file);
+            }
+            else
+            {
+                string str_id=this.read_string(id);
+                int id2 = int.Parse(str_id);
+                if (id2>0)
+                {
+                    dic_path.Add(str_file, new C_File(id2, str_file, str_file, "utf8"));
+                    JObject item = new JObject();
+                    item["id"] = str_id;
+                    item["path"] = str_file;
+                    arr.Add(item);
+                    File.WriteAllText(file_json, obj.ToString());
+                }
+            }
+
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+}

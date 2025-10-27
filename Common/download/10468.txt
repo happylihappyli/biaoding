@@ -1,0 +1,119 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    public class C_Filter_Uneven : C_Node
+    {
+        public C_Planet_Catch pPlanet = null;
+        public C_Data that = null;
+
+
+        public string ball_radius = "50";
+        public string key_data = "";
+        public string key_cloud = "";
+        public string key_camera = "";
+        public string dz = "10";
+        public string min = "10";
+
+
+        public C_Filter_Uneven(string name, C_Space space_parent, C_Space space) : base(name, space_parent, space)
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            that = (C_Data)space.read_vars(pTrain, this, this.key_data, "C_Data");// "#main"
+
+            this.pPlanet = that.planet;
+            if (this.pPlanet == null)
+            {
+                space_parent.console.WriteLine(" this.pPlanet == null ", Level_Enum.Info, this.log_index, this.Name );
+                return;
+            }
+
+            bool b_not_smooth = this.计算抓取面是否凹凸不平(pTrain, pPlanet);
+            if (b_not_smooth)
+            {
+                //that.Filter_Conidtion.Append(pPlanet.Group_ID + "抓取面凹凸不平！\r\n");
+                //that.pLast = C_Mp3.Play_State.机械臂可能会碰撞;
+                that.bFilter = true;
+                that.bFilter_UnEven = true;
+            }
+        }
+
+        public bool 计算抓取面是否凹凸不平(I_Train pTrain, C_Planet_Catch pPlanet)
+        {
+
+            double len = -double.Parse(this.ball_radius);// + 30);
+            var x5 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * len;
+            var y5 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * len;
+            var z5 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * len;
+            pPlanet.check_collision = new C_Point3D(x5, y5, z5);
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)space.read_vars(pTrain, this, this.key_camera, "C_Camera_TuYang");
+
+            C_Point3D p1_camera = Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.check_collision);
+
+            C_Point3D p2_camera = Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.arm_pCenter);
+
+
+            List<C_Point3D> pList_Point3D = (List<C_Point3D>)space.read_vars(pTrain, this, this.key_cloud, "List<C_Point3D>");
+            if (pList_Point3D == null)
+            {
+                MessageBox.Show(key_cloud + "==null" );
+                return true;
+            }
+
+
+            List<C_Point3D> pList_Point = 查找区域的点(pList_Point3D,p1_camera, float.Parse(this.ball_radius));
+
+            int count = 0;
+            for (var i = 0; i < pList_Point.Count; i++)
+            {
+                C_Point3D p2 = pList_Point[i];
+                C_Point3D val = p2.subtract(pPlanet.center);
+                double num = val.dotProduct(pPlanet.z_faxiangliang);
+
+                if (Math.Abs(num) > float.Parse(this.dz))
+                {
+                    count++;
+                }
+            }
+
+            if (count> float.Parse(this.min))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+
+
+        public static List<C_Point3D> 查找区域的点(
+            List<C_Point3D> pList, C_Point3D center,double radious)
+        {
+            List<C_Point3D> list = new List<C_Point3D>();
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D val = pList[i];
+                double d=val.distance(center);
+                if (Math.Abs(d - radious)<3)
+                {
+                    list.Add(val);
+                }
+            }
+
+            return list;
+        }
+    }
+}

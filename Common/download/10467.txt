@@ -1,0 +1,91 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using MathNet.Spatial.Euclidean;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class C_Filter_Length_Min_Max : C_Node
+    {
+        public C_Data? that = null;
+        public string key_data = "";
+        public string key_cloud = "";
+
+        public string max = "500";
+        public string min = "100";
+
+
+        public C_Filter_Length_Min_Max(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+
+            that = (C_Data?)this.read_var(this.key_data, "C_Data");
+
+            List<C_Point3D> list = that.list_3D_Point;// (List<C_Point3D>)space.vars.read_vars(pTrain, this.key_cloud, "List<C_Point3D>");
+
+            bool bfilter=this.阈值过滤(pTrain, list);
+
+            if (bfilter)
+            {
+                that.bFilter = true;
+                that.bFilter_Size = true;
+            }
+
+        }
+
+        public bool 阈值过滤(I_Train pTrain, List<C_Point3D> pList3)
+        {
+
+
+            (List<C_Point3D> rect, double angle2, double len1,double len2) = m1.计算外接矩形(pList3);
+
+
+            if (len1< float.Parse(this.min)||len1>float.Parse(this.max))
+            {
+                return true;
+            }
+
+            if (len2 < float.Parse(this.min) || len2 > float.Parse(this.max))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+
+
+        public static List<C_Point3D> 查找区域的点(
+            List<C_Point3D> pList, C_Point3D center,double radious)
+        {
+            List<C_Point3D> list = new List<C_Point3D>();
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D val = pList[i];
+                double d=val.distance(center);
+                if (Math.Abs(d - radious)<3)
+                {
+                    list.Add(val);
+                }
+            }
+
+            return list;
+        }
+    }
+}

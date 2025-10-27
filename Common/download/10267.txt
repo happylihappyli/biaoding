@@ -1,0 +1,42 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class Data_New_Grid : C_Node
+    {
+        public string key_save = "#grid";
+        public string rows = "0";
+        public string cols = "0";
+
+        public Data_New_Grid(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string str_rows = this.read_string(this.rows);
+            string str_cols = this.read_string(this.cols);
+
+            int i_rows = int.Parse(str_rows);
+            int i_cols = int.Parse(str_cols);
+            C_Grid grid = new C_Grid(i_rows, str_cols);
+
+            this.save_var(this.key_save, "C_Grid", grid);
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

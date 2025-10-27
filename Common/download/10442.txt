@@ -1,0 +1,65 @@
+﻿using Common_Robot;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Math;
+
+namespace Test1
+{
+    public class S_Save_ListView : C_Node
+    {
+
+        public string file = ",";
+        public string key_ui = ",";
+        public string split = ",";
+
+        public S_Save_ListView(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            S_List_View pItem = (S_List_View)space.vars.vars_ui[key_ui];
+            ListView ui_item = pItem.ui_item;
+
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+                    List<string> list = new List<string>();
+
+                    for(var k = 0; k < ui_item.Items.Count; k++)
+                    {
+                        ListViewItem item = ui_item.Items[k];
+                        string line = item.Text + split;
+                        for (var i = 1; i < item.SubItems.Count - 1; i++)
+                        {
+                            line += item.SubItems[i].Text + split;
+                        }
+                        line += item.SubItems[item.SubItems.Count - 1].Text;
+                        list.Add(line);
+                    }
+                    File.WriteAllLines(this.file, list);
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+
+        }
+    }
+}

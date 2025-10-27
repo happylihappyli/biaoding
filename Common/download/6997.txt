@@ -1,0 +1,57 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    public class File_Read_Drone_Vertex: C_Node
+    {
+        //文件名" 
+        public string file = "";
+        //保存模型变量 
+        public string key_save = "";
+        public File_Read_Drone_Vertex(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string file_name = (string)this.read_string(file);
+
+            List<C_Point3D> list1 = 读取坐标数据(file_name);
+            this.save_var(this.key_save, "List<C_Point3D>", list1);
+        }
+
+        public  List<C_Point3D> 读取坐标数据(string file1)
+        {
+            string str1 = File.ReadAllText(file1);
+            string[] strSplit1 = str1.Split("\r\n");
+            List<C_Point3D> list1 = new List<C_Point3D>();
+
+            for (var i = 0; i < strSplit1.Length; i++)
+            {
+                if (strSplit1[i].Length > 3)
+                {
+                    C_Point3D pPoint = new C_Point3D(strSplit1[i], " ");
+                    list1.Add(pPoint);
+                }
+            }
+            return list1;
+        }
+
+        public void init()
+        {
+        }
+    }
+}

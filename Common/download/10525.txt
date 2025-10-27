@@ -1,0 +1,89 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+
+
+    public class U_List_View_Refresh_Selected_Item : C_Node
+    {
+        private ListView? ui_item = null;
+
+
+        public string key_ui = "";
+        public string? index_select = "0";
+        public string? index = "0";
+        public string? value = "";
+
+        public U_List_View_Refresh_Selected_Item(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public override void init()
+        {
+        }
+
+        private void run_sub_main()
+        {
+
+            S_List_View? pItem = null;
+            if (space.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_List_View?)space.vars_ui[key_ui];
+            }
+            else if (space.parent != null && space.parent.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_List_View?)space_parent.vars_ui[key_ui];
+            }
+            else if (space.parent != null && space.parent.parent != null && space.parent.parent.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_List_View?)space.parent.parent.vars_ui[key_ui];
+            }
+            else
+            {
+                MessageBox.Show(this.Name + "UI没有这个控件");
+            }
+
+            ui_item = pItem?.ui_item;
+
+            string str_index = this.read_string(this.index);
+            string str_Value = this.read_string(this.value);
+            string str_index_select = this.read_string(this.index_select);
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+                    int iIndex = int.Parse(str_index);
+                    
+                    int iIndex_Select = int.Parse(str_index_select);
+
+                    if (iIndex_Select >= ui_item.SelectedItems.Count)
+                    {
+                        return;
+                    }
+
+                    ListViewItem item = ui_item.SelectedItems[iIndex_Select];
+
+
+                    while (iIndex >= item.SubItems.Count)
+                    {
+                        item.SubItems.Add("");
+                    }
+
+                    {
+                        item.SubItems[iIndex].Text = str_Value;
+                    }
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+        }
+    }
+}

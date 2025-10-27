@@ -1,0 +1,91 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Label : S_UI
+    {
+        public Label? label;
+        public string url = "";
+        public string read_key = "";
+        public string text = "label1";
+
+        public S_Label(string name, C_Space space_parent, C_Space space) : 
+            base(name, space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+
+        public override void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+
+            label = new Label();
+            label.BackColor = Color.Transparent;
+            label.Location = new Point(x, y);
+            label.Size = new Size(width, height);
+            string text2 = Tools.process_title(text); 
+            label.Text = text2;
+
+            if (text2.StartsWith("@#"))
+            {
+                this.key_field = text2.Substring(1);
+                space.pUI_Update.TryAdd(this.key_field, this);
+            }
+
+            var font_name = this.font_name;
+            if (font_name == "")
+            {
+                font_name = "宋体";
+            }
+            var font_size = this.font_size;
+            if (this.font_size == "")
+            {
+                font_size = "9";
+            }
+            label.Font = new Font(font_name, float.Parse(font_size),
+                FontStyle.Regular, GraphicsUnit.Point, ((byte)(134)));
+            if (this.color_bg != "")
+            {
+                label.BackColor = ColorTranslator.FromHtml(this.color_bg);
+            }
+            if (this.color_font != "")
+            {
+                label.ForeColor = ColorTranslator.FromHtml(this.color_font);
+            }
+
+            if (pFrm != null)
+            {
+                Action act = delegate ()
+                {
+                    if (pFrm != null)
+                    {
+                        Main.Add_Panel(this.pFrm, dock, this.group, space, label);
+
+                    }
+                };
+                if (pFrm != null)
+                    pFrm.BeginInvoke(act, null);
+
+                this.event_change_value += S_Label_event_change_value;
+            }
+        }
+
+        private void S_Label_event_change_value()
+        {
+            Action act = delegate ()
+            {
+                if (pFrm != null)
+                {
+                    label.Text = (string)this.data;
+                }
+            };
+            if (pFrm != null)
+                pFrm.BeginInvoke(act, null);
+
+        }
+    }
+}

@@ -1,0 +1,334 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using MathNet.Spatial.Units;
+using pcammls;
+
+namespace Test1
+{
+    public class C_Cloud_Get : C_Node
+    {
+        public string data_out = "";
+        public string key_cloud = "";
+
+        public string key_bottom = "";
+        public string key_rect = "";
+
+        public string filter_rect = "0";
+        public string filter_bottom = "0";
+        public string step_y = "5";
+        public string step_x = "5";
+        public string height_min = "3";
+
+        private double f_height_min = 3;
+
+        public C_Point3D[,]? Image_Point_3D = null;
+
+        public TY_VECT_3F_ARRAY? glb_p3dArray = null;
+        public TY_IMAGE_DATA? img = null;
+        public uint16_t_ARRAY? registration_depth_data = null;//对齐到彩色图坐标系的深度图
+        public string key_camera="";
+
+
+        public string? file_polygon="";
+        public string? key_region = "";
+        public string? angle = "";
+        public string? row ="";
+        public string? dir="";
+
+        public C_Cloud_Get(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            this.f_height_min = float.Parse(this.height_min);
+        }
+
+        public override Task run_sub()
+        {
+            try
+            {
+                run_sub_main();
+            }catch(Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            int point_count = 0;
+            double? d_max = 0;
+            double? d_min = 3000;
+            Main.WriteLine(this, "开始读取点云");
+
+            C_Planet? Bottom = (C_Planet?)this.read_var(this.key_bottom, "C_Planet");
+            if (Bottom == null && filter_bottom == "1")
+            {
+                MessageBox.Show(this.Name + ",key_bottom 设置 错误");
+            }
+
+
+            C_Camera_TuYang? camera1 = (C_Camera_TuYang?)this.read_var(this.key_camera, "C_Camera_TuYang");
+            if (camera1 == null )
+            {
+                MessageBox.Show(this.Name + ",key_camera 设置 错误 space=" +this.space.Name);
+            }
+
+
+
+
+            List<C_Point3D> pList_Point3D = new List<C_Point3D>();
+
+            
+            if (this.data_out != "")
+            {
+                this.key_cloud = this.data_out;
+            }
+
+            if (this.key_cloud != "")
+            {
+                this.save_var(this.key_cloud, "List<C_Point3D>", pList_Point3D);
+            }
+
+
+            int[,] debug = new int[128, 96];
+            List<C_Point3D>? polygon = null;
+            if (this.filter_rect == "1" && this.key_rect != "")
+            {
+                polygon = (List<C_Point3D>?)this.read_var(this.key_rect, "List<C_Point3D>");
+            }
+
+            string? str_file_polygon = this.read_string(this.file_polygon);
+
+            if (polygon == null && str_file_polygon!=null && str_file_polygon.Length>0)
+            {
+                string str_angle = this.read_string(this.angle);
+                if (str_angle == "")
+                {
+                    S_TTS.speak_async(this.Name+ " 角度错误");
+                    return;
+                }
+                int i_angle = int.Parse(str_angle);
+
+                string str_row = this.read_string(this.row);
+                if (str_row == "")
+                {
+                    S_TTS.speak_async(this.Name + " 行读取错误");
+                    str_row = "0";
+                }
+                int i_row = int.Parse(str_row);
+                {
+
+                    string? strDir = this.read_string(this.dir);
+
+
+                    str_file_polygon = str_file_polygon.Replace("{fold}", strDir + "");
+                    str_file_polygon = str_file_polygon.Replace("{angle}", i_angle + "");
+                    str_file_polygon = str_file_polygon.Replace("{row}", i_row + "");
+
+                    //List<C_Point3D>? list_edge = null;
+                    if (File.Exists(str_file_polygon))
+                    {
+                        Main.WriteLine(this, "过滤框：" + str_file_polygon);
+                        polygon = Main.cloud_read(this,str_file_polygon, ",");
+                        this.save_var(this.key_region, "List<C_Point3D>", polygon);
+                    }
+                    else
+                    {
+                        File.WriteAllText(str_file_polygon, "");
+                    }
+                }
+            }
+
+            if (this.Name== "测距右边@读取3D点云")
+            {
+                Console.WriteLine("D");
+            }
+
+            int distance = 6;
+            if ((polygon == null || polygon.Count==0) && img!=null && this.Image_Point_3D!=null)
+            {
+                if (this.step_x == "" || this.step_y == "")
+                {
+                    MessageBox.Show("step_x,step_y 参数不能为空！");
+                    return;
+                }
+                int step_y = int.Parse(this.step_y);
+                int step_x = int.Parse(this.step_x);
+                for (var v = distance; v < 960 - distance; v += step_y)
+                {
+                    for (var u = distance; u < 1280 - distance; u += step_x)
+                    {
+                        int index = img.width * v + u;
+                        double? d = (double?)this.registration_depth_data?[index];
+
+                        if (d > 0)
+                        {
+                            C_Point3D pPoint2 = Main_Camera.图像转3D点云(this.glb_p3dArray, img.width, u, v);
+                            
+
+                            if (double.IsNaN(pPoint2.x) == false)
+                            {
+                                this.Image_Point_3D[u, v] = pPoint2;
+                            }
+                            else
+                            {
+                                continue;
+                            }
+
+                            if (pPoint2.x == 0 && pPoint2.y == 0 & pPoint2.z == 0)
+                            {
+                                continue;
+                            }
+
+                            if (filter_bottom == "1" && Bottom != null)
+                            {
+                                if (Tools.到底面距离(pPoint2, Bottom) > this.f_height_min)
+                                {
+                                    point_count++;
+                                    pList_Point3D.Add(pPoint2);
+                                }
+                            }
+                            else
+                            {
+                                pList_Point3D.Add(pPoint2);
+
+                                int xx = u / 10;
+                                int yy = v / 10;
+                                debug[xx, yy] = (int)pPoint2.z / 100;
+
+                                this.Image_Point_3D[u, v] = pPoint2;
+                                int? z = ((int)pPoint2.z) * 100;
+                            }
+                        }
+                    }
+                }
+
+            }
+            else if (img != null && polygon!=null && polygon.Count>2)
+            {
+
+                int step_y = int.Parse(this.step_y);
+                int step_x = int.Parse(this.step_x);
+                for (var v = distance; v < 960 - distance; v += step_y)
+                {
+                    for (var u = distance; u < 1280 - distance; u += step_x)
+                    {
+
+                        if (Main.判断是否在多边形内(polygon, u, v))
+                        {
+                            int index = img.width * v + u;
+                            double? d = (double?)this.registration_depth_data?[index];
+
+                            if (d > 0)
+                            {
+                                if (d > d_max) d_max = d;
+                                if (d < d_min) d_min = d;
+
+                                C_Point3D pPoint2 = Main_Camera.图像转3D点云(this.glb_p3dArray, img.width, u, v);
+
+                                this.Image_Point_3D[u, v] = pPoint2;
+
+                                if (double.IsNaN(pPoint2.x))
+                                {
+                                    continue;
+                                }
+
+                                if (pPoint2.x == 0 && pPoint2.y == 0 & pPoint2.z == 0)
+                                {
+                                    continue;
+                                }
+
+                                if (filter_bottom == "1")
+                                {
+                                    if (Tools.到底面距离(pPoint2, Bottom) > this.f_height_min)
+                                    {
+                                        point_count++;
+                                        pList_Point3D.Add(pPoint2);
+                                    }
+                                }
+                                else
+                                {
+                                    pList_Point3D.Add(pPoint2);
+                                }
+                            }
+
+                        }
+                    }
+                }
+
+				if (1==2) //debug
+				{
+	                //List<C_Point3D> pList2 = new List<C_Point3D>();
+	                //List<C_Point3D> pList3 = new List<C_Point3D>();
+	                //for (int i = 0; i < pList_Point3D.Count; i++)
+	                //{
+	                //    C_Point3D p = pList_Point3D[i];
+	                //    if (p.z < 2155)
+	                //    {
+	                //        C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p);
+	                //        if (uv == null) continue;
+	                //        pList2.Add(uv);
+	                //        pList3.Add(p);
+	                //    }
+	                //}
+	
+	                //Main.save_cloud("D:\\cloud1.txt", pList3);
+	
+	                //Bitmap pBitmap1 = new Bitmap("D:\\debug1.png");
+	                //Bitmap bmp_new = new Bitmap(pBitmap1.Width, pBitmap1.Height);
+	                //Graphics g2 = Graphics.FromImage(bmp_new);
+	
+	                //g2.DrawImage(pBitmap1,
+	                //            new Rectangle(0, 0, pBitmap1.Width, pBitmap1.Height),
+	                //            new Rectangle(0, 0, pBitmap1.Width, pBitmap1.Height),
+	                //            GraphicsUnit.Pixel);
+	
+	                //for (int i = 0; i < pList2.Count; i++)
+	                //{
+	                //    C_Point3D uv = pList2[i];
+	                //    {
+	                //        g2.DrawEllipse(Pens.Red, uv.x, uv.y, 5, 5);
+	                //    }
+	                //}
+	                //bmp_new.Save("D:\\debug2.png");
+	            }
+            }
+
+			if (1==2){//debug
+	            //double[] data = camera1.camera1.color_calib.intrinsic.data;
+	            //string line = "";
+	            //for (var i = 0; i < data.Length; i++)
+	            //{
+	            //    line += data[i] + "\r\n";
+	            //}
+	            //File.WriteAllText("D:\\txt1.txt", line);
+			}
+
+
+            if (space.vars.bDebug_Mode)
+            {
+
+                //using (StreamWriter file = new StreamWriter(@"D:\debug2.txt", false))
+                //{
+
+                //    for (var j = 0; j < debug.GetLength(1); j++)
+                //    {
+                //        for (var i = 0; i < debug.GetLength(0); i++)
+                //        {
+                //            file.Write(debug[i, j] + ",");
+                //        }
+                //        file.Write("\r\n");
+                //    }
+                //}
+            }
+
+            Main.WriteLine(this,",3D点个数=" + pList_Point3D.Count);
+        }
+
+
+    }
+}

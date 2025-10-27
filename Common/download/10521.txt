@@ -1,0 +1,48 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class String_Read_Vars : C_Node
+    {
+        public string key_read = "";
+        public string split = "|";
+        public string key_save = "";
+
+        public String_Read_Vars(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+        public override void init()
+        {
+
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            string line = this.read_string("@" + this.key_read);
+
+            if (this.key_save.IndexOf(",") > -1)
+            {
+                string[] strSplit_Source = line.Split(this.split);
+                string[] strSplit = key_save.Split(',');
+                
+
+                for (var i = 0; i < strSplit.Length; i++)
+                {
+                    this.save_var(strSplit[i], "string", strSplit_Source[i]);
+                }
+            }
+            else
+            {
+                this.save_var(key_save, "string", line);
+            }
+        }
+    }
+}

@@ -1,0 +1,67 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using NAudio.Wave;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Test1
+{
+    public class S_To_Hex : C_Node
+    {
+        public string read = "10";
+        public string key_save = "";
+        public string min_size = "1";
+
+        public S_To_Hex(string name, C_Space space_parent, C_Space space) : 
+            base(name, space_parent, space)
+        {
+            //this.Name = name;
+            ////space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            double value1 = 0;
+            if (this.read.StartsWith("@"))
+            {
+                object obj = this.read_var(this.read.Substring(1), "");
+                value1 = Main.get_double_from_obj(this, obj);
+            }
+            else
+            {
+                value1 = double.Parse(this.read);
+            }
+
+            int iValue = ((int)value1);
+
+            string hex = iValue.ToString("X");//.ToString("X");
+
+            int i_min_size = int.Parse(this.min_size);
+
+            while(hex.Length< i_min_size)
+            {
+                hex = "0" + hex;
+            }
+
+            this.save_var(this.key_save, "string",hex);
+        }
+
+    }
+
+
+
+}

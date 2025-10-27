@@ -1,0 +1,63 @@
+﻿using Common_Robot2;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class U_TextBox_Password_Char : C_Node
+    {
+        public TextBox? pText1;
+        public string key_ui = "";
+        public string msg = "";
+        public U_TextBox_Password_Char(string name,C_Space space_parent, C_Space space) :
+            base(name,space_parent,space)
+        {
+        }
+        public override void init()
+        {
+
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            if (pText1 == null)
+            {
+                if (space.vars_ui.ContainsKey(key_ui) == false)
+                {
+                    return;
+                }
+                S_TextBox pItem = (S_TextBox)space.vars_ui[key_ui];
+                pText1 = pItem.pText1;
+            }
+
+            string value = this.msg;
+             
+
+            Action act = delegate ()
+            {
+                if (pText1 != null)
+                {
+                    pText1.PasswordChar = value.ToCharArray()[0];
+                }
+            };
+
+            if (pText1 != null)
+                pText1.BeginInvoke(act, null);
+
+        }
+    }
+}

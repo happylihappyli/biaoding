@@ -1,0 +1,127 @@
+﻿using Common_Robot2;
+using System.Diagnostics.Metrics;
+using System.Text;
+
+namespace Test1
+{
+    public class U_TextBox_Show : C_Node
+    {
+        public TextBox? pText1;
+        public string key_ui = "";
+        public string string_read = "";//要读取的变量
+        public string msg = "";
+        public string? mode = "";
+        //public string? data_in = "";
+        public U_TextBox_Show(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        { 
+        }
+
+        public override void init()
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            S_TextBox? pItem = null;
+
+            pItem = (S_TextBox?)Main.get_ui_from_parent_vars_steps(space, key_ui);
+
+            
+            if (pItem == null)
+            {
+                MessageBox.Show(this.Name +"UI没有这个控件");
+                return;
+            }
+
+            if (pText1 == null && pItem!=null)
+            {
+                pText1 = pItem.pText1;
+            }
+
+            Main.WriteLine(this, " run");
+
+            if (this.string_read != "")
+            {
+                msg = "@" + this.string_read;
+            }
+
+            string? value = "";
+            if (msg.StartsWith("@"))
+            {
+                string? key=msg.Substring(1);
+                object? obj = this.read_var(key, "");
+                if (obj != null)
+                {
+                    if (obj.GetType().Name == "Double")
+                    {
+                        value = obj?.ToString();
+                    }else if (obj.GetType().Name == "Int32")
+                    {
+                        value = obj?.ToString();
+                    }
+                    else if (obj.GetType().Name == "String")
+                    {
+                        value = (string)obj;
+                        Main.WriteLine(this, "=>" + value+" key="+ key+ " pTrain.ID="+ pTrain?.get_ID());
+                    }
+                    else if (obj.GetType().Name == "List<string>")
+                    {
+                        StringBuilder? sb = new StringBuilder();
+                        List<string>? list = (List<string>)obj;
+                        for(var i = 0; i < list.Count; i++)
+                        {
+                            sb.Append(list[i]+"\r\n");
+                        }
+                        value = sb.ToString();
+                    }
+                }
+            }
+            else
+            {
+                value = msg;
+            }
+
+            int count = 0;
+            Action act = delegate ()
+            {
+                if (pText1 != null)
+                {
+                    if (this.mode == "append")
+                    {
+                        if (value!="")
+                            pText1.AppendText(value+"\r\n");
+                    }
+                    else
+                    {
+                        pText1.Text = value;
+                    }
+                    count = 30000;
+                }
+            };
+            if (pText1 != null)
+            {
+                try
+                {
+                    pText1.BeginInvoke(act, null);
+                }
+                catch (Exception e)
+                {
+                    Main.WriteLine(this,e.ToString());
+                }
+            }
+
+            while (count < 300)
+            {
+                count++;
+                Thread.Sleep(10);
+            }
+        }
+    }
+}

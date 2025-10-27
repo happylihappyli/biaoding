@@ -1,0 +1,177 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+
+
+namespace Test1
+{
+    //根据抓取位置，设置一个立方体，过滤点云
+    public class S_Move_Planet_From_Cloud_Cube : C_Node
+    {
+        //"min_dxdydz",min点相对于A的,dx,dy,dz","var_type":"string",
+        public string min_dxdydz = "";
+        //"max_dxdydz",max点相对于A的,dx,dy,dz","var_type":"string",
+        public string max_dxdydz = "";
+        //"key_cloud" 点云变量
+        public string key_cloud="";
+        //"key_cloud" 保存点云变量
+        public string key_cloud_save = "";
+        //"key_a" 点云变量
+        public string key_a = "";
+
+        public string min = "0";
+        public string key_planet = "";
+
+
+        public override void init()
+        {
+
+        }
+
+        public S_Move_Planet_From_Cloud_Cube(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            List<C_Point3D>? cloud1 = (List<C_Point3D>?)this.read_var(this.key_cloud, "List<C_Point3D>");
+            C_Point3D? A = (C_Point3D?)this.read_var(this.key_a, "C_Point3D");
+
+            if (A == null)
+            {
+                Main.WriteLine(this, "要处理的对象为key_a空！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            if (cloud1 == null || cloud1?.Count == 0)
+            {
+                Main.WriteLine(this, "点云为空！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            string[] strSplit = min_dxdydz.Split(',');
+
+            double x1 = double.Parse(strSplit[0]);
+            double y1 = double.Parse(strSplit[1]);
+            double z1 = double.Parse(strSplit[2]);
+
+            strSplit = max_dxdydz.Split(',');
+
+            double x2 = double.Parse(strSplit[0]);
+            double y2 = double.Parse(strSplit[1]);
+            double z2 = double.Parse(strSplit[2]);
+
+            C_Point3D d_min= new C_Point3D(x1, y1, z1);
+            C_Point3D d_max = new C_Point3D(x2, y2, z2);
+
+            C_Point3D min = A.add(d_min);
+            C_Point3D max = A.add(d_max);
+
+
+            var cloud2 = check_collision(A, d_min, d_max, cloud1);
+            if (cloud2.Count>0)
+            {
+                //如果碰撞
+
+                //如果是右边碰撞，看看最多往左移动多少就不会碰撞
+
+                List<C_Point3D> cloud_right = Main.cloud_filter(cloud2, "y", min.y, A.y);
+                List<C_Point3D> cloud_left = Main.cloud_filter(cloud2, "y", A.y, max.y);
+
+
+                double? right_max = Main.cloud_get_mid(this, cloud_right, "y", -1);
+                double? left_min = Main.cloud_get_mid(this, cloud_left, "y", 0);
+
+                double d1 = 0;
+                double d2 = 0;
+                if (right_max != null)
+                {
+                    d1 = (double)right_max - min.y;
+                }
+                if (left_min != null)
+                {
+                    d2 = max.y - (double)left_min;
+                }
+
+                C_Point3D dy = null;
+                if (d1 < d2)
+                {
+                    if (d1 < 60)
+                    {
+                        dy = new C_Point3D(0, d1, 0);
+                    }
+                }
+                else
+                {
+                    if (d2 < 60)
+                    {
+                        dy = new C_Point3D(0, -d2, 0);
+                    }
+                }
+
+                if (dy == null)
+                {
+                    this.save_var(this.key_cloud_save, "List<C_Point3D>", cloud1);
+                    this.Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    C_Planet_Catch? read = (C_Planet_Catch?)this.read_var(this.key_planet, "C_Planet_Catch");
+
+                    if (read != null)
+                    {
+                        read.arm_a = read.arm_a.add(dy);
+                        read.arm_b = read.arm_b.add(dy);
+                    }
+
+                    this.Next_Step = Node_Next.False;
+                }
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+
+        }
+
+        public List<C_Point3D> check_collision(C_Point3D A,C_Point3D d_min,C_Point3D d_max,List<C_Point3D> cloud1)
+        {
+            C_Point3D min = A.add(d_min);
+            C_Point3D max = A.add(d_max);
+
+            Main.WriteLine("x=" + min.x + "," + max.x);
+            Main.WriteLine("y=" + min.y + "," + max.y);
+            Main.WriteLine("z=" + min.z + "," + max.z);
+
+            List<C_Point3D> cloud2 = Main.cloud_filter(cloud1, "x", min.x, max.x);
+            List<C_Point3D> cloud3 = Main.cloud_filter(cloud2, "y", min.y, max.y);
+            List<C_Point3D> cloud4 = Main.cloud_filter(cloud3, "z", min.z, max.z);
+
+            this.save_var("_min", "C_Point3D", min);
+            this.save_var("_max", "C_Point3D", max);
+
+
+            if (cloud4.Count > 0)
+            {
+                Main.WriteLine(this, "cloud4.Count >0 ");
+            }
+            else
+            {
+                Main.WriteLine(this, "cloud4.Count == 0！");
+            }
+            return cloud4;
+        }
+
+    }
+}

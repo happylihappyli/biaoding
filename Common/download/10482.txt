@@ -1,0 +1,95 @@
+﻿using Common_Robot2;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class E_Textbox_Event : C_Node
+    {
+        public TextBox button;
+        public string type = "key_down";
+        public string key_ui = "";
+        public string key_code = "";
+        private Keys key_code_compare;
+
+        public E_Textbox_Event(string name, C_Space space_parent, C_Space space) : base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show("key_ui ==null ! " + Name);
+                return;
+            }
+            if (space.vars_ui.ContainsKey(key_ui) == false)
+            {
+                MessageBox.Show("没有这个文本框 key_ui=" + key_ui);
+                return;
+            }
+            S_TextBox pItem = (S_TextBox)space.vars_ui[key_ui];
+
+            button = pItem.pText1;
+            if (button != null)
+            {
+                if (this.type == "key_down")
+                {
+                    button.KeyDown += Event_Start;
+                }
+                else if (this.type == "key_up")
+                {
+                    button.KeyUp += Event_Start;
+                }
+                else if (this.type == "key_press")
+                {
+                    button.KeyPress += Key_Press;
+                }
+            }
+
+            this.key_code_compare = Keys.Return;
+            if (this.key_code == "return")
+            {
+                this.key_code_compare = Keys.Return;
+            }
+        }
+
+        private void Key_Press(object? sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == this.key_code[0])
+            {
+                Console.WriteLine(Name + " 事件激活 " + this.GetType().Name);
+
+                Random rnd = new Random();
+                string id = "Button_" + rnd.Next(100);
+                pTrain = new C_Train(id);
+                Run(pTrain);
+            }
+        }
+
+        private void Event_Start(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == this.key_code_compare)
+            {
+                Console.WriteLine(Name + " 事件激活 " + this.GetType().Name);
+
+                Random rnd = new Random();
+                string id = "Textbox_" + rnd.Next(100);
+                pTrain = new C_Train(id);
+                Run(pTrain);
+            }
+        }
+
+        public override Task run_sub()
+        {
+            //run_sub_main();
+            return Task.CompletedTask;
+        }
+         
+    }
+}

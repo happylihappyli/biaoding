@@ -1,0 +1,32 @@
+﻿using Common_Robot;
+using NAudio.Wave;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static Common_Robot.C_Mp3;
+
+namespace Test1
+{
+    public class DIY_Code : C_Node
+    {
+
+        public DIY_Code(string name, C_Space space_parent, C_Space space) : 
+            base(space_parent, space)
+        {
+            this.Name = name;
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            //main
+        }
+    }
+}

@@ -1,0 +1,126 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using static System.Net.Mime.MediaTypeNames;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using Three.Net.Lights;
+using System.Collections.Concurrent;
+
+namespace Test1
+{
+    
+    public class U_Menu_Init : C_Node
+    {
+
+        public string json = @"";
+        public string key_array = "nodeDataArray";
+        public MenuStrip main_menu = null;
+
+
+        public U_Menu_Init(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        { 
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            string strJson = this.read_string(this.json);
+
+            JObject jobj=JObject.Parse(strJson);
+
+            JArray? arr = (JArray?)jobj[key_array];// JArray.Parse(strJson);
+
+            List<C_Menu_Item> list_level1 = new List<C_Menu_Item>();
+
+            ConcurrentDictionary<string, C_Menu_Item> dic_menu = new ConcurrentDictionary<string, C_Menu_Item>();
+            //先添加一级菜单
+            for(var i = 0; i < arr.Count; i++)
+            {
+                JObject obj = (JObject)arr[i];
+
+                string? key = obj["key"]?.ToString();
+                string? name = obj["text"]?.ToString();
+                if (key==null || name == null)
+                {
+                    continue;
+                }
+                C_Menu_Item item = new C_Menu_Item(key, name);
+                dic_menu.TryAdd(key, item);
+
+                if (obj.ContainsKey("group"))
+                {
+                    string? key_parent = obj["group"]?.ToString();
+
+                    if (key_parent!=null && dic_menu.ContainsKey(key_parent))
+                    {
+                        C_Menu_Item parent = dic_menu[key_parent];
+
+                        //space.vars_menu.Add("menu/" + item.key, item);
+                        parent.sub_items.Add(item);
+                    }
+                    else
+                    {
+                        Console.WriteLine("D");
+                    }
+                }
+                else
+                {
+                    list_level1.Add(item);
+                }
+            }
+
+
+            main_menu = new MenuStrip();
+
+            for(var i = 0; i < list_level1.Count; i++)
+            {
+                C_Menu_Item item = list_level1[i];
+                space.vars_menu.TryAdd("menu/" + item.key, item);
+                item.menu_item = new ToolStripMenuItem();
+                item.menu_item.BackColor = Color.Transparent;
+                item.menu_item.Text = Tools.process_title(item.name);
+                main_menu.Items.Add(item.menu_item);
+
+                check_sub_item(item);
+            }
+
+
+            Action act = delegate ()
+            {
+                C_Space_Load.form1.Controls.Add(main_menu);
+            };
+            C_Space_Load.form1.BeginInvoke(act, null);
+        }
+
+        public void check_sub_item(C_Menu_Item item)
+        {
+            ToolStripMenuItem menu_item = item.menu_item;
+
+            for (var j = 0; j < item.sub_items.Count; j++)
+            {
+                var sub_item = item.sub_items[j];
+
+                space.vars_menu.TryAdd("menu/" + sub_item.key, sub_item);
+
+                sub_item.menu_item = new ToolStripMenuItem();
+                sub_item.menu_item.BackColor = Color.Transparent;
+                sub_item.menu_item.Text = Tools.process_title(sub_item.name);
+                menu_item.DropDownItems.Add(sub_item.menu_item);
+
+                check_sub_item(sub_item);
+            }
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

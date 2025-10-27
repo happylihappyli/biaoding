@@ -1,0 +1,47 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Set_Rect : C_Node
+    {
+        public string x1 = "";
+        public string y1 = "";
+        public string x2 = "";
+        public string y2 = "";
+        public string key_save = "1";
+
+
+        public S_Set_Rect(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            float x1 = float.Parse(this.x1);
+            float y1 = float.Parse(this.y1);
+            float x2 = float.Parse(this.x2);
+            float y2 = float.Parse(this.y2);
+
+            C_Rect pRect1 = new C_Rect(new C_Point3D(x1, y1, 0),new C_Point3D(x2, y2, 0));
+            this.save_var(key_save, "C_Rect", pRect1);
+        }
+    }
+}

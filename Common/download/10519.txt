@@ -1,0 +1,82 @@
+﻿
+using Common_Robot2;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //卸货抓取前过滤
+    public class Cal_Unload_Filter: C_Node
+    {
+
+
+        public string key_space = "";//C_Space
+        public string key_3d = "";
+        public string max_ry = "70";
+        public string key_array_main = "mains";
+        public string key_last = "";//上次抓取的面
+
+        public string debug = "1";
+        public string key_angle = "";//读取角度的变量
+        public string key_angle_min = "";//读取最小角度的变量
+        public string calculate_type = "x";
+        public string z_min = "-1680";
+        public string z_max = "2000";
+
+        public string key_grid = "#搜索表格";
+        public string key_grid_row = "#最左边z2";
+
+        public string key_catch_z = "#抓取坐标z";//#抓取坐标z,上次抓取的位置的z（最左边的抓取位置的z分量的变量）
+        public string key_catch_x = "#抓取坐标x";//
+
+
+        public string? key_planets = "";
+        public string key_list_data = "";
+        public string key_x = "#最小x";//测距的x的变量
+        public string key_z = "";//切换到z坐标，如果是测抓，中心点在z下面，就过滤
+
+        public string key_last_x = "#抓取坐标x";//抓取坐标x
+
+        public List<C_Data>? not_move;
+        public C_Train? pTrain_Old = null;
+        public C_Train? pTrain_Finished = null;
+        public string key_camera = "";
+
+        public string y_min = "-870";
+        public string y_max = "870";
+        public string x_len = "0";
+        public string y_len = "0";
+        public string z_len = "0";
+
+        public double car_move_len = 0;
+        public string y_filter = "-300";
+        public string x_max = "1600";
+
+        public string len_robot = "2100";
+        public string key_nobox = "#没有盒子";
+        public double angle_start = -10;
+        public string? key_sum_move_len = "";
+        public string? dz = "0";
+
+        public override void init()
+        {
+
+        }
+
+        public Cal_Unload_Filter(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+        }
+
+    }
+}

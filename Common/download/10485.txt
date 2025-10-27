@@ -1,0 +1,108 @@
+﻿
+using Common_Robot2;
+using dll_ssh;
+using Funny;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class W_SSH : C_Node
+    {
+        public string ip  = "";
+        public string port = "";
+        public string user = "";
+        public string str_commands  = "";
+        public string file  = "";
+        public string password = "";
+        public string long_command = "0";
+        public c_ssh p_ssh=null;
+
+        public W_SSH(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            p_ssh = new c_ssh();
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            var ip_new = space.tools.var_read(pTrain, this, this.ip);
+            var port_new = space.tools.var_read(pTrain, this, this.port);
+            var user_new = space.tools.var_read(pTrain, this, this.user);
+            var file_new = space.tools.var_read(pTrain, this, this.file);
+            var password_new = space.tools.var_read(pTrain, this, this.password);
+            var str_commands = space.tools.var_read(pTrain, this, this.str_commands);
+
+            if (password_new == "")
+            {
+                c_string pString = new c_string();
+                var pass1 = pString.default_password;
+                string password_aes = File.ReadAllText(file_new);
+                var str_password = pString.aes_decrypt(password_aes, pass1);
+                p_ssh.connect(ip_new, port_new, user_new, str_password, "");
+            }
+            else
+            {
+                p_ssh.connect(ip_new, port_new, user_new, password_new, "");
+            }
+
+            p_ssh.stream();
+
+
+            JArray pArray = JArray.Parse(str_commands);
+            for (var i = 0; i < pArray.Count; i++)
+            {
+                JObject item = (JObject)pArray[i];
+
+                if (item.ContainsKey("expect"))
+                {
+                    string cmd = item.GetValue("cmd").ToString();
+
+                    string cmd_new = space.tools.var_read(pTrain, this, cmd);
+
+                    string expect = item.GetValue("expect").ToString();
+                    string expect_new = space.tools.var_read(pTrain, this, expect);
+
+                    string wait = item.GetValue("wait").ToString();
+                    string wait_new = space.tools.var_read(pTrain, this, wait);
+
+                    p_ssh.stream_expect("",
+                        expect_new,
+                        cmd_new,
+                        int.Parse(wait_new));
+                }
+                else
+                {
+                    string cmd = item.GetValue("cmd").ToString();
+                    if (cmd == "@cmd2")
+                    {
+                        Console.WriteLine("error");
+                    }
+                    string cmd_new = space.tools.var_read(pTrain, this, cmd);
+
+                    p_ssh.stream_command("cmd", cmd_new);
+                }
+            }
+
+            if (long_command == "0")
+            {
+                p_ssh.stream_result(2);
+            }
+            else
+            {
+                //否则是长命令，要运行很长时间
+            }
+        }
+    }
+
+    
+}

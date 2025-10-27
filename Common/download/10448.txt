@@ -1,0 +1,47 @@
+﻿using Common_Robot2;
+using Microsoft.Data.Sqlite;
+using Windows.Web.AtomPub;
+
+namespace Test1
+{
+    /// <summary>
+    /// SQLite 操作类
+    /// </summary>
+    public class File_SQLite : C_Node
+    {
+
+        public SqLiteHelper? db_helper;
+
+        public string file_db="D:\\sqlite1.db";
+        public string table = "test";
+        public string field = "ID,Content,Time";
+        public string field_type = "INT PRIMARY KEY NOT NULL,TEXT,TEXT,TEXT";
+
+        public File_SQLite(string name, C_Space space_parent, C_Space space)
+            : base(name, space_parent, space)
+        {
+        }
+        public override void init()
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            db_helper = new SqLiteHelper(C_Vars.log_path, "data source=" + this.file_db);
+
+            db_helper.CreateTable(this.table,
+               field.Split(","), field_type.Split(","));
+
+        }
+    }
+
+
+}

@@ -1,0 +1,287 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Space_Caculate : C_Node
+    {
+        public string container = "";
+        public string key_data = "";
+        public string thickness ="2";
+        public string key_save = "";
+
+        public S_Space_Caculate(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string line_space = space.tools.var_read(pTrain, this, this.container);
+
+            C_Block_Space pSpace = new C_Block_Space(line_space);
+            C_Block_Data pBlockData = (C_Block_Data)space.vars.read_vars(pTrain, this, this.key_data, "C_Block_Data");
+
+            int split_type = 1;
+            double thickness = Main.get_double_from_obj(this,space.vars.read_vars(pTrain, this, this.thickness,""));
+
+            try
+            {
+                C_Block_Loading_Run pBlock_Loading_Run = new C_Block_Loading_Run();
+
+                double space_remain_min = double.MaxValue;
+                int index_min = -1;
+                List<string> list = null;
+
+                for (var i = 0; i < pBlockData.block_list_complex.Count; i++)
+                {
+                    if (i == 6)
+                    {
+                        Console.WriteLine("D");
+                    }
+                    C_Block_Space pSpace2 = new C_Block_Space(line_space);
+                    C_Block_Data pBlock_Data = pBlockData.Clone();
+                    (List<string> list2, double space_remain_all2, int index2) =
+                        pBlock_Loading_Run.calculate(this,true, pBlock_Data, pSpace2, i, (int)thickness, split_type);
+                    if (space_remain_all2 < space_remain_min)
+                    {
+                        space_remain_min = space_remain_all2;
+                        index_min = index2;
+                        list = list2;
+                    }
+                }
+                if (index_min == -1)
+                {
+                    MessageBox.Show(this.Name+"码垛计算错误！");
+                }
+
+                //(List<string> list, double space_remain_all, int index) =
+                //    pBlock_Loading_Run.calculate(this, true, pBlockData, pSpace, index_min, (int)thickness, split_type);
+
+                if (1 == 2)
+                {
+                    string line = pBlockData.block_list[0].box_type.x_len + "_" +
+                                pBlockData.block_list[0].box_type.y_len + "_" +
+                                pBlockData.block_list[0].box_type.z_len;
+
+                    string file = "D:/tmp_" + line + ".txt";
+                    string content = "";
+                    for (var i = 0; i < list.Count; i++)
+                    {
+                        content += list[i] + "\r\n";
+                    }
+                    File.WriteAllText(file, content);
+                }
+
+                S_TTS.speak_async(this.Name+" 计算完毕");
+
+                space.vars.save_vars(pTrain, this, this.key_save, "List<string>", list);
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+
+    }
+
+    public class C_Block_Loading_Run
+    {
+        //private C_Main pMain;
+
+        public C_Block_Loading_Run()//C_Main pMain)
+        {
+            //this.pMain = pMain;
+        }
+
+
+
+        public int comparison2(C_Block_Complex x, C_Block_Complex y)
+        {
+            double a = x.space_used();// x.x_len * x.y_len * x.z_len;
+            double b = y.space_used(); //y.x_len * y.y_len * x.z_len;
+            if (a < b)
+                return 1;
+            else if (a == b)
+            {
+                return 0;
+            }
+            else
+                return -1;
+        }
+
+
+        public int comparison(C_Block_Simple x, C_Block_Simple y)
+        {
+            double a = x.space_used();// x.x_len * x.y_len * x.z_len;
+            double b = y.space_used(); //y.x_len * y.y_len * x.z_len;
+            if (a < b)
+                return 1;
+            else if (a == b)
+            {
+                return 0;
+            }
+            else
+                return -1;
+        }
+
+        public bool 是否有更多盒子(C_Block_Data pMain)
+        {
+
+            List<C_Block_Complex> pList = pMain.block_list_complex;
+
+            pList.Sort(comparison2);
+
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Block_Complex block = pList[i];
+                if (block.用完) continue;
+
+                return true;
+
+            }
+            return false;
+        }
+
+
+
+
+        /// <summary>
+        /// 放置复杂模块2
+        /// </summary>
+        /// <param name="pNode"></param>
+        /// <param name="bSave"> 是否保存 </param>
+        /// <param name="b2D"></param>
+        /// <param name="pBlock_Data"></param>
+        /// <param name="space_root"></param>
+        /// <param name="start_index">从start_index开始放</param>
+        /// <param name="thickness"></param>
+        /// <param name="split_type"></param>
+        /// <returns></returns>
+        public (List<string> result,double space_remain_all, int index)
+            calculate(
+            C_Node pNode,
+            bool b2D,
+            C_Block_Data pBlock_Data,
+            C_Block_Space space_root,
+            int start_index, int thickness, int split_type)
+        {
+
+            double space_remain_all = double.MaxValue;
+
+            List<C_Block_Space> space_list = new List<C_Block_Space>();
+
+            if (pBlock_Data.block_list_complex.Count == 0)
+            {
+                MessageBox.Show(pNode.Name+ "盒子信息有问题！");
+                return (null,space_remain_all,-1);
+            }
+            if (b2D)
+            {
+                space_root.z_len = pBlock_Data.block_list_complex[0].z_len;
+            }
+            space_list.Add(space_root);
+
+            pBlock_Data.block_list_complex.Sort(comparison2);
+
+            double space_taken = 0;//占用的空间
+
+            for (var j = 0; j < space_list.Count; j++) 
+            {
+                C_Block_Space space = space_list[j];
+
+                C_Block_Complex block_selected = null;
+                C_Block_Space space_selected = null;
+                double waist_min = double.MaxValue;
+                for (var i = start_index; i < pBlock_Data.block_list_complex.Count; i++)
+                {
+                    C_Block_Complex block = pBlock_Data.block_list_complex[i];
+                    if (block.用完) continue;
+
+                    if (space.被占用) continue;
+
+                    double waist = space.space() - block.space_used();
+                    if (waist < waist_min)
+                    {
+                        //如果方块小于要放置的空间，说明可以放置
+                        if (block.x_len <= space.x_len &&
+                            block.y_len <= space.y_len &&
+                            block.z_len <= space.z_len)
+                        {
+                            waist_min = waist;
+                            space_selected = space;
+                            block_selected = block;
+                        }
+                    }
+                }
+
+                if (space_selected != null)
+                {
+                    space_selected.放置积木(pBlock_Data, block_selected);
+                    space_taken += block_selected.space_used();
+                    List<C_Block_Space> remain = space_selected.空间切割_by_Complex(block_selected, split_type);
+                    for (var k = 0; k < remain.Count; k++)
+                    {
+                        C_Block_Space space_remain = remain[k];
+                        space_list.Add(space_remain);
+                    }
+                    space_remain_all = (space_root.space() - space_taken);
+
+                    Console.WriteLine(j + " space=" + space_remain_all);
+                }
+            }
+            //Console.WriteLine(pNode.Name+ "输出数据");
+
+
+            List<string> result = new List<string>();
+
+            for (var step = 0; step < space_list.Count; step++)
+            {
+                C_Block_Space space = space_list[step];
+                if (space.被占用)
+                {
+                    C_Block_Complex block2 = space.block;
+
+                    for (var i = 0; i < block2.blocks.Count; i++)
+                    {
+                        C_Block_Simple block = block2.blocks[i];
+                        for (var nx = 1; nx <= block.nx; nx++)
+                        {
+                            for (var ny = 1; ny <= block.ny; ny++)
+                            {
+                                for (var nz = 1; nz <= block.nz; nz++)
+                                {
+                                    int x_len = block.x_len / block.nx - thickness;
+                                    int y_len = block.y_len / block.ny - thickness;
+                                    int z_len = block.z_len / block.nz - thickness;
+
+                                    double x = space.x0 + block.pos.x + (x_len + thickness) * (nx - 1);
+                                    double y = space.y0 + block.pos.y + (y_len + thickness) * (ny - 1);
+                                    double z = space.z0 + block.pos.z + (z_len + thickness) * (nz - 1);
+
+                                    result.Add(x_len + "," + y_len + "," + z_len + "," +
+                                        x + "," + y + "," + z);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+            return (result,space_remain_all, start_index);
+
+        }
+    }
+
+}

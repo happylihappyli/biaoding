@@ -1,0 +1,122 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Text;
+using System.Threading;
+using System.Net.Sockets;
+using System.Net;
+using System.Collections;
+using System.Threading.Tasks;
+
+namespace Test1
+{
+    public class W_TCP_Server_One : I_TCP
+    {
+
+        public string tcp_server = "";
+
+        public W_TCP_Server_One(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+            Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            this.save_var("#" + tcp_server, "string", Name);
+
+            Received_CallbackFunc = Callback_Robot;
+
+            string ip =this.read_string(this.ip);
+            string port = this.read_string(this.port);
+
+
+            Main.WriteLine(this, "启动TCP ");
+
+
+            //设置IP，port
+            try
+            {
+                if (Listener == null)
+                {
+                    Listener = new TcpListener(IPAddress.Parse(ip), int.Parse(port));
+                    listenThread = new Thread(new ThreadStart(ListenForClients));
+                    listenThread.Start();
+                }
+                else
+                {
+                    Main.WriteLine(this,"已启动服务器");
+                }
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this, "错误:" + ex.ToString());
+                if (null != Received_CallbackFunc)
+                {
+                    Received_CallbackFunc(new byte[] { 0x00 }, -2, ex.ToString());
+                }
+            }
+        }
+
+        private void ListenForClients()
+        {
+            try
+            {
+                Listener.Start();
+                while (space.vars.bClosingWindows == false)
+                {
+                    C_TcpClient client = new C_TcpClient();
+                    client.client = Listener.AcceptTcpClient();
+                    client.clientStream = client.client.GetStream();
+                    client.Thread = new Thread(new ParameterizedThreadStart(HandleClientComm));
+                    client.Thread.Start(client);
+
+                    for (var i = 0; i < clients.Count; i++)
+                    {
+                        clients[i].client.Close();
+                    }
+                    clients.Clear();
+
+                    clients.Add(client);
+                }
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this,"错误1");
+                Main.WriteLine(this,ex.ToString());
+                if (null != Received_CallbackFunc)
+                {
+                    Received_CallbackFunc(new byte[] { 0x00 }, -2, ex.ToString());
+                }
+            }
+        }
+
+
+        //public static string ToHexString(byte[] bytes) // 0xae00cf => "AE00CF "
+        //{
+        //    string hexString = string.Empty;
+        //    if (bytes != null)
+        //    {
+        //        StringBuilder strB = new StringBuilder();
+        //        for (int i = 0; i < bytes.Length; i++)
+        //        {
+        //            strB.Append(bytes[i].ToString("X2"));
+        //        }
+        //        hexString = strB.ToString();
+        //    }
+        //    return hexString;
+        //}
+
+    }
+
+
+}

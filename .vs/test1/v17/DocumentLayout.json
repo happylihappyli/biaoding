@@ -1,0 +1,245 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Projects\\csharp\\test1\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\data\\main_robot.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\data\\main_robot.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\data\\main.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\data\\main.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|d:\\projects\\csharp\\test1\\frmmain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:frmmain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\frmmain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:frmmain.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\step\\s_camera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\step\\s_camera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\step\\cloud\\cloud_get.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\step\\cloud\\cloud_get.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\class\\camera\\tyisp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\class\\camera\\tyisp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\class\\camera\\thread_depth_img.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\class\\camera\\thread_depth_img.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\test1.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:test1.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\step\\s_convert_3d_point_to_3d.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\step\\s_convert_3d_point_to_3d.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\class\\camera\\main_camera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\class\\camera\\main_camera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|D:\\Projects\\csharp\\test1\\common\\class\\camera\\c_camera_tuyang.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{523CE553-19F7-4C7B-BF5B-447B8FDDEE26}|test1.csproj|solutionrelative:common\\class\\camera\\c_camera_tuyang.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "S_Camera.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Step\\S_Camera.cs",
+              "RelativeDocumentMoniker": "Common\\Step\\S_Camera.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Step\\S_Camera.cs",
+              "RelativeToolTip": "Common\\Step\\S_Camera.cs",
+              "ViewState": "AQIAAOACAAAAAAAAAAAiwOsCAAAVAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:39:32.26Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Main_Robot.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Data\\Main_Robot.cs",
+              "RelativeDocumentMoniker": "Common\\Data\\Main_Robot.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Data\\Main_Robot.cs",
+              "RelativeToolTip": "Common\\Data\\Main_Robot.cs",
+              "ViewState": "AQIAAKYEAAAAAAAAAAAcwLEEAAAdAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T12:28:25.252Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Thread_Depth_Img.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\Thread_Depth_Img.cs",
+              "RelativeDocumentMoniker": "Common\\Class\\Camera\\Thread_Depth_Img.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\Thread_Depth_Img.cs",
+              "RelativeToolTip": "Common\\Class\\Camera\\Thread_Depth_Img.cs",
+              "ViewState": "AQIAABIAAAAAAAAAAAAiwCAAAABUAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:39:19.298Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "FrmMain.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\FrmMain.cs",
+              "RelativeDocumentMoniker": "FrmMain.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\FrmMain.cs",
+              "RelativeToolTip": "FrmMain.cs",
+              "ViewState": "AQIAAB4AAAAAAAAAAAAiwC0AAAAmAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:33:18.62Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAADwvwYAAAABAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:30:39.06Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "test1",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\test1.csproj",
+              "RelativeDocumentMoniker": "test1.csproj",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\test1.csproj",
+              "RelativeToolTip": "test1.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-10-23T13:30:16.159Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "FrmMain.cs [\u8BBE\u8BA1]",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\FrmMain.cs",
+              "RelativeDocumentMoniker": "FrmMain.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\FrmMain.cs [\u8BBE\u8BA1]",
+              "RelativeToolTip": "FrmMain.cs [\u8BBE\u8BA1]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:29:33.129Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Form1.cs",
+              "RelativeDocumentMoniker": "Form1.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Form1.cs",
+              "RelativeToolTip": "Form1.cs",
+              "ViewState": "AQIAAAADAAAAAAAAAAAAAAwDAAAzAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T12:31:06.058Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Main.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Data\\Main.cs",
+              "RelativeDocumentMoniker": "Common\\Data\\Main.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Data\\Main.cs",
+              "RelativeToolTip": "Common\\Data\\Main.cs",
+              "ViewState": "AQIAAHUCAAAAAAAAAAAgwIICAAA1AAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-08T06:28:30.718Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "Cloud_Get.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Step\\Cloud\\Cloud_Get.cs",
+              "RelativeDocumentMoniker": "Common\\Step\\Cloud\\Cloud_Get.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Step\\Cloud\\Cloud_Get.cs",
+              "RelativeToolTip": "Common\\Step\\Cloud\\Cloud_Get.cs",
+              "ViewState": "AQIAALUAAAAAAAAAAAAiwMIAAAAtAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:39:50.629Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "TYISP.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\TYISP.cs",
+              "RelativeDocumentMoniker": "Common\\Class\\Camera\\TYISP.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\TYISP.cs",
+              "RelativeToolTip": "Common\\Class\\Camera\\TYISP.cs",
+              "ViewState": "AQIAAJkAAAAAAAAAAAAiwKcAAAAVAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T13:39:54.741Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "S_Convert_3D_Point_To_3D.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Step\\S_Convert_3D_Point_To_3D.cs",
+              "RelativeDocumentMoniker": "Common\\Step\\S_Convert_3D_Point_To_3D.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Step\\S_Convert_3D_Point_To_3D.cs",
+              "RelativeToolTip": "Common\\Step\\S_Convert_3D_Point_To_3D.cs",
+              "ViewState": "AQIAACAAAAAAAAAAAAAawC4AAAAUAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T12:30:14.335Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "C_Camera_TuYang.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\C_Camera_TuYang.cs",
+              "RelativeDocumentMoniker": "Common\\Class\\Camera\\C_Camera_TuYang.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\C_Camera_TuYang.cs",
+              "RelativeToolTip": "Common\\Class\\Camera\\C_Camera_TuYang.cs",
+              "ViewState": "AQIAAAIAAAAAAAAAAAAawAoAAAAPAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T12:29:34.38Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "Main_Camera.cs",
+              "DocumentMoniker": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\Main_Camera.cs",
+              "RelativeDocumentMoniker": "Common\\Class\\Camera\\Main_Camera.cs",
+              "ToolTip": "D:\\Projects\\csharp\\test1\\Common\\Class\\Camera\\Main_Camera.cs",
+              "RelativeToolTip": "Common\\Class\\Camera\\Main_Camera.cs",
+              "ViewState": "AQIAABsAAAAAAAAAAAAiwBoAAAAZAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-23T12:28:58.004Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

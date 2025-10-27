@@ -1,0 +1,69 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class C_Cloud_Remove : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_index = "";
+        public string key_save = "cloud2";
+
+        public C_Cloud_Remove(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? pList = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+
+            if (pList == null)
+            {
+                MessageBox.Show(this.Name + "key_read 读取为空");
+                return;
+            }
+
+            List<C_Point3D> pList2 = new List<C_Point3D>();
+
+            List<string>? list_index = (List<string>?)this.read_var(this.key_index, "List<string>");
+
+            if (pList == null || list_index == null)
+            {
+                MessageBox.Show(this.Name + "key_index 读取为空");
+                return;
+            }
+
+
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+                pList2.Add(p.Clone());
+            }
+
+
+            for (var i = list_index.Count-1;i>=0;i--)
+            {
+                string str_index= list_index[i];
+                pList2.RemoveAt(int.Parse(str_index));
+            }
+
+
+            this.save_var(this.key_save, "List<C_Point3D>", pList2);
+
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

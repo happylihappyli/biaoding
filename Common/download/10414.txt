@@ -1,0 +1,55 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using Three.Net.Math;
+
+namespace Test1
+{
+    public class C_Cloud_Rotate : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string key_axis = "";
+        public string angle = "0";
+
+        public C_Cloud_Rotate(string name, C_Space space_parent, C_Space space) : base(name, space_parent,space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> pList = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+            
+            C_Point3D p_vector = (C_Point3D)this.read_var(this.key_axis, "C_Point3D");
+            Vector3 v_axis = new Vector3(p_vector.x, p_vector.y, p_vector.z);
+            double f_angle= double.Parse(this.angle);
+
+            f_angle = f_angle * Math.PI/180;
+
+            List<C_Point3D> pList_save = new List<C_Point3D>();
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+                Vector3 v = new Vector3(p.x,p.y,p.z);
+                v.ApplyAxisAngle(v_axis, (float)f_angle);
+
+                pList_save.Add(new C_Point3D(v.x,v.y,v.z)); 
+            }
+
+
+            this.save_var(this.key_save, "List<C_Point3D>", pList_save);
+
+        }
+
+        public void init()
+        {
+        }
+    }
+}

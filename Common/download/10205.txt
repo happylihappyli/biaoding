@@ -1,0 +1,63 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class String_Angle_Six_Continue : C_Node
+    {
+        public string key_read1 = "";//string
+        public string key_read2 = "";//string
+        public String_Angle_Six_Continue(string Name, C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string line1 = (string)space.vars.read_vars(pTrain, this, this.key_read1, "string");
+
+            string[] strSplit1 = line1.Split(',');
+
+            string line2 = (string)space.vars.read_vars(pTrain, this, this.key_read2, "string");
+
+            string[] strSplit2 = line2.Split(',');
+
+            double six1 = double.Parse(strSplit1[5]);
+            double six2 = double.Parse(strSplit2[5]);
+
+            if (six1 > six2)
+            {
+                while (six1 - six2 > 90)
+                {
+                    six2 += 180;
+                }
+            }else if (six1 < six2)
+            {
+                while (six2 - six1 > 90)
+                {
+                    six2 -= 180;
+                }
+            }
+
+            strSplit2[5] = six2 + "";
+            
+            space.vars.save_vars(pTrain, this, this.key_read2, "string", string.Join(",", strSplit2));
+        }
+    }
+}

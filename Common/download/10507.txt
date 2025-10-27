@@ -1,0 +1,53 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class U_Show_Hide_Panel : C_Node
+    {
+        public S_Panel? pItem;
+        public string key_ui = "";
+        public U_Show_Hide_Panel(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        { 
+        }
+
+        public override void init()
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (space.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_Panel)space.vars_ui[key_ui];
+            }
+            else
+            {
+                MessageBox.Show(this.Name +"UI没有这个控件");
+            }
+
+            if (pItem == null)
+            {
+                return;
+            }
+             
+
+            Action act = delegate ()
+            {
+                if (pItem.panel != null)
+                {
+                    pItem.panel.Visible = !pItem.panel.Visible;
+                }
+            };
+            if (pItem.panel != null)
+                pItem.panel.BeginInvoke(act, null);
+
+        }
+    }
+}

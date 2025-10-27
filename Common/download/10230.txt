@@ -1,0 +1,87 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Vars_Set : C_Node
+    {
+
+        public string type = "";
+        public string type_group = "";
+
+        private string _jarray = "";
+        public string jarray { get => _jarray; set => this._jarray = value; }
+
+        public S_Vars_Set(string name, C_Space space_parent,C_Space space):
+            base(name, space_parent, space)
+        {
+            //this.Name = name;
+            ////space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            JArray _jarray = null;
+
+            try
+            {
+                _jarray = JArray.Parse(this.jarray);
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+
+            for(var i=0;i< _jarray.Count;i++)
+            {
+                JObject jObject = (JObject)_jarray[i];
+
+                string? name = jObject["name"]?.ToString();
+                string? value = jObject["value"]?.ToString();
+
+
+                if (value != null && value.StartsWith("@"))
+                {
+                    string new_value=this.read_string(value);
+
+                    this.save_var(name, "string", new_value);
+                }
+                else
+                {
+                    if (type == "double")
+                    {
+                        double value_double = double.Parse(value);
+                        this.save_var(name, type, value_double);
+                    }
+                    else
+                    {
+                        this.save_var(name, "string", value);
+                    }
+                }
+            }
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

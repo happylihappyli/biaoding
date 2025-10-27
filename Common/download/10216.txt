@@ -1,0 +1,53 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Collections;
+
+namespace Test1
+{
+    public class F_If_StartsWith : C_Node
+    {
+        public string key_read = "";
+        public string value = "string";
+
+        public F_If_StartsWith(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            if (this.Name== "如果=上半页")
+            {
+                Main.WriteLine(this,"D");
+            }
+            string strLine = (string)this.read_var(this.key_read, "string");
+            if( strLine == null)
+            {
+                Next_Step = Node_Next.None;
+                return;
+            }
+
+            if (strLine.StartsWith(value)) // pTrain.vars.ContainsKey
+            {
+                Next_Step = Node_Next.True;
+            }
+            else
+            {
+                Next_Step = Node_Next.False;
+            }
+        }
+    }
+}

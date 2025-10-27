@@ -1,0 +1,54 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class String_To_Byte_Array: C_Node
+    {
+        public string msg = "";
+        public string encode = "";
+        public string key_save = "";
+        public String_To_Byte_Array(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            string msg = this.read_string(this.msg);
+
+            byte[] gbk = Encoding.GetEncoding(encode).GetBytes(msg);
+
+            var hex = BitConverter.ToString(gbk, 0);
+
+            Main.WriteLine(hex);
+
+            this.save_var(this.key_save, "byte[]", gbk);
+        }
+
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

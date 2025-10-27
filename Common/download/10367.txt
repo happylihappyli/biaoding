@@ -1,0 +1,115 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Menu_Item : S_UI
+    {
+        public ToolStripMenuItem menu;
+        public MenuStrip panel;
+        public string url = "";
+        public string read_key = "";
+        public string text = "button1";
+
+        public S_Menu_Item(string name, C_Space space_parent, C_Space space) : base(name, space_parent, space)
+        {
+            
+        }
+
+        public void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+            menu = new ToolStripMenuItem();
+            menu.BackColor = Color.Transparent;
+            //button.Location = new Point(x, y);
+            menu.Size = new Size(width, height);
+            menu.Text = Tools.process_title(text);
+            var font_name = this.font_name;
+            if (font_name == "")
+            {
+                font_name = "宋体";
+            }
+            var font_size = this.font_size;
+            if (this.font_size == "")
+            {
+                font_size = "12";
+            }
+            menu.Font = new Font(font_name, float.Parse(font_size),
+                FontStyle.Regular, GraphicsUnit.Point, ((byte)(134)));
+
+            if (this.color_bg != "")
+            {
+                menu.BackColor = ColorTranslator.FromHtml(this.color_bg);
+            }
+            if (this.color_font != "")
+            {
+                menu.ForeColor = ColorTranslator.FromHtml(this.color_font);
+            }
+
+            if (pFrm != null)
+            {
+
+                Action act = delegate ()
+                {
+                    
+                    if (pFrm != null)
+                    {
+                        if (space.vars_ui.ContainsKey(this.group) == false)
+                        {
+                            MessageBox.Show("没有这个group=" + this.group);
+                            return;
+                        }
+                        var pParent = space.vars_ui[this.group];
+                        if (pParent.GetType().Name == "S_Form")
+                        {
+                            //pFrm.Controls.Add(button);
+                        }
+                        else if (pParent.GetType().Name == "S_Panel_Map")
+                        {
+                            if (space.vars_ui.ContainsKey(pParent.key_parent) == false)
+                            {
+                                MessageBox.Show("没有这个group=" + pParent.key_parent);
+                                return;
+                            }
+                            var pParent2 = space.vars_ui[pParent.key_parent];
+                            if (pParent2.GetType().Name == "S_Menu_Item")
+                            {
+
+                                S_Menu_Item pParent3 = (S_Menu_Item)pParent2;
+                                pParent3.menu.DropDownItems.Add(menu);
+                            }
+                            else
+                            {
+                                S_Tool_Menu pParent3 = (S_Tool_Menu)pParent2;
+                                pParent3.main_menu.Items.Add(menu);
+                            }
+                        }
+
+                        //button.BringToFront();
+                        switch (this.dock)
+                        {
+                            case "left":
+                                menu.Dock = DockStyle.Left;
+                                break;
+                            case "right":
+                                menu.Dock = DockStyle.Right;
+                                break;
+                            case "top":
+                                menu.Dock = DockStyle.Top;
+                                break;
+                            case "bottom":
+                                menu.Dock = DockStyle.Bottom;
+                                break;
+                            case "fill":
+                                menu.Dock = DockStyle.Fill;
+                                break;
+                        }
+                    }
+                };
+                if (pFrm != null)
+                    pFrm.BeginInvoke(act, null);
+
+
+            }
+        }
+    }
+}

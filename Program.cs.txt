@@ -1,0 +1,23 @@
+
+using MathNet.Numerics.Distributions;
+
+using Test1;
+
+namespace Test1
+{
+    internal static class Program
+    {
+        public static bool bOpenGL4 = false;
+
+        /// <summary>
+        ///  主程序入口
+        /// </summary>
+        [STAThread]
+        static void Main()
+        {
+
+	ApplicationConfiguration.Initialize();
+	Application.Run(new Form1());
+        }
+    }
+}

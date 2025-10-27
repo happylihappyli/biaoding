@@ -1,0 +1,124 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class D_Draw_Polygons : C_Node
+    {
+
+        public string color = "red";
+        public string pic_read = "pic1";
+        public string pic_save = "";
+
+        public string data_in = "";
+        public string data_out = "";
+
+        private string _key_polygons = "";
+        private string _pen_width = "3";
+
+        public string key_polygons{ get => _key_polygons; set => _key_polygons = value; }
+        public string pen_width { get => _pen_width; set => _pen_width = value; }
+
+        public D_Draw_Polygons(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            //this.Name = name;
+            //space.vars_step.Add(name, this);
+
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (pTrain == null) return;
+
+            if (data_in != "")
+            {
+                pic_read = data_in;
+            }
+
+            if (data_out != "")
+            {
+                pic_save = data_out;
+            }
+
+
+            if (this.read_var(pic_read, "Bitmap") == null)
+            {
+                MessageBox.Show("pic_read=null " + pic_read + "==" + Name);
+                return;
+            }
+            Bitmap pBitmapRGB = (Bitmap)this.read_var(pic_read, "Bitmap");
+            
+            Bitmap pBitmapTmp = Main.CopyBmp(pBitmapRGB);
+
+            int width = pBitmapTmp.Width;
+            int height = pBitmapTmp.Height;
+            Bitmap bmpSave = new Bitmap(width, height);
+            Graphics g = Graphics.FromImage(bmpSave);
+
+            g.DrawImage(pBitmapTmp,
+                new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                        (int)space.vars.draw_offset_y_tuyang,
+                    pBitmapTmp.Width - (int)space.vars.draw_offset_x_tuyang,
+                    pBitmapTmp.Height - (int)space.vars.draw_offset_y_tuyang),
+                new Rectangle(0, 0, pBitmapTmp.Width, pBitmapTmp.Height),
+                GraphicsUnit.Pixel);
+
+            string strColor = space.tools.var_read(pTrain, this, this.color);
+            string[] strSplit = _key_polygons.Split(",");
+            string[] strSplit_Color = strColor.Split(",");
+
+            if (strSplit_Color.Length < strSplit.Length)
+            {
+                MessageBox.Show(this.Name + "颜色数量太少");
+            }
+
+            for (var i = 0; i < Math.Min(strSplit_Color.Length, strSplit.Length); i++)
+            {
+                string key_polygon = strSplit[i];
+                if (space.read_vars(pTrain, this, key_polygon, "List<C_Point3D>") != null)
+                {
+
+                    List<C_Point3D>? pPoints = (List<C_Point3D>?)this.read_var(key_polygon, "List<C_Point3D>");
+
+                    if (pBitmapTmp != null  && pPoints!=null  && pPoints.Count>=3)
+                    {
+                        lock (pBitmapTmp)
+                        {
+                            string color2 = strSplit_Color[i];
+                            if (color2 == "") color2 = "red";
+                            Pen pPen = new Pen(ColorTranslator.FromHtml(color2), int.Parse(_pen_width));
+
+                            C_Point3D x0y0 = pPoints[0];
+                            C_Point3D x1y1;
+                            for (var j = 1; j < pPoints.Count; j++)
+                            {
+                                x1y1 = pPoints[j];
+                                g.DrawLine(pPen, x0y0.x, x0y0.y, x1y1.x, x1y1.y);
+                                x0y0 = x1y1;
+                            }
+
+                            x1y1 = pPoints[0];
+                            g.DrawLine(pPen, x0y0.x, x0y0.y, x1y1.x, x1y1.y);
+                        }
+                    }
+                }
+
+            }
+            this.save_var(pic_save, "Bitmap", bmpSave);
+
+
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

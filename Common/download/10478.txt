@@ -1,0 +1,47 @@
+﻿using Common_Robot2;
+namespace Test1
+{
+    public class File_Dir_Directory: C_Node
+    {
+        public string path = "";
+        public string key_save ="";
+
+        public File_Dir_Directory(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+        }
+        public override void init()
+        {
+
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string path2 = space.tools.var_read(pTrain, this, path);
+            if (path2.EndsWith("\\")==false)
+            {
+                path2 += "\\";
+            }
+
+            List<string> pList = new List<string>();
+            string[] fileEntries = Directory.GetDirectories(path2);
+            foreach (string fileName in fileEntries)
+            {
+                pList.Add(fileName.Substring(path2.Length) + "|d");
+            }
+
+
+            this.save_var(key_save, "List<string>", pList);
+
+        }
+    }
+
+}

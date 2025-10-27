@@ -1,0 +1,126 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Music_To_Beep : C_Node
+    {
+        public string sound_base = "68";
+        public string time_base = "1000";
+        public string line = "1:2,2:2,3:2,4:2,5:2";
+        public string key_save = "";
+
+        public S_Music_To_Beep(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+        public void run_sub_main()
+        {
+            this.convert();
+        }
+
+        public void convert()
+        {
+            try
+            {
+                string line2 =this.read_string(line);
+                line2 = line2.Replace("\r", "");
+                line2 = line2.Replace("\n", "");
+
+                string[] strSplit = line2.Split(",");
+                int count=strSplit.Length;
+                int[] fre = new int[count];
+                int[] times = new int[count];
+
+                string str_sound_base = this.read_string(this.sound_base);
+                string str_time_base = this.read_string(this.time_base);
+                for (var i = 0; i < count; i++)
+                {
+                    string[] strSplit2 = strSplit[i].Split(":");
+                    if (strSplit2.Length > 1)
+                    {
+                        int step = get_step(strSplit2[0]);
+                        int p =int.Parse(str_sound_base) + step;
+                        int time = int.Parse(strSplit2[1]);
+                        fre[i] = p;
+                        times[i] =int.Parse(str_time_base) /time;
+                    }
+                }
+
+                string result = "";
+                for(var i = 0;i < fre.Length;i++)
+                {
+                    result += fre[i] + ":" + times[i] + ",";
+                }
+                this.save_var(this.key_save, "string",result);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+        }
+
+        private int get_step(string step)
+        {
+            switch(step)
+            {
+                case "1-":
+                    return -12;
+                case "2-":
+                    return -10;
+                case "3-":
+                    return -8;
+                case "4-":
+                    return -7;
+                case "5-":
+                    return -5;
+                case "6-":
+                    return -3;
+                case "7-":
+                    return -1;
+                case "1":
+                    return 1;
+                case "2":
+                    return 3;
+                case "3":
+                    return 5;
+                case "4":
+                    return 6;
+                case "5":
+                    return 8;
+                case "6":
+                    return 10;
+                case "7":
+                    return 12;
+                case "1+":
+                    return 13;
+                case "2+":
+                    return 15;
+                case "3+":
+                    return 17;
+                case "4+":
+                    return 19;
+                case "5+":
+                    return 20;
+                case "6+":
+                    return 22;
+                case "7+":
+                    return 24;
+            }
+            return 100;
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+
+
+}

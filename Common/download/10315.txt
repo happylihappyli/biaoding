@@ -1,0 +1,82 @@
+﻿
+using Common_Robot2;
+using System.Text;
+
+namespace Test1
+{
+    public class File_Read : C_Node
+    {
+        public string file = "";
+        public string key_save = "";
+        public string from = "0";
+        public string to = "10";
+        public string encode = "utf-8";
+
+        public File_Read(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+        public void run_sub_main()
+        {
+            try
+            {
+                string file_new = this.read_string(file);
+                string from_new = this.read_string(from);
+                string to_new = this.read_string(to);
+                string str_encode = this.read_string(encode);
+                if (str_encode == "" || str_encode == "utf8")
+                {
+                    str_encode = "utf-8";
+                }
+
+                int iFrom =int.Parse(from_new);
+                int iTo =int.Parse(to_new);
+
+                StringBuilder sb = new StringBuilder();
+                var pEncode=Encoding.GetEncoding(str_encode);
+                using (StreamReader sr = new StreamReader(file_new, pEncode))
+                {
+                    string line;
+                    int index = 0;
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        if (iFrom <= index)
+                        {
+                            sb.AppendLine(line);
+                            //Main.WriteLine(this, line);
+                        }
+                        if (iTo > 0)
+                        {
+                            if (index > iTo)
+                            {
+                                break;
+                            }
+                        }
+                        index++;
+                    }
+                    if (sb.Length >=2)
+                    {
+                        sb.Remove(sb.Length - 2,2);
+                    }
+                    this.save_var(key_save,"string",sb.ToString());
+                }
+            }
+            catch (Exception e)
+            {
+                Main.WriteLine(this,"文件读取错误:");
+                Main.WriteLine(this, e.Message);
+            }
+
+        }
+    }
+}

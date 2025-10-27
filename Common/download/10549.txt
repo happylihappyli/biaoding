@@ -1,0 +1,143 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 计算卸货的时候抓取的箱子的信息
+    /// </summary>
+    public class Cal_Box_Table: C_Node
+    {
+
+        public string key_boxs_read = "";
+        public string angle = "";//读取角度的变量
+
+        public string x_max1 = "1200";
+        public string x_max2 = "1680";
+        public string camera_index = "";// 当前相机高度，1，2，3，代表上 中 下，3个相机
+
+        public string? key_table { get;  set; }
+        public string z { get;  set; }
+        public string x { get;  set; }
+
+        public Cal_Box_Table(string name,C_Space space_parent,C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string str_angle = this.read_string(this.angle);
+            double db_angle = double.Parse(str_angle);
+
+
+            string str_x_max1 = this.read_string(this.x_max1);
+            double db_x_max1 = double.Parse(str_x_max1);
+            string str_x_max2 = this.read_string(this.x_max2);
+            double db_x_max2 = double.Parse(str_x_max2);
+
+
+            List<C_BoxInfo> list_boxInfo2 = new List<C_BoxInfo>();
+            List<C_BoxInfo>? list_boxInfo = (List<C_BoxInfo>?)this.read_var(this.key_boxs_read, "List<C_BoxInfo>");
+
+            for (var i = 0; i < list_boxInfo?.Count; i++)
+            {
+                C_BoxInfo box1 = list_boxInfo[i];
+                C_Point3D faxiangliang = box1.faxiangliang;
+                C_Point3D center= box1.center;
+
+                if (this.z=="1")
+                {
+                    if (Math.Abs(faxiangliang.z) > 0.6)
+                    {
+
+                        if (center.x < db_x_max2)
+                        {
+                            list_boxInfo2.Add(box1);
+                        }
+
+                        Main.WriteLine(this, "add i=" + i + ",  GID=" + box1.pData.Group_ID + "===== f =======" + faxiangliang.ToString());
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "过滤 i=" + i + ",  GID=" + box1.pData.Group_ID + "===== <0.6 z  =======" + faxiangliang.ToString() + ",y=" + center.ToString());
+                    }
+                }
+                if (this.x == "1")
+                {
+                    if (Math.Abs(faxiangliang.x) > 0.6)
+                    {
+                        if (center.x < db_x_max1)
+                        {
+                            list_boxInfo2.Add(box1);
+                        }
+                        box1.x_min = box1.center.x;
+                        box1.x_max = box1.center.x;
+
+                        Main.WriteLine(this, "add i=" + i + ",  GID=" + box1.pData.Group_ID + "===== f  =======" + faxiangliang.ToString());
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "过滤 i=" + i + ",  GID=" + box1.pData.Group_ID + "===== <0.6 x  =======" + faxiangliang.ToString() + ",y=" + center.ToString());
+                    }
+                }
+            }
+
+            list_boxInfo2.Sort(delegate (C_BoxInfo p1, C_BoxInfo p2)
+            {
+                return Math.Sign(p1.center.z- p2.center.z);
+            });
+
+            string str_camera_index = this.read_string(this.camera_index);
+
+            Dictionary<string, List<C_BoxInfo>>? dic = 
+                (Dictionary<string, List<C_BoxInfo>>?)this.read_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>");
+
+            if (dic == null)
+            {
+                dic = new Dictionary<string, List<C_BoxInfo>>();
+                this.save_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>", dic);
+            }
+            string key = db_angle + "," + str_camera_index;
+            if (dic.ContainsKey(key))
+            {
+                dic.Remove(key);
+            }
+
+
+            {
+                dic.Add(key, list_boxInfo2);
+            }
+        }
+
+        public string get_direction(C_Point3D faxiangliang)
+        {
+            if (Math.Abs(faxiangliang.z) > 0.6)
+            {
+                return "z";
+            }else if (Math.Abs(faxiangliang.x) > 0.6)
+            {
+                return "x";
+            }
+            else if (Math.Abs(faxiangliang.y) > 0.6)
+            {
+                return "y";
+            }
+            return "";
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

@@ -1,0 +1,134 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System.Collections;
+
+namespace Test1
+{
+
+    public class F_Call_Space : C_Node
+    {
+
+        public string space_name = "";
+        public string key_array = "";
+        public string item_type = "";
+        public string jarray = "";
+        public string map = "";
+
+        public F_Call_Space(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            Main.WriteLine(this, " F_Call_Space 开始");
+
+            List<C_Space> spaces = new List<C_Space>();
+
+            JArray arr = null;
+            if (this.jarray != "")
+            {
+                arr=JArray.Parse(this.jarray);
+            }
+
+
+            C_Thread_Data? pThread_Data=null;
+
+            if (this.key_array=="")
+            {
+                C_Data pData2 = new C_Data(space);
+                pThread_Data = new C_Thread_Data(this,spaces, space, pData2, space_name, "0");
+                pThread_Data.space_new.vars.copy_from(space_parent, this);
+                pThread_Data.space_new.save_vars(pThread_Data.space_new.pTrain, this, "_data", "C_Data", pData2);
+                
+                if (arr != null)
+                {
+                    for (int i = 0; i < arr.Count; i++)
+                    {
+                        JObject obj = (JObject)arr[i];
+                        string name = obj["name"].ToString();
+                        string value = obj["value"].ToString();
+                        pThread_Data.space_new.save_vars(pThread_Data.space_new.pTrain, this, name, "string", value);
+                    }
+                }
+
+                Thread thread = new Thread(pThread_Data.ThreadFun);
+                thread.Start();
+
+                C_Data.threads.Add(thread);
+            }
+            else
+            {
+                IList pList = (IList)this.read_var(this.key_array, "");
+                if (pList == null)
+                {
+                    MessageBox.Show(this.Name+ " error key_array没有数据！");
+                    return;
+                }
+                for (var i = 0; i < pList.Count; i++)
+                {
+                    var item = pList[i];
+                    pThread_Data = new C_Thread_Data(this, spaces, space, null, space_name, i + "");
+                    pThread_Data.space_new.vars.copy_from(space_parent, this);
+                    pThread_Data.space_new.save_vars(pThread_Data.space_new.pTrain, this, "_data",this.item_type, item);
+                    if (arr != null)
+                    {
+                        for (int j = 0; i < arr.Count; i++)
+                        {
+                            JObject obj = (JObject)arr[j];
+                            string name = obj["name"].ToString();
+                            string value = obj["value"].ToString();
+                            pThread_Data.space_new.save_vars(pThread_Data.space_new.pTrain, this, name, "string", value);
+                        }
+                    }
+
+                    Thread thread = new Thread(pThread_Data.ThreadFun);
+                    thread.Start();
+
+                    C_Data.threads.Add(thread);
+                }
+            }
+
+            Thread.Sleep(1);
+
+            while (check_finished(spaces) == false)
+            {
+                Thread.Sleep(1);
+            }
+
+            if (pThread_Data != null)
+            {
+                this.save_var("_log_file", "", pThread_Data.space_new.file_log);
+            }
+            Main.WriteLine(this,Name + " F_Call_Space 结束");
+        }
+
+
+        public bool check_finished(List<C_Space> spaces)
+        {
+            for (var i = 0; i < spaces.Count; i++)
+            {
+                var space2 = spaces[i];
+                if (space2 != null && space2.finished == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

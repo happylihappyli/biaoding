@@ -1,0 +1,461 @@
+﻿using Common_Robot;
+using System;
+using System.Text;
+using System.Threading;
+using System.Net.Sockets;
+using System.Net;
+using System.Collections;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class I_TCP : C_Node
+    {
+        public List<C_Node_Send> nodes = new List<C_Node_Send>();
+
+        public Action<byte[], int, string>? Received_CallbackFunc = null;
+        public TcpListener Listener;
+        public Thread listenThread;
+        public List<C_TcpClient> clients = new List<C_TcpClient>();
+
+        public List<C_CallBack_Item> pCallBack_Connected = new List<C_CallBack_Item>();
+        public List<C_CallBack_Item> pCallBack_DisConnected = new List<C_CallBack_Item>();
+        public List<C_CallBack_Item> pCallBack = new List<C_CallBack_Item>();
+
+        public string ip = "";
+        public string port = "";
+        public string key_change = "";
+        public string read_start = "0";
+        public string key_process ="";
+        public bool bClient = true;
+        public string? decode = "utf-8";
+
+        public I_TCP(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+        public void connect_server()
+        {
+            Received_CallbackFunc = this.Callback_Robot;
+            //设置IP，port
+            string ip = space.read_string(this,this.ip);
+            string port = space.read_string(this,this.port);
+            if (clients != null)
+            {
+                C_TcpClient client = new C_TcpClient();
+                client.client = new TcpClient(ip, int.Parse(port));
+                clients.Add(client);
+
+                client.clientStream = client.client.GetStream();
+                Thread clientThread = new Thread(new ParameterizedThreadStart(HandleClientComm));
+                clientThread.Start(client);
+            }
+            else
+            {
+                Main.WriteLine(this, "已经启动");
+            }
+
+        }
+
+        /// <summary>
+        /// Robot RcvData 机械臂监听记录
+        /// </summary>
+        /// <param name="RData"></param>
+        /// <param name="status"></param>
+        /// <param name="message"></param>
+        public void Callback_Robot(byte[] RData, int status, string message)
+        {
+            if (status == -1)
+            {
+                Main.WriteLine(this,"当前状态码 " + status + " ：程序异常 ");
+            }
+            else
+            {
+                Main.WriteLine(this, "当前状态码 " + status + " ：正常启动 ");
+            }
+
+
+            switch (status)
+            {
+                case 0:
+                    if (this.key_process == "")
+                    {
+                        data_process(RData);
+                    }
+                    else
+                    {
+                        space.vars_step.TryGetValue(space.Name+ this.key_process, out C_Node pNode2);
+                        if (pNode2 != null)
+                        {
+                            ((I_Process)pNode2).process(RData);
+                        }
+                    }
+                    break;
+                case 1: //连接成功
+                    Main.WriteLine(this,"连接成功");
+                    for (var i = 0; i < pCallBack_Connected.Count; i++)
+                    {
+                        C_CallBack_Item item = pCallBack_Connected[i];
+                        C_Node? pStep = space.vars_step[space.Name + item.name];
+                        if (pStep != null && pTrain!=null)
+                        {
+                            pStep.bNew_Train = true;
+                            pStep.Run(pTrain);
+                        }
+                    }
+                    break;
+                default: //断开连接
+                    Main.WriteLine(this, "断开连接");
+                    for (var i = 0; i < this.pCallBack_DisConnected.Count; i++)
+                    {
+                        C_CallBack_Item? item = pCallBack_DisConnected[i];
+                        C_Node? pStep = space.vars_step[space.Name + item.name];
+                        if (pStep != null && pTrain != null)
+                        {
+                            pStep.bNew_Train = true;
+                            pStep.Run(pTrain);
+                        }
+                    }
+
+                    Console.Beep(1000, 500);
+                    Console.Beep(2000, 500);
+                    Console.Beep(4000, 500);
+
+                    break;
+            }
+        }
+
+        private void data_process(byte[] RData)
+        {
+            int index = int.Parse(this.read_start);
+
+            string hex_string = "";
+            for (int i = 0; i < RData.Length; i++)
+            {
+                hex_string += RData[i].ToString("X") + ",";
+            }
+            string hex_string2 = hex_string;
+
+            //Main.WriteLine(this, "<<<" + this.Name + "收到:" + hex_string2);
+
+            string str_encode =this.read_string(this.decode);
+            string str = Encoding.GetEncoding(str_encode).GetString(RData, index, RData.Length - index);
+            if (this.key_change != "")
+            {
+                this.save_var(this.key_change, "string", str);
+            }
+
+            //str = str.Replace("\r", "/");
+            if (str.Length > 500)
+            {
+                Main.WriteLine(this, "收到消息:" + str.Substring(0,500));
+            }
+            else
+            {
+
+                Main.WriteLine(this, "收到消息:" + str);
+            }
+
+            for (var i = nodes.Count - 1; i >= 0; i--)
+            {
+                C_Node_Send item = nodes[i];
+                item.init();
+
+                bool bMatch = false;
+                if (item.bytes != null)
+                {
+                    if (RData.Length == item.bytes.Length)
+                    {
+                        bMatch = true;
+                        for (var j = 0; j < RData.Length; j++)
+                        {
+                            if (RData[j] != item.bytes[j])
+                            {
+                                bMatch = false;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (item.match_type == "*")
+                    {
+                        bMatch = true;
+                    }
+                    else
+                    {
+                        int index2 = str.IndexOf("{");
+                        if (index2 >= 0)
+                        {
+                            Main.WriteLine("parse Json");
+                            JObject obj = JObject.Parse(str.Substring(index2));
+                            Main.WriteLine(obj.ToString());
+                            if (obj.ContainsKey("type"))
+                            {
+                                string type = obj["type"].ToString();
+                                if (type == item.match_type)
+                                {
+                                    bMatch = true;
+                                }
+                            }else if (obj.ContainsKey("action"))
+                            {
+                                string type = obj["action"].ToString();
+                                if (type == item.match_type)
+                                {
+                                    bMatch = true;
+                                }
+                            }
+                            else
+                            {
+                                Main.WriteLine(this, str);
+                            }
+                        }
+                    }
+                }
+
+
+                item.bReceive = bMatch;
+                if (bMatch)
+                {
+                    item.receive_msg = str;
+                    nodes.Remove(item);
+                }
+            }
+
+
+            for (var i = 0; i < pCallBack.Count; i++)
+            {
+                bool bMatch = false;
+                C_CallBack_Item item = pCallBack[i];
+                if (item.msg == "*")
+                {
+                    bMatch = true;
+                }
+                else
+                {
+                    if (item.bytes != null)
+                    {
+                        if (RData.Length == item.bytes.Length)
+                        {
+                            bMatch = true;
+                            for (var j = 0; j < RData.Length; j++)
+                            {
+                                if (RData[j] != item.bytes[j])
+                                {
+                                    bMatch = false;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        string[] strSplit = str.Split('/');
+                        for (var k = 0; k < strSplit.Length; k++)
+                        {
+                            string str2 = strSplit[k];
+                            if (str2 == "") continue;
+
+                            if (str2 == item.msg)
+                            {
+                                bMatch = true;
+                            }
+                        }
+                    }
+                }
+                if (bMatch)
+                {
+                    C_Node? pStep = space.vars_step[item.name];
+                    C_Train pTrain2 = new C_Train("");
+                    space.save_vars(pTrain2, this, this.key_change, "string", str);
+                    pStep?.Run(pTrain2);
+                }
+            }
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+
+
+
+        public void HandleClientComm(Object? client)
+        {
+            C_TcpClient? tcpClient = (C_TcpClient?)client;
+
+            if (null != Received_CallbackFunc && tcpClient!=null)
+            {
+                TcpClient? client3 = (TcpClient?)tcpClient.client;
+                try
+                {
+
+                    if (client3.Client != null)
+                    {
+                        string strLine = string.Format("Client @[{0}] connected @{1}",
+                            client3.Client.RemoteEndPoint, DateTime.Now.ToString());
+
+                        Received_CallbackFunc(
+                            new byte[] { 0x00 }, 1, strLine);
+                    }
+                }catch(Exception ex)
+                {
+                    Console.Error.WriteLine(ex.ToString());
+                }
+            }
+
+            int msglen = 40960;
+            byte[] message = new byte[msglen];
+            int bytesRead = 0;
+
+            while (space.vars.bClosingWindows == false)
+            {
+                bytesRead = 0;
+                try
+                {
+                    //if (tcpClient.clientStream.DataAvailable)
+                    {
+                        bytesRead = tcpClient.clientStream.Read(message, 0, msglen);
+                        //Main.WriteLine(this,"数据读取：" + bytesRead);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (null != Received_CallbackFunc)
+                    {
+                        Main.WriteLine(this,"错误2：" + ex.Message);
+                        Received_CallbackFunc(new byte[] { 0x00 },
+                            -2,
+                            "Error:receive msg error"
+                            );
+                    }
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    if (null != Received_CallbackFunc)
+                    {
+                        //if (tcpClient.client.Connected == false)
+                        {
+                            Received_CallbackFunc(new byte[] { 0x00 },
+                                                    -1,
+                                                    "the client has disconnected from the server"
+                                                    );
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    ASCIIEncoding? encoder = new ASCIIEncoding();
+                    byte[] bData = new byte[bytesRead];
+                    for (int i = 0; i < bytesRead; i++)
+                    {
+                        bData[i] = message[i];
+                    }
+                    if (null != Received_CallbackFunc)
+                    {
+                        Received_CallbackFunc(bData,
+                            0,
+                            "receive data"
+                            );
+                    }
+                }
+                Thread.Sleep(10);
+            }
+        }
+
+        public bool Send(C_Node_Send? pNode,byte[] bt)
+        {
+            if (pNode != null)
+            {
+                nodes.Add(pNode);
+            }
+
+            bool bRet = false;
+            try
+            {
+                if (clients.Count == 0)
+                {
+                    if (bClient)
+                    {
+                        connect_server();
+                    }
+                    else
+                    {
+                        Main.speak_async(this.Name+" 连接都断开，无法发送消息！");
+                    }
+
+                }
+
+                bool bError = false;
+                for (var i = 0; i < clients.Count; i++)
+                {
+                    C_TcpClient? client = clients[i];
+                    try
+                    {
+                        if (client.client != null && client.client.Connected)
+                        {
+                            client.clientStream.Write(bt, 0, bt.Length);
+                            client.clientStream.Flush();
+                            bRet = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Main.WriteLine(this,ex.ToString());
+                        client.client.Close();
+                        Main.speak_async("TCP断开,"+this.Name);
+                        bError = true;
+                    }
+                }
+
+                if (bError)
+                {
+                    for (var i = 0; i < clients.Count; i++)
+                    {
+                        C_TcpClient? client = clients[i];
+                        client.client.Close();
+                    }
+                    clients=new List<C_TcpClient>();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this,ex.ToString());
+                bRet = false;
+            }
+
+            return bRet;
+        }
+
+        public static string ToHexString(byte[] bytes) // 0xae00cf => "AE00CF "
+        {
+            string hexString = string.Empty;
+            if (bytes != null)
+            {
+                StringBuilder? strB = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    strB.Append(bytes[i].ToString("X2"));
+                }
+                hexString = strB.ToString();
+            }
+            return hexString;
+        }
+
+    }
+    //end class 2
+
+}

@@ -1,0 +1,159 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using MathNet.Spatial.Euclidean;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Collision : C_Node
+    {
+        public C_Planet_Catch? pPlanet=null;
+        public C_Data? that = null;
+
+        public string ball_radius = "50";
+
+        public string key_data = "";
+        public string key_cloud = "";
+        public string key_camera = "";
+
+        public S_Collision(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            string str_r = this.read_string(this.ball_radius);
+            double db_r=double.Parse(str_r);
+
+            C_Camera_TuYang? camera1 = (C_Camera_TuYang?)this.read_var(this.key_camera, "C_Camera_TuYang");
+
+            that = (C_Data?)this.read_var(this.key_data, "C_Data");// "#main"
+            if (this == null)
+            {
+                Main.WriteLine(this, " this == null ");
+                return;
+            }
+
+            this.pPlanet = that?.planet;
+            if (this.pPlanet == null)
+            {
+                Main.WriteLine(this," this.pPlanet == null ");
+                return;
+            }
+            List<C_Point3D> pListArray_Objs = new List<C_Point3D>();
+
+            pPlanet.collision_obj = Main.计算是否碰撞到障碍物(this,camera1, db_r, pListArray_Objs, pPlanet);
+            if (pPlanet.collision_obj)
+            {
+                Main.WriteLine(pPlanet.Group_ID + "机械臂可能会碰撞障碍物！\r\n");
+                that.pLast = C_Mp3.Play_State.机械臂可能会碰撞障碍物;
+                that.bFilter = true;
+                that.bFilter_Collision = true;
+            }
+
+            pPlanet.collision = this.计算是否碰撞到其他包裹(pTrain, pPlanet);
+            if (pPlanet.collision)
+            {
+                Main.WriteLine(pPlanet.Group_ID + "机械臂可能会碰撞！\r\n");
+                that.pLast = C_Mp3.Play_State.机械臂可能会碰撞;
+                that.bFilter = true;
+                that.bFilter_Collision = true;
+            }
+        }
+
+
+
+
+
+        public bool 计算是否碰撞到其他包裹(
+            I_Train pTrain, C_Planet_Catch pPlanet)
+        {
+
+            double len = -double.Parse(this.ball_radius);// + 30);
+            var x5 = pPlanet.arm_pCenter.x + pPlanet.arm_faxiangliang.x / pPlanet.arm_faxiangliang.length() * len;
+            var y5 = pPlanet.arm_pCenter.y + pPlanet.arm_faxiangliang.y / pPlanet.arm_faxiangliang.length() * len;
+            var z5 = pPlanet.arm_pCenter.z + pPlanet.arm_faxiangliang.z / pPlanet.arm_faxiangliang.length() * len;
+            pPlanet.check_collision = new C_Point3D(x5, y5, z5);
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(this.key_camera, "C_Camera_TuYang");
+
+            C_Point3D p1_camera = Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.check_collision);
+            //C_Point3D p1_pic = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p1_camera);
+
+
+            C_Point3D p2_camera = Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.arm_pCenter);
+            //C_Point3D p2_pic = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p2_camera);
+
+
+            List<C_Point3D> pList_Point3D = (List<C_Point3D>)this.read_var(this.key_cloud, "List<C_Point3D>");
+            if (pList_Point3D == null)
+            {
+                MessageBox.Show(key_cloud+"  ==null");
+                return true;
+            }
+
+
+            List<C_Point3D> pList_Point = Tools.查找区域的点(pList_Point3D,
+                p1_camera.x - float.Parse(this.ball_radius), p1_camera.x + float.Parse(this.ball_radius),
+                p1_camera.y - float.Parse(this.ball_radius), p1_camera.y + float.Parse(this.ball_radius),
+                p1_camera.z - float.Parse(this.ball_radius), p1_camera.z + float.Parse(this.ball_radius));
+
+            List<C_Point3D> pCollision = new List<C_Point3D>();
+
+            //lock (that.pList_Collision)
+            {
+
+                for (var i = 0; i < pList_Point.Count; i++)
+                {
+                    C_Point3D p2 = pList_Point[i];
+
+                    double len2 = p1_camera.distance(p2);
+                    if (len2 < float.Parse(this.ball_radius))
+                    {
+                        if (that.Group_ID != p2.Group_ID)
+                        {
+                            C_Point3D p_new = Tools.摄像头坐标转到机械臂坐标(camera1,p2);
+                            pCollision.Add(p_new);
+                        }
+                    }
+                }
+            }
+
+            if (pCollision.Count > 0 && 1==2)
+            {
+                if (that.Group_ID == 2)
+                {
+
+                    Main.WriteLine(this.Name + that.Group_ID + " 碰撞的点个数为：" + pCollision.Count);
+                    for (var i = 0; i < pCollision.Count; i++)
+                    {
+                        Main.WriteLine(" 碰撞点为：" + pCollision[i].ToString());
+                    }
+                    Main.save_cloud("D:/collision_" + that.Group_ID + ".txt", pCollision);
+                }
+            }
+            
+
+            return pCollision.Count > 5;
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

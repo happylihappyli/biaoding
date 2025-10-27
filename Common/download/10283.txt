@@ -1,0 +1,47 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Point3D_Add_Point3D : C_Node
+    {
+        public string key_point1 = "";
+        public string key_point2 = "";
+        public string key_save = "";
+        public string scale="1";
+
+        public S_Point3D_Add_Point3D(
+            string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+
+            C_Point3D? point1 = (C_Point3D?)this.read_var(this.key_point1, "C_Point3D");
+            C_Point3D? point2 = (C_Point3D?)this.read_var(this.key_point2, "C_Point3D");
+
+            if (point1 == null || point2 ==null)
+            {
+                MessageBox.Show(this.Name + "坐标读取错误");
+                return;
+            }
+            double db_scale = double.Parse(this.scale);
+            C_Point3D point3 = point1.add(point2.scale(db_scale));
+            this.save_var(this.key_save,"C_Point3D", point3);
+        }
+
+    }
+}

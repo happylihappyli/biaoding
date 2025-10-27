@@ -1,0 +1,48 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class Img_New : C_Node
+    {
+        private string _width = "";
+        public string width { get => _width; set => _width = value; }
+        private string _height = "";
+        public string height { get => _height; set => _height = value; }
+
+        private string _key_save = "";
+        public string key_save { get => _key_save; set => _key_save = value; }
+
+        public Img_New(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_width = this.read_string(this.width);
+            string str_height = this.read_string(this.height);
+
+            int iWidth = (int)double.Parse(str_width);
+            int iHeight = (int)double.Parse(str_height);
+
+            Bitmap img = new Bitmap(iWidth,iHeight);
+            Graphics g = Graphics.FromImage(img);
+            g.Clear(Color.White);
+            this.save_var(key_save, "Bitmap", img);
+
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

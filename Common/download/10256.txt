@@ -1,0 +1,312 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace Test1
+{
+    public class C_Block_Space
+    {
+        public static int index_count = 0;
+        public int index = 0;
+
+
+        public int x_len = 0;
+        public int y_len = 0;
+        public int z_len = 0;
+        
+        public int x0 = 0;
+        public int y0 = 0;
+        public int z0 = 0;
+
+        public bool 被占用 = false;
+        public C_Block_Complex block;
+
+        public C_Block_Space(string text)
+        {
+            this.index = C_Block_Space.index_count;
+            C_Block_Space.index_count++;
+
+            string[] strSplit=text.Split(',');
+            if (strSplit.Length > 2)
+            {
+                this.x_len = int.Parse(strSplit[0]);
+                this.y_len = int.Parse(strSplit[1]);
+                this.z_len = int.Parse(strSplit[2]);
+            }
+        }
+
+        public C_Block_Space(int x_len, int y_len, int z_len,
+                int x0, int y0, int z0)
+        {
+            this.x_len = x_len;
+            this.y_len = y_len;
+            this.z_len = z_len;
+            this.x0 = x0;
+            this.y0 = y0;
+            this.z0 = z0;
+        }
+
+
+        public void 放置积木(C_Block_Data pBlock_Data, C_Block_Complex block)
+        {
+            this.被占用 = true;
+            this.block = block;
+
+            for(var i = 0; i < block.blocks.Count; i++)
+            {
+                C_Block_Simple block_sim= block.blocks[i];
+                block_sim.box_type.count -= block_sim.nx * block_sim.ny * block_sim.nz;
+            }
+
+
+            for (var i = 0; i < pBlock_Data.block_list_complex.Count; i++)
+            {
+                C_Block_Complex block_complex = pBlock_Data.block_list_complex[i];
+
+                if (block_complex.pBox_Type == block.pBox_Type)
+                {
+                    if (block_complex.count() > block.pBox_Type.count)
+                    {
+                        block_complex.用完 = true;
+                    }
+                }
+            }
+        }
+
+
+        public void 放置积木_zzz(C_Block_Data pMain, C_Block_Simple block)
+        {
+            this.被占用 = true;
+            //this.block = block;
+
+            block.box_type.count -= block.nx * block.ny * block.nz;
+
+            List<C_Block_Simple> pList = pMain.block_list;
+
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Block_Simple block2 = pList[i];
+
+                if (block2.box_type == block.box_type)
+                {
+                    if (block2.count > block.box_type.count)
+                    {
+                        block2.用完 = true;
+                    }
+                }
+            }
+        }
+
+
+
+        public List<C_Block_Space> 空间切割(C_Block_Simple block,int type)
+        {
+            List<C_Block_Space> list = new List<C_Block_Space>();
+            if (type == -1)
+            {
+                if (z_len - block.z_len > 0)
+                {
+                    list.Add(new C_Block_Space(x_len, y_len, z_len - block.z_len,this.x0,this.y0,this.z0+block.z_len));
+                }
+                if (y_len - block.y_len > 0)
+                {
+                    list.Add(new C_Block_Space(block.x_len, y_len - block.y_len, block.z_len, this.x0, this.y0 + block.y_len, this.z0));
+                }
+                if (x_len - block.x_len > 0)
+                {
+                    list.Add(new C_Block_Space(x_len - block.x_len, y_len, block.z_len, this.x0 + block.x_len, this.y0, this.z0));
+                }
+                    
+            }else if (type ==1)
+            {
+                split1(list);
+            }
+            else if (type == 2)
+            {
+                split2(list);
+                
+            }
+            else if (type == 3)
+            {
+                Random rand = new Random();
+                if (rand.NextDouble() > 0.5)
+                {
+                    split1(list);
+                }
+                else
+                {
+                    split2(list);
+                }
+            }
+            else if (type == 4)
+            {
+                List<int> pList = new List<int>();
+                pList.Add(x_len - block.x_len);
+                pList.Add(x_len);
+                pList.Add(y_len);
+                pList.Add(z_len);
+                pList.Add(block.y_len);
+                pList.Add(z_len - block.z_len);
+                pList.Add(block.x_len);
+                pList.Add(y_len - block.y_len);
+
+
+                List<int> pList2 = new List<int>();
+                pList2.Add(x_len - block.x_len);
+                pList2.Add(x_len);
+                pList2.Add(y_len);
+                pList2.Add(z_len);
+                pList2.Add(block.y_len);
+                pList2.Add(z_len - block.z_len);
+                pList2.Add(block.x_len);
+                pList2.Add(y_len - block.y_len);
+
+
+                pList.Sort(delegate (int x, int y)
+                {
+                    return y - x;
+                });
+                pList2.Sort(delegate (int x, int y)
+                {
+                    return y - x;
+                });
+
+
+                if (pList[0]< pList2[0])
+                {
+                    split1(list);
+                }
+                else
+                {
+                    split2(list);
+                }
+            }
+            return list;
+        }
+
+
+
+        public List<C_Block_Space> 空间切割_by_Complex(C_Block_Complex block, int type)
+        {
+            List<C_Block_Space> list = new List<C_Block_Space>();
+            if (type == -1)
+            {
+                if (z_len - block.z_len > 0)
+                {
+                    list.Add(new C_Block_Space(x_len, y_len, z_len - block.z_len, this.x0, this.y0, this.z0 + block.z_len));
+                }
+                if (y_len - block.y_len > 0)
+                {
+                    list.Add(new C_Block_Space(block.x_len, y_len - block.y_len, block.z_len, this.x0, this.y0 + block.y_len, this.z0));
+                }
+                if (x_len - block.x_len > 0)
+                {
+                    list.Add(new C_Block_Space(x_len - block.x_len, y_len, block.z_len, this.x0 + block.x_len, this.y0, this.z0));
+                }
+
+            }
+            else if (type == 1)
+            {
+                split1(list);
+            }
+            else if (type == 2)
+            {
+                split2(list);
+
+            }
+            else if (type == 3)
+            {
+                Random rand = new Random();
+                if (rand.NextDouble() > 0.5)
+                {
+                    split1(list);
+                }
+                else
+                {
+                    split2(list);
+                }
+            }
+            else if (type == 4)
+            {
+                List<int> pList = new List<int>();
+                pList.Add(x_len - block.x_len);
+                pList.Add(x_len);
+                pList.Add(y_len);
+                pList.Add(z_len);
+                pList.Add(block.y_len);
+                pList.Add(z_len - block.z_len);
+                pList.Add(block.x_len);
+                pList.Add(y_len - block.y_len);
+
+
+                List<int> pList2 = new List<int>();
+                pList2.Add(x_len - block.x_len);
+                pList2.Add(x_len);
+                pList2.Add(y_len);
+                pList2.Add(z_len);
+                pList2.Add(block.y_len);
+                pList2.Add(z_len - block.z_len);
+                pList2.Add(block.x_len);
+                pList2.Add(y_len - block.y_len);
+
+
+                pList.Sort(delegate (int x, int y)
+                {
+                    return y - x;
+                });
+                pList2.Sort(delegate (int x, int y)
+                {
+                    return y - x;
+                });
+
+
+                if (pList[0] < pList2[0])
+                {
+                    split1(list);
+                }
+                else
+                {
+                    split2(list);
+                }
+            }
+            return list;
+        }
+
+        public void split1(List<C_Block_Space> list)
+        {
+            if (x_len - block.x_len > 0)
+            {
+                list.Add(new C_Block_Space(x_len - block.x_len, y_len, z_len, this.x0 + block.x_len, this.y0, this.z0));
+            }
+
+            if (z_len - block.z_len > 0)
+            {
+                list.Add(new C_Block_Space(block.x_len, block.y_len, z_len - block.z_len, this.x0, this.y0, this.z0 + block.z_len));
+            }
+            if (y_len - block.y_len > 0)
+            {
+                list.Add(new C_Block_Space(block.x_len, y_len - block.y_len, z_len, this.x0, this.y0 + block.y_len, this.z0));
+            }
+        }
+        public void split2(List<C_Block_Space> list)
+        {
+            if (y_len - block.y_len > 0)
+            {
+                list.Add(new C_Block_Space(x_len, y_len - block.y_len, z_len, this.x0, this.y0 + block.y_len, this.z0));
+            }
+
+            if (z_len - block.z_len > 0)
+            {
+                list.Add(new C_Block_Space(block.x_len, block.y_len, z_len - block.z_len, this.x0, this.y0, this.z0 + block.z_len));
+            }
+            if (x_len - block.x_len > 0)
+            {
+                list.Add(new C_Block_Space(x_len - block.x_len, block.y_len, z_len, this.x0 + block.x_len, this.y0, this.z0));
+            }
+        }
+
+        public double space()
+        {
+            return x_len * y_len * z_len;
+        }
+    }
+}

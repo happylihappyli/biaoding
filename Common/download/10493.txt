@@ -1,0 +1,88 @@
+﻿using Common_Robot2;
+using System.Diagnostics;
+
+namespace Test1
+{
+    public class S_Run_Cmd_One : C_Node
+    {
+        public string cmd = "";
+        public string path = "";
+
+        public S_Run_Cmd_One(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            //List<string> pList = (List<string>)space.vars.read_vars(pTrain,this.key_read,"");
+
+            run_cmd();
+        }
+
+        public void run_cmd()//List<string> pList)
+        {
+            string path = this.read_string(this.path);
+            string cmd = this.read_string(this.cmd);///k D:/code/python/python.exe D:/DB/python/nn1.py
+
+            Process p = new Process();
+            ProcessStartInfo info = new ProcessStartInfo();
+            info.FileName = "cmd.exe";
+
+            info.Arguments = cmd;// "/k D:/code/python/python.exe D:/DB/python/nn1.py";
+            info.WorkingDirectory = path;// "D:/DB/python";
+            info.UseShellExecute = true;   //是否使用操作系统shell启动 
+            info.CreateNoWindow = true;   //是否在新窗口中启动该进程的值 (不显示程序窗口)
+            
+            //info.RedirectStandardInput = true;
+            //info.RedirectStandardOutput = true;
+            //info.RedirectStandardError = true;
+            info.UseShellExecute = true;//= false;
+            p.EnableRaisingEvents = true;
+            
+            //p.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
+            //{
+            //    Console.WriteLine(e.Data);
+            //});
+
+            //p.ErrorDataReceived += new DataReceivedEventHandler((sender, e) =>
+            //{ 
+            //    Console.WriteLine(e.Data); 
+            //});
+
+            p.StartInfo = info;
+            p.Start();
+            //p.BeginErrorReadLine();
+            //p.BeginOutputReadLine();
+
+
+            //using (StreamWriter sw = p.StandardInput)
+            //{
+            //    if (sw.BaseStream.CanWrite)
+            //    {
+            //        for (var i = 0; i < pList.Count; i++)
+            //        {
+            //            p.StandardInput.Write(pList[i] + p.StandardInput.NewLine);
+            //        }
+            //    }
+            //}
+            //string output = p.StandardOutput.ReadToEnd();
+            //p.WaitForExit();
+
+            //space.vars.save_vars(pTrain, this.key_save, "string", output);
+
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+    
+}

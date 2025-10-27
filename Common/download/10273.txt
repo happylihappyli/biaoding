@@ -1,0 +1,292 @@
+﻿using Cloo;
+using Common_Robot2;
+using ConverxHull;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+
+
+namespace Test1
+{
+    public class C_Cloud_Transform_OpenCL : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string key_camera = "";
+
+        public string opencl_code = @"
+//kernel数据类型要严格一样，不能用int传给float，否则会出错
+kernel void Angles(
+    global float* x,
+    global float* y,
+    global float* z,
+    global float* x2,
+    global float* y2,
+    global float* z2,
+    const float x0, 
+    const float y0,
+    const float z0,
+    const float x1,
+    const float y1,
+    const float z1,
+    const float m00,
+    const float m01,
+    const float m02,
+    const float m10,
+    const float m11,
+    const float m12,
+    const float m20,
+    const float m21,
+    const float m22)
+{
+    int index = get_global_id(0);//计算当前的index
+    float ox= x[index];
+    float oy= y[index];
+    float oz= z[index];
+
+    float xx1 = ox - x0;
+    float yy1 = oy - y0;
+    float zz1 = oz - z0;
+
+    float n_x1 = xx1 * m00 + yy1 * m10 + zz1 * m20+x1;
+    float n_y1 = xx1 * m01 + yy1 * m11 + zz1 * m21+y1;
+    float n_z1 = xx1 * m02 + yy1 * m12 + zz1 * m22+z1;
+
+    x2[index]=n_x1;
+    y2[index]=n_y1;
+    z2[index]=n_z1;
+}
+";
+
+        public C_Cloud_Transform_OpenCL(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            //Main.WriteLine(Name + " 开始运行 ");
+
+            List<C_Point3D> list1;
+            if (this.key_read == "%main.3d")
+            {
+                C_Data? pData = (C_Data?)this.read_var("main","");
+                if (pData == null)
+                {
+                    S_TTS.speak_async("pData 为空！");
+                    return;
+                }
+                list1 = pData.list_3D_Point;
+            }
+            else
+            {
+                list1 = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+            }
+
+
+            if (list1 == null)
+            {
+                MessageBox.Show(this.Name + ",key_read 设置 错误");
+            }
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(this.key_camera, "C_Camera_TuYang");
+            if (camera1 == null )
+            {
+                MessageBox.Show(this.Name + ",key_camera 设置 错误");
+            }
+
+            float x0 = camera1.p1_center.x;
+            float y0 = camera1.p1_center.y;
+            float z0 = camera1.p1_center.z;
+            float x1 = camera1.p2_center.x;
+            float y1 = camera1.p2_center.y;
+            float z1 = camera1.p2_center.z;
+            DenseMatrix m1=camera1.M_Rotate;
+            double[,] m = m1.ToArray();
+
+            long time_last = DateTime.Now.Ticks;
+            List<C_Point3D> list2 = new List<C_Point3D>();// =convert(list1, x0, y0, z0, x1, y1, z1, m1);
+            for (var i = 0; i < list1.Count; i++)
+            {
+                C_Point3D p1 = list1[i];
+                C_Point3D p2 = convert2(x0, y0, z0, x1, y1, z1, m, p1);// Tools.摄像头坐标转到机械臂坐标(camera1, p1);
+                list2.Add(p2);
+            }
+            this.save_var(this.key_save, "List<C_Point3D>", list2);
+            Main.WriteLine(this.Name + "count="+list2.Count);
+
+            DateTime DateTime2 = DateTime.Now;
+            //Main.WriteLine(Name + " 结束运行 毫秒= " + (DateTime2.Ticks - time_last) / 10000);
+        }
+
+
+
+
+        public List<C_Point3D> convert(
+            List<C_Point3D> list1,
+            float x0, float y0, float z0, float x1, float y1, float z1,
+            DenseMatrix m1)
+        {
+            List<C_Point3D> pList = new List<C_Point3D>();
+            try
+            {
+                ComputePlatform platform = ComputePlatform.Platforms[0];
+                IList<ComputeDevice> devices = new List<ComputeDevice>();
+                ComputeContextPropertyList properties = new ComputeContextPropertyList(platform);
+                devices.Add(platform.Devices[0]);
+
+                ComputeContext context = new ComputeContext(devices, properties, null, IntPtr.Zero);
+
+                int count_sample = list1.Count;
+                float[] arrX = new float[count_sample];
+                float[] arrY = new float[count_sample];
+                float[] arrZ = new float[count_sample];
+
+                float[] arr2X = new float[count_sample];
+                float[] arr2Y = new float[count_sample];
+                float[] arr2Z = new float[count_sample];
+
+
+                for (int i = 0; i < count_sample; i++)
+                {
+                    C_Point3D uv = list1[i];   //C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.color_calib, p);
+                    if (uv != null)
+                    {
+                        arrX[i] = uv.x;
+                        arrY[i] = uv.y;
+                    }
+                }
+
+
+                // 创建输入缓存并且用数组数据填充 // Access modifiers should match those in a kernel.
+                // CopyHostPointer 的意思是缓存的数据需要用最后一个参数提供地址填满。 
+                ComputeBuffer<float> x = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arrX);
+                ComputeBuffer<float> y = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arrY);
+                ComputeBuffer<float> z = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arrZ);
+                
+                //输出缓存只需要指定数组大小。
+                ComputeBuffer<float> x2 = new ComputeBuffer<float>(context, ComputeMemoryFlags.WriteOnly, arr2X.Length);
+                ComputeBuffer<float> y2 = new ComputeBuffer<float>(context, ComputeMemoryFlags.WriteOnly, arr2Y.Length);
+                ComputeBuffer<float> z2 = new ComputeBuffer<float>(context, ComputeMemoryFlags.WriteOnly, arr2Z.Length);
+
+                //创建编译opencl程序
+                ComputeProgram program = new ComputeProgram(context, opencl_code);
+
+                program.Build(null, null, null, IntPtr.Zero);
+
+                //创建内核函数，设置参数。
+                ComputeKernel kernel = program.CreateKernel("Angles");
+                kernel.SetMemoryArgument(0, x);
+                kernel.SetMemoryArgument(1, y);
+                kernel.SetMemoryArgument(2, z);
+                kernel.SetMemoryArgument(3, x2);
+                kernel.SetMemoryArgument(4, y2);
+                kernel.SetMemoryArgument(5, z2);
+                kernel.SetValueArgument(6, x0);
+                kernel.SetValueArgument(7, y0);
+                kernel.SetValueArgument(8, z0);
+                kernel.SetValueArgument(9, x1);
+                kernel.SetValueArgument(10, y1);
+                kernel.SetValueArgument(11, z1);
+
+                double[,] m = m1.ToArray();
+
+                kernel.SetValueArgument(12, m[0, 0]);
+                kernel.SetValueArgument(13, m[0, 1]);
+                kernel.SetValueArgument(14, m[0, 2]);
+
+                kernel.SetValueArgument(15, m[1, 0]);
+                kernel.SetValueArgument(16, m[1, 1]);
+                kernel.SetValueArgument(17, m[1, 2]);
+
+                kernel.SetValueArgument(18, m[2, 0]);
+                kernel.SetValueArgument(19, m[2, 1]);
+                kernel.SetValueArgument(20, m[2, 2]);
+
+
+                //创建事件列表，这个例子并不需要事件列表，但是它是看到它是如何工作是很重要的。
+                ComputeEventList eventList = new ComputeEventList();
+
+                // 创建命令队列.
+                ComputeCommandQueue commands = new ComputeCommandQueue(context, context.Devices[0], ComputeCommandQueueFlags.None);
+
+                commands.Execute(kernel, null, new long[] { count_sample }, null, eventList);
+                commands.ReadFromBuffer(x2, ref arr2X, false, eventList);
+                commands.ReadFromBuffer(y2, ref arr2Y, false, eventList);
+                commands.ReadFromBuffer(z2, ref arr2Z, false, eventList);
+                commands.Finish();
+
+
+
+                // 打印结果
+                Console.WriteLine("--------------X-------------");
+                for (int i = 0; i < count_sample; i++)
+                {
+                    pList.Add(new C_Point3D(arr2X[i], arr2Y[i], arr2Z[i]));
+                }
+
+
+                // 清除 commands
+                commands.Dispose();
+
+                //清除事件
+                foreach (ComputeEventBase eventBase in eventList)
+                {
+                    eventBase.Dispose();
+                }
+                eventList.Clear();
+                kernel.Dispose();
+                program.Dispose();
+
+                // 清除缓存
+                x.Dispose();
+                y.Dispose();
+                z.Dispose();
+                x2.Dispose();
+                y2.Dispose();
+                z2.Dispose();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+            return pList;
+        }
+
+
+        public C_Point3D convert2(
+            float x0,float y0,float z0,float x1,float y1,float z1,
+            double[,] m, C_Point3D pPoint)
+        {
+            //DenseMatrix denseMatrix = DenseMatrix.OfArray(new double[3, 1]
+            //{
+            //    { pPoint.x - x0 },
+            //    { pPoint.y - y0 },
+            //    { pPoint.z - z0 }
+            //});
+
+            double xx1 = pPoint.x - x0;
+            double yy1 = pPoint.y - y0;
+            double zz1 = pPoint.z - z0;
+            //Matrix<double> matrix = denseMatrix.Transpose().Multiply(m1);
+
+            double n_x1 = xx1 * m[0, 0] + yy1 * m[1, 0] + zz1 * m[2, 0]+x1;
+            double n_y1 = xx1 * m[0, 1] + yy1 * m[1, 1] + zz1 * m[2, 1]+y1;
+            double n_z1 = xx1 * m[0, 2] + yy1 * m[1, 2] + zz1 * m[2, 2]+z1;
+
+            return new C_Point3D(n_x1, n_y1, n_z1);
+        }
+
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

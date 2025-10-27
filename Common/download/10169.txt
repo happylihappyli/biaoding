@@ -1,0 +1,70 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Beep : C_Node
+    {
+        public string line = "69:500,71:500,73:500,74:500";
+
+        public S_Beep(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+        public void run_sub_main()
+        {
+            this.play();
+        }
+
+        public void play()
+        {
+            try
+            {
+                string line2 = this.read_string(line);
+                line2 = line2.Replace("\r", "");
+                line2 = line2.Replace("\n", "");
+
+                string[] strSplit = line2.Split(",");
+                int count=strSplit.Length;
+                int[] fre = new int[count];
+                int[] times = new int[count];
+
+                for (var i = 0; i < count; i++)
+                {
+                    string[] strSplit2 = strSplit[i].Split(":");
+                    if (strSplit2.Length > 1)
+                    {
+                        int p = int.Parse(strSplit2[0]);
+                        int time = int.Parse(strSplit2[1]);
+                        double f = 440 * Math.Pow(2.0, (p-69) / 12.0);
+                        fre[i] = (int)f;
+                        times[i] = time;
+                    }
+                }
+
+                for (var i = 0; i < count; i++)
+                {
+                    if (fre[i] > 0)
+                    {
+                        Console.Beep(fre[i], times[i]);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+            }
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+
+
+}

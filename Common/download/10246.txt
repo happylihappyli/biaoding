@@ -1,0 +1,89 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using OuelletConvexHull;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class C_Cloud_Height : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_save = "";
+        public string key_bottom="";
+        public string key_camera="";
+
+        public C_Cloud_Height(string Name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        C_Point3D center_arm = null;
+        public double 到底面距离(C_Point3D pPoint2, C_Planet pPlanet_Bottom)
+        {
+            C_Point3D c_Point3D = pPoint2.subtract(center_arm);
+            return c_Point3D.dotProduct(pPlanet_Bottom.z_faxiangliang);
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> pList = (List<C_Point3D>)this.read_var(this.key_read, "List<C_Point3D>");
+
+            C_Planet Bottom = (C_Planet)this.read_var(this.key_bottom, "C_Planet");
+            C_Camera_TuYang camera = (C_Camera_TuYang)this.read_var(this.key_camera, "C_Camera_TuYang");
+            if (camera == null)
+            {
+                MessageBox.Show(this.Name+ " 摄像头参数有问题！");
+                return;
+            }
+
+            center_arm=Tools.摄像头坐标转到机械臂坐标(camera, Bottom.center);
+
+            List<double> list_height = new List<double>();
+
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Point3D pPoint2 = pList[i];
+                //C_Point3D pPoint3 = Tools.摄像头坐标转到机械臂坐标(camera, pPoint2);
+
+                double height=到底面距离(pPoint2, Bottom);
+                double height2 = Math.Abs(height);
+                list_height.Add(height2);
+            }
+
+
+            list_height.Sort();
+
+            double value = 0;
+            if (list_height.Count > 100)
+            {
+                value= list_height[list_height.Count / 2];
+            }
+            else
+            {
+                MessageBox.Show(this.Name+ " 个数太少");
+            }
+
+            space.save_vars(pTrain, this, this.key_save, "string",value+"");
+        }
+
+    }
+}

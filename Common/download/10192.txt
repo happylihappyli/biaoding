@@ -1,0 +1,2827 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+using MathNet.Numerics.LinearAlgebra.Factorization;
+using MathNet.Spatial.Euclidean;
+using MathNet.Spatial.Units;
+using OuelletConvexHull;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Drawing.Imaging;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
+using Three.Net.Math;
+using File = System.IO.File;
+
+namespace Test1
+{
+    public partial class Main
+    {
+        C_Space space;
+        C_Node pNode;
+
+        public static int x_distance = 450;
+
+        public Main(C_Space space,C_Node pNode)
+        {
+            this.space = space;
+            this.pNode = pNode;
+        }
+
+
+        public static double time1 = 0;
+        public static void Time_Start()
+        {
+            DateTime DateTime1 = DateTime.Now; //仅从当前时间获得毫秒
+            time1 = DateTime1.Ticks;
+        }
+
+
+        public static void create_directory(string path_code)
+        {
+            if (Directory.Exists(path_code) == false)
+            {
+                Directory.CreateDirectory(path_code);
+            }
+        }
+
+
+        public static string FileToBase64Str(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);// 读取文件
+            string base64 = Convert.ToBase64String(bytes);// 转换为 base64
+            return base64;
+        }
+        public static void Time_Print(C_Node pNode, string tag)
+        {
+            DateTime DateTime2 = DateTime.Now; //仅从当前时间获得毫秒
+            double time2 = (DateTime2.Ticks - time1) / 10000;
+            Main.WriteLine(pNode," End " + tag + " 毫秒= " + time2);
+        }
+
+
+
+        public static List<C_Point3D> 中心点附近70mm范围的点(List<C_Point3D> pList_Point_Filter, C_Point3D p1)
+        {
+            List<C_Point3D> list = new List<C_Point3D>();
+            for (int i = 0; i < pList_Point_Filter.Count; i++)
+            {
+                C_Point3D c_Point3D = pList_Point_Filter[i];
+                float num = Math.Abs(c_Point3D.x - p1.x);
+                float num2 = Math.Abs(c_Point3D.y - p1.y);
+                double num3 = Math.Sqrt(num * num + num2 * num2);
+                if (num3 < 70.0)
+                {
+                    list.Add(c_Point3D);
+                }
+            }
+
+            return list;
+        }
+
+        public static C_Point3D 平面拟合计算法向量等(List<C_Point3D> pList_Point, bool b_auto_correct_z = true)
+        {
+            Matrix<double> matrix = 平面拟合计算法向量等_sub(pList_Point);
+            double num = matrix[0, 0];
+            double num2 = matrix[1, 0];
+            //double num3 = matrix[2, 0];
+            //double num4 = -1.0;
+            //double num5 = Math.Sqrt(num * num + num2 * num2 + num4 * num4);
+            double x = num;// / a;
+            double y = num2;// / b;
+            double z = 1.0 - num - num2;// / c;
+            C_Point3D c_Point3D = new C_Point3D(x, y, z);
+
+            return c_Point3D.normalize();
+        }
+
+
+        /// <summary>
+        /// https://blog.csdn.net/tjuzhsir/article/details/112799809
+        /// z分量也可能==0，默认z分量不等于，有漏洞
+        /// ax+by+cz+d=0
+        /// 假设 a+b+c=1 ,上面系数缩放不影响
+        /// c=1-a-b
+        /// ax+by+(1-a-b)z+d=0
+        /// a(x-z)+b(y-z)+d=-1*z
+        /// a,b,d是未知数的方程
+        /// </summary>
+        /// <param name="pList_Point"></param>
+        /// <returns></returns>
+        public static Matrix<double> 平面拟合计算法向量等_sub(List<C_Point3D> pList_Point)
+        {
+            double[,] array = new double[pList_Point.Count, 3];
+            double[,] array2 = new double[pList_Point.Count, 1];
+            for (int i = 0; i < pList_Point.Count; i++)
+            {
+                C_Point3D point = pList_Point[i];
+                array[i, 0] = (point.x - point.z);
+                array[i, 1] = (point.y - point.z);
+                array[i, 2] = 1.0;
+                array2[i, 0] = -1 * point.z;
+            }
+
+            DenseMatrix denseMatrix = DenseMatrix.OfArray(array);
+            DenseMatrix other = DenseMatrix.OfArray(array2);
+            return denseMatrix.Transpose().Multiply(denseMatrix).Inverse()
+                .Multiply(denseMatrix.Transpose())
+                .Multiply(other);
+        }
+
+
+
+        public static List<C_Point3D> cloud_read(C_Node pNode,string file,string seperate)
+        {
+            List<C_Point3D> pList = new List<C_Point3D>();
+            try
+            {
+                using (StreamReader sr = new StreamReader(file, Encoding.UTF8))
+                {
+                    string? line;
+
+                    // 从文件读取并显示行，直到文件的末尾 
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        line = line.Replace("，", ",");
+                        Main.WriteLine(pNode,line);
+                        string[] strSplit = line.Split(seperate.ToCharArray());
+                        if (strSplit.Length > 1)
+                        {
+                            float x = float.Parse(strSplit[0]);
+                            float y = float.Parse(strSplit[1]);
+                            float z = 0;
+                            if (strSplit.Length > 2)
+                            {
+                                z = float.Parse(strSplit[2]);
+                            }
+                            C_Point3D p = new C_Point3D(x, y, z);
+                            pList.Add(p);
+                        }
+                    }
+
+                }
+            }
+            catch (Exception e)
+            {
+                Main.WriteLine(pNode,"The file could not be read:");
+                MessageBox.Show(e.Message);
+            }
+            return pList;
+        }
+
+
+        public static (List<C_Point3D> list_camera, List<C_Point3D> list_arm) check_in_out(int Group_ID,
+            List<C_Point3D> edges, 
+            List<C_Point3D> list_point_camera,
+            List<C_Point3D> list_point_arm, 
+            List<C_Point3D> list_uv)
+        {
+            List<C_Point3D> list_camera = new List<C_Point3D>();
+            List<C_Point3D> list_arm = new List<C_Point3D>();
+            try
+            {
+                int count_sample = list_uv.Count;
+                float[] arrX = new float[count_sample];
+                float[] arrY = new float[count_sample];
+                float[] arrAngle = new float[count_sample];
+
+                for (int i = 0; i < count_sample; i++)
+                {
+                    C_Point3D uv = list_uv[i];
+                    if (uv != null)
+                    {
+                        if (Main.判断是否在多边形内(edges, uv.x, uv.y))
+                        {
+                            list_point_camera[i].Group_ID = Group_ID;
+                            list_camera.Add(list_point_camera[i]);
+                            list_arm.Add(list_point_arm[i]);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Main.WriteLine(e.ToString());
+            }
+            return (list_camera, list_arm);
+        }
+
+        public static void Add_Panel(Form pFrm,string dock, string group,C_Space space, System.Windows.Forms.Control button)
+        {
+            if (space.vars_ui.ContainsKey(group) == false)
+            {
+                MessageBox.Show("没有这个group=" + group);
+                return;
+            }
+
+            var pParent = space.vars_ui[group];
+            if (pParent.GetType().Name == "S_Form")
+            {
+                pFrm.Controls.Add(button);
+            }
+            else if (pParent.GetType().Name == "S_Panel_Map")
+            {
+                Add_Panel_Sub(space, pParent, button);
+            }
+
+
+
+            button.BringToFront();
+            switch (dock)
+            {
+                case "left":
+                    button.Dock = DockStyle.Left;
+                    break;
+                case "right":
+                    button.Dock = DockStyle.Right;
+                    break;
+                case "top":
+                    button.Dock = DockStyle.Top;
+                    break;
+                case "bottom":
+                    button.Dock = DockStyle.Bottom;
+                    break;
+                case "fill":
+                    button.Dock = DockStyle.Fill;
+                    break;
+            }
+        }
+
+
+        public static void Add_Panel_Sub(C_Space space,S_UI pParent,System.Windows.Forms.Control button)
+        {
+            if (space.vars_ui.ContainsKey(pParent.key_parent) == false)
+            {
+                MessageBox.Show("没有这个group=" + pParent.key_parent);
+                return;
+            }
+            var pParent2 = space.vars_ui[pParent.key_parent];
+            if (pParent2.GetType().Name == "S_Tab_View")
+            {
+                S_Panel_Map pMap = (S_Panel_Map)pParent;
+                S_Tab_View pParent3 = (S_Tab_View)pParent2;
+
+                int index = int.Parse(pMap.dock_rank) - 1;
+
+                TabPage page;
+                if (pParent3.ui_item.Controls.Count > index)
+                {
+                    page = (TabPage)pParent3.ui_item.Controls[index];
+                }
+                else
+                {
+                    page = new TabPage();
+                    page.Text = pMap.Name;
+                    pParent3.ui_item.Controls.Add(page);
+                }
+                page.Controls.Add(button);
+            }
+            else if (pParent2.GetType().Name == "S_Split_View")
+            {
+                S_Panel_Map pMap = (S_Panel_Map)pParent;
+                S_Split_View pParent3 = (S_Split_View)pParent2;
+                if (pMap.dock_rank == "1")
+                {
+                    pParent3.ui_item.SplitterDistance = pParent3.ui_item.Width * pMap.width/pParent2.width;
+                    pParent3.ui_item.Panel1.Controls.Add(button);
+                }
+                else
+                {
+                    pParent3.ui_item.Panel2.Controls.Add(button);
+                }
+            }
+            else
+            {
+                S_Panel pParent3 = (S_Panel)pParent2;
+                pParent3.panel.Controls.Add(button);
+            }
+        }
+
+        public static string file_replace(I_Train pTrain,string file_save)
+        {
+            if (file_save.IndexOf("@") > -1)
+            {
+                string time_id = pTrain.get_Time_ID();// (string)space.vars.read_vars(pTrain, this, this.key_time_id, "string");
+
+                if (time_id == "")
+                {
+                    time_id = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss__FFF");
+                }
+                file_save = file_save.Replace("@", time_id);
+            }
+            return file_save;
+        }
+
+        public static List<C_Point3D> 计算外接多边形(List<C_Point3D> pList)
+        {
+
+
+            //Bitmap bmp = new Bitmap(1280, 960);
+            //Graphics e = Graphics.FromImage(bmp);
+            int n = pList.Count;
+            C_Point3D[] points = new C_Point3D[n];
+            for (int j = 0; j < n; j++)
+            {
+
+                C_Point3D p = pList[j];
+
+                C_Point3D p2 = p;//.add(new C_Point3D(500,300,0));//Tools.f_3DPoint_to_depth(camera1.color_calib, p.add(centerAll));
+                points[j] = p2;
+
+                //e.DrawEllipse(Pens.Red, p2.x, p2.y, 10, 10);
+            }
+
+            var windowsPoints = points.Select(p => new ConverxHull.Point(p.x, p.y)).ToList();
+
+            var ouelletConvexHull = new ConvexHull(windowsPoints);
+            ouelletConvexHull.CalcConvexHull(ConvexHullThreadUsage.OnlyOne);
+
+            List<C_Point3D> ouelletAsVertices = ouelletConvexHull.GetResultsAsArrayOfPoint()
+                .Select(p => new C_Point3D(p.X, p.Y, 0)).ToList();
+
+            List<C_Point3D> result = new List<C_Point3D>();
+            for (var i = 0; i < ouelletAsVertices.Count; i++)
+            {
+                C_Point3D p1 = ouelletAsVertices[i];
+                //var p2 = ouelletAsVertices[i + 1];
+                //e.DrawLine(new Pen(Color.Yellow), (float)p1.x, (float)p1.y, (float)p2.x, (float)p2.y);
+                //currentPolygon.AddPoint(new System.Drawing.Point((int)p1.x, (int)p1.y));
+
+                result.Add(p1);
+            }
+            return result;
+
+        }
+
+
+        public static C_Point3D 转截面坐标系(C_Point3D p1)
+        {
+            var new_x = Math.Sqrt(p1.x * p1.x + p1.y * p1.y);
+            var new_y = p1.z;
+            return new C_Point3D(new_x, new_y, 0);
+        }
+
+
+        public static C_Point3D 截面转普通坐标系(C_Point3D p1, double angle)
+        {
+            var new_x = p1.x * Math.Cos(angle);
+            var new_y = p1.x * Math.Sin(angle);
+            return new C_Point3D(new_x, new_y, p1.y);
+        }
+
+
+
+        //http://csharphelper.com/blog/2014/07/determine-whether-a-polygon-is-convex-in-c/
+        public static bool 判断是否在多边形内(List<C_Point3D> Points, double X, double Y)
+        {
+            int max_point = Points.Count - 1;
+            double total_angle = GetAngle(
+                Points[max_point].x, Points[max_point].y,
+                X, Y, Points[0].x, Points[0].y);
+
+            for (int i = 0; i < max_point; i++)
+            {
+                total_angle += GetAngle(
+                    Points[i].x, Points[i].y,
+                    X, Y,
+                    Points[i + 1].x, Points[i + 1].y);
+            }
+            return (Math.Abs(total_angle) > 1);
+        }
+
+        // Return the angle ABC.
+        // Return a value between PI and -PI.
+        // Note that the value is the opposite of what you might
+        // expect because Y coordinates increase downward.
+        public static double GetAngle(double Ax, double Ay,
+            double Bx, double By, double Cx, double Cy)
+        {
+            // Get the dot product.
+            double dot_product = DotProduct(Ax, Ay, Bx, By, Cx, Cy);
+
+            // Get the cross product.
+            double cross_product = CrossProductLength(Ax, Ay, Bx, By, Cx, Cy);
+
+            // Calculate the angle.
+            return Math.Atan2(cross_product, dot_product);
+        }
+
+        // Return the dot product AB · BC.
+        // Note that AB · BC = |AB| * |BC| * Cos(theta).
+        private static double DotProduct(double Ax, double Ay,
+            double Bx, double By, double Cx, double Cy)
+        {
+            // Get the vectors' coordinates.
+            double BAx = Ax - Bx;
+            double BAy = Ay - By;
+            double BCx = Cx - Bx;
+            double BCy = Cy - By;
+
+            // Calculate the dot product.
+            return (BAx * BCx + BAy * BCy);
+        }
+
+
+        // Return the cross product AB x BC.
+        // The cross product is a vector perpendicular to AB
+        // and BC having length |AB| * |BC| * Sin(theta) and
+        // with direction given by the right-hand rule.
+        // For two vectors in the X-Y plane, the result is a
+        // vector with X and Y components 0 so the Z component
+        // gives the vector's length and direction.
+        public static double CrossProductLength(double Ax, double Ay,
+            double Bx, double By, double Cx, double Cy)
+        {
+            // Get the vectors' coordinates.
+            double BAx = Ax - Bx;
+            double BAy = Ay - By;
+            double BCx = Cx - Bx;
+            double BCy = Cy - By;
+
+            // Calculate the Z coordinate of the cross product.
+            return (BAx * BCy - BAy * BCx);
+        }
+
+
+
+
+        /// <summary>
+        /// 保存点云
+        /// </summary>
+        public static void save_cloud(string file2, C_Matrix camera1, List<C_Point3D> pList)
+        {
+            
+
+            string time_id = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss__FFF");
+            file2 = file2.Replace("@", time_id);
+
+
+            string? path = Path.GetDirectoryName(file2);
+            if (path!=null && Directory.Exists(path) == false)
+            {
+                Directory.CreateDirectory(path);
+            }
+            StreamWriter file = new StreamWriter(file2);
+
+            foreach (C_Point3D p in pList)
+            {
+                C_Point3D? p2=Tools.摄像头坐标转到机械臂坐标(camera1, p);
+                file.WriteLine(p2?.ToString());
+            }
+            file.Close();
+        }
+
+
+
+        /// <summary>
+        /// 保存点云
+        /// </summary>
+        public static string save_cloud(string file2, List<C_Point3D> pList)
+        {
+
+            string time_id = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss__FFF");
+            file2 = file2.Replace("@", time_id);
+
+
+            string? path = Path.GetDirectoryName(file2);
+            if (path!=null &&  Directory.Exists(path) == false)
+            {
+                Directory.CreateDirectory(path);
+            }
+            StreamWriter file = new StreamWriter(file2);
+
+            foreach (C_Point3D p in pList)
+            {
+                file.WriteLine(p.ToString());
+            }
+            file.Close();
+            return file2.ToString();
+        }
+
+
+        //https://blog.csdn.net/zx3517288/article/details/53326420
+        /// <summary>
+        /// 在截面坐标系下计算，算完毕要转回原先坐标系，返回值 c2,c2,c,c,有两个解
+        /// </summary>
+        /// <param name="x1"></param>
+        /// <param name="y1"></param>
+        /// <param name="r1"></param>
+        /// <param name="p2_x"></param>
+        /// <param name="p2_y"></param>
+        /// <param name="r2"></param>
+        /// <returns></returns>
+
+        public static List<C_Point3D> 计算两个圆的交点C2_根据C2计算C(
+            C_Robot pRobot,C_Node pNode, int Group_ID,
+            C_Point3D point_D, C_Point3D point_B,
+            double r1, double r2)
+        {
+            List<C_Point3D> arr = new List<C_Point3D>();
+            double L = Math.Sqrt((point_D.x - point_B.x) * (point_D.x - point_B.x) + (point_D.y - point_B.y) * (point_D.y - point_B.y));//AB
+            if (L > r1 + r2)
+            {
+                Main.WriteLine(pNode,"GroupID= "+ Group_ID + " L>r1+r2 超范围！");
+                return arr;
+            }
+            double k1 = (point_B.y - point_D.y) / (point_B.x - point_D.x);
+            double k2 = -1 / k1;
+            double AE = (r1 * r1 - r2 * r2 + L * L) / (2 * L);
+            double x0 = point_D.x + AE / L * (point_B.x - point_D.x);
+            double y0 = point_D.y + AE / L * (point_B.y - point_D.y);
+
+            double CE = Math.Sqrt(r1 * r1 - AE * AE);
+
+            double EF = CE / Math.Sqrt(1 + k2 * k2);
+            double CF = Math.Abs(EF * k2);
+
+
+            //加减要和k2符号有关
+            double x_c = 0;
+            if (k2 > 0)
+            {
+                x_c = x0 + EF;
+            }
+            else
+            {
+                x_c = x0 - EF;
+            }
+
+            double y_c = y0 + CF;
+            double x_d = x0 - EF;
+            double y_d = y0 - CF;
+            arr.Add(new C_Point3D(x_c, y_c, 0));
+            arr.Add(new C_Point3D(x_d, y_d, 0));
+
+            //================================================
+
+            //上面两个坐标C就是立体图里面的C2，下面根据根据C2算C
+            C_Point3D vector_C2B = point_B.subtract(arr[0]);
+            Vector2D v_C2B = new Vector2D(vector_C2B.x, vector_C2B.y);
+
+            double length640 = pRobot.arm_bc;
+            double length200 = pRobot.arm_cc2;
+
+            Angle a = Angle.FromRadians(Math.Atan2(length640, length200));
+            Vector2D v_C2C = v_C2B.Normalize().Rotate(a).ScaleBy(length200);
+            //C=C2+向量C2C
+            arr.Add(arr[0].add(new C_Point3D(v_C2C.X, v_C2C.Y, 0)));
+
+
+            //上面两个坐标就是立体图里面的C2，下面根据根据C2算C
+            vector_C2B = point_B.subtract(arr[1]);
+            v_C2B = new Vector2D(vector_C2B.x, vector_C2B.y);
+            a = Angle.FromRadians(Math.Atan2(length640, length200));
+            v_C2C = v_C2B.Normalize().Rotate(a).ScaleBy(length200);
+            arr.Add(arr[1].add(new C_Point3D(v_C2C.X, v_C2C.Y, 0)));
+
+            return arr;
+        }
+
+
+        public static List<C_Point3D>? 计算C2和C坐标(
+            C_Node pNode, C_Robot? pRobot, 
+            int Group_ID, C_Point3D B1, C_Point3D D1)
+        {
+            if (pRobot == null) return null;
+
+            //根据B,D 算C2
+            C_Point3D D = 转截面坐标系(D1);
+            C_Point3D B = 转截面坐标系(B1);
+            List<C_Point3D> arr = 计算两个圆的交点C2_根据C2计算C(
+                pRobot,pNode, Group_ID, D, B, pRobot.arm_c2d, pRobot.arm_bc2);
+            if (arr.Count==0)
+            {
+                return arr;
+            }
+
+            double angle = Math.Atan2(B1.y, B1.x);
+            for (var i = 0; i < arr.Count; i++)
+            {
+                arr[i] = 截面转普通坐标系(arr[i], angle);
+            }
+            return arr;
+        }
+
+
+
+        /// <summary>
+        /// Robot RcvData PLC 传输带 监听记录
+        /// </summary>
+        /// <param name="RData"></param>
+        /// <param name="status"></param>
+        /// <param name="message"></param>
+        public void PLC_Callback(byte[] RData, int status, string message)
+        {
+            Main.WriteLine("当前状态：" + status);
+            switch (status)
+            {
+                case 0:
+                    string strData = TCPServer.ToHexString(RData);
+                    Main.WriteLine("收到消息：" + strData);
+                    if (strData == "88020106")
+                    {
+                        Main.WriteLine("传输带移动成功，开始新一轮抓取");
+
+                        //space.vars.照相机模块.开始拍照();
+                    }
+                    if (strData == "88020107")
+                    {
+                        //皮带
+                        //space.vars.照相机模块.开始拍照();
+                    }
+                    break;
+                case 1: //连接成功
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_plc, space.vars.port_plc) + "连接成功...");
+                    break;
+                default:
+                    //断开连接
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_plc, space.vars.port_plc) + "断开连接...");
+
+                    break;
+            }
+        }
+
+
+
+        /// <summary>
+        /// Robot RcvData 机械臂监听记录
+        /// </summary>
+        /// <param name="RData"></param>
+        /// <param name="status"></param>
+        /// <param name="message"></param>
+        public void Robot_CallBack(byte[] RData, int status, string message)
+        {
+            Main.WriteLine("当前状态：" + status);   
+            switch (status)
+            {
+                case 0:
+                    string str = Encoding.GetEncoding("GBK").GetString(RData);
+                    if (str == "Connect sucessful")
+                    {
+                        Main.WriteLine("监听连接成功...");
+                    }
+                    else if (str == "move sucessful")
+                    {
+                        Main.WriteLine("抓取成功...");
+                        //Tools.bRobot_Catch = true;
+                        //space.vars.bPrepare_Get_Picture = true;
+                    }
+                    else if (str == "put sucessful")
+                    {
+                        space.vars.count_put += 1;//ABB
+
+                        if (space.vars.count_put == 1)
+                        {
+                        }
+                        else
+                        {
+                            int count = space.vars.count_put - 1;
+                            if (count == 0) count = 1;
+                            //space.vars.speed = Math.Round((space.vars.second_put + 0.0) / count, 2);
+                        }
+
+                        Main.WriteLine("放置成功...");
+                    }
+                    break;
+                case 1: //连接成功
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_robot, space.vars.port_robot) + "连接成功...");
+                    break;
+                default: //断开连接
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_robot, space.vars.port_robot) + "断开连接...");
+                    break;
+            }
+        }
+
+
+        public static void CPP_Server_Start()
+        {
+            //监听CPP 通信
+            //m1.CPP_Server.InitServer(space.vars.ip_cpp, space.vars.port_cpp);
+
+            //Main.WriteLine(string.Format("CPP_Server 【IP:{0} 端口:{1}】", space.vars.ip_cpp, space.vars.port_cpp) + "开始监听");
+
+        }
+
+        public static void PLC_Start()
+        {
+            //监听PLC输送带
+            //m1.PLC_Server.InitServer(space.vars.ip_plc, space.vars.port_plc);
+
+            //Main.WriteLine(string.Format("PLC 【IP:{0} 端口:{1}】", space.vars.ip_plc, space.vars.port_plc) + "开始监听");
+
+        }
+
+
+
+        //public WebServer CreateWebServer(string url,string root_path)
+        //{
+        //    space.vars.pArm = new WebSocketArm("/terminal");
+        //    var server = new WebServer(o => o
+        //            .WithUrlPrefix(url)
+        //            .WithMode(HttpListenerMode.EmbedIO))
+        //        .WithIPBanning(o => o
+        //            .WithMaxRequestsPerSecond()
+        //            .WithRegexRules("HTTP exception 404"))
+        //        .WithLocalSessionManager()
+        //        //.WithWebApi("/test", m => m
+        //        //    .WithController<TestController>())
+        //        .WithModule(space.vars.pArm)
+        //        .WithStaticFolder("/", root_path, true, m => m
+        //            .WithContentCaching(false)) // Add static files after other modules to avoid conflicts
+        //        .WithModule(new ActionModule("/", HttpVerbs.Any, ctx => ctx.SendDataAsync(new { Message = "Error" })));
+
+        //    server.StateChanged += (s, e) => Main.WriteLine($"WebServer New State - {e.NewState}");
+
+        //    return server;
+        //}
+
+
+        public static List<C_Point3D>? 计算D和C2_C以及是否超范围(
+            C_Space space,
+            C_Node pNode, 
+            C_Robot? pRobot, int Group_ID, C_Point3D A, C_Point3D B)
+        {
+            C_Point3D? D = C_Planet_Catch.计算D坐标(pRobot, B);// pPlanet.arm_point_b);
+
+            if (D == null)
+            {
+                return new List<C_Point3D>();
+            }
+            List<C_Point3D>? arr = Main.计算C2和C坐标(pNode, pRobot, Group_ID, B, D);
+
+            return arr;
+        }
+
+
+
+        public static (C_Result pResult,double len1,double len2) 根据坐标计算6轴角度(
+            string direction,
+            bool Angle_Modify,
+            C_Space space,
+            C_Node pNode,
+            C_Robot? pRobot,
+            int GroupID,
+            C_Point3D A, 
+            C_Point3D B,
+            C_Point3D D,
+            List<C_Point3D> list_arm,
+            string file,
+            double angle_dif)
+        {
+
+
+            pNode.save_var("_A_string", "string", A.ToString());
+            pNode.save_var("_B_string", "string", B.ToString());
+            pNode.save_var("_D_string", "string", D.ToString());
+
+
+            List<C_Point3D>? arr = 计算D和C2_C以及是否超范围(space,pNode, pRobot, GroupID, A, B);
+
+            if (arr==null || arr?.Count == 0)
+            {
+                Main.WriteLine(pNode, "GroupID="+GroupID+" 前面超范围没有过滤！");
+                return (new C_Result("", A, B, "前面超范围没有过滤！"),0,0);
+            }
+
+            C_Point3D? C2 = arr?[0];
+            C_Point3D? C = arr?[2];
+
+            if (C==null || C2 == null)
+            {
+                Main.WriteLine(pNode, "GroupID=" + GroupID + " C,C2==null！");
+                return (new C_Result("", A, B, "C,C2==null！"), 0, 0);
+            }
+
+            Main.WriteLine(pNode, "计算旋转轴角度");
+            double[] angle = new double[6];
+            double a1 = Math.Atan2(D.y, D.x);//第一个轴
+            a1 = angle_process(a1);
+            Main.WriteLine(pNode,"1=" + a1 + ",=" + Tools.to_degree(a1));
+
+            C_Point3D vector_dc2 = C2.subtract(D);
+            C_Point3D vector_od_in_z0 = D.subtract(new C_Point3D(0, 0, D.z)).subtract(new C_Point3D(0, 0, 0));//od 在z=0平面的投影
+            double len_vector_dc2_in_z0 = vector_dc2.dotProduct(vector_od_in_z0.normalize());
+
+            double new_y = len_vector_dc2_in_z0;// Math.Sqrt(vector_dc2.x * vector_dc2.x + vector_dc2.y * vector_dc2.y);
+            double new_x = vector_dc2.z;
+            double a2 = Math.Atan2(new_y, new_x); //Math.PI / 2 - Math.Atan2(new_y, new_x);
+            a2 = angle_process(a2);
+            
+            Main.WriteLine(pNode, "2=" + a2 + ",=" + Tools.to_degree(a2));
+
+
+            C_Point3D? vector_cb = B.subtract(C);
+            C_Point3D? vector_c2c = C.subtract(C2);
+
+            Vector3D v_dc2 = new Vector3D(vector_dc2.x, vector_dc2.y, vector_dc2.z);
+            Vector3D v_c2c = new Vector3D(vector_c2c.x, vector_c2c.y, vector_c2c.z);
+
+            C_Point3D Z = new C_Point3D(D.x, D.y, 0);
+
+            C_Point3D vector_oz = Z;
+            Vector3D v_oz = new Vector3D(vector_oz.x, vector_oz.y, vector_oz.z);
+            Vector3D v_c2r = v_dc2.CrossProduct(v_oz); //v_dc2.CrossProduct(v_z2);
+
+            if (v_dc2.DotProduct(new Vector3D(0, 0, 1)) < 0)
+            {
+                v_c2r = -v_c2r;
+            }
+
+            UnitVector3D J = v_dc2.CrossProduct(v_c2r).Normalize();
+
+            new_x = v_c2c.DotProduct(v_dc2.Normalize());
+            new_y = v_c2c.DotProduct(J);
+
+            double a3 = Math.Atan2(new_y, new_x);
+            a3 = angle_process(a3);
+            Main.WriteLine(pNode,"3=" + a3 + ",=" + Tools.to_degree(a3));
+
+            C_Point3D vector_ba = B.subtract(A);
+            C_Point3D vector_bc = B.subtract(C);
+
+            Vector3D v_ba = new Vector3D(vector_ba.x, vector_ba.y, vector_ba.z);
+            Vector3D v_bc = new Vector3D(vector_bc.x, vector_bc.y, vector_bc.z);
+
+            var len_bg = v_ba.DotProduct(v_bc.Normalize());
+
+            //G
+            C_Point3D G = B.add(C.subtract(B).scale(len_bg / v_bc.Length));
+
+            //J
+            C_Point3D vector_cd = C.subtract(D);
+            Vector3D v_cb = new Vector3D(vector_cb.x, vector_cb.y, vector_cb.z);
+            Vector3D v_cd = new Vector3D(vector_cd.x, vector_cd.y, vector_cd.z);
+            UnitVector3D v_cj = v_cb.CrossProduct(v_cd).Normalize();
+            v_cj.CrossProduct(v_cb);
+            UnitVector3D v_gk = v_cj;
+            C_Point3D vector_gc = G.subtract(C);
+            Vector3D v_gc = new Vector3D(vector_gc.x, vector_gc.y, vector_gc.z);
+            UnitVector3D v_gh = v_gk.CrossProduct(v_gc).Normalize();
+
+            C_Point3D vector_ga = G.subtract(A);
+            Vector3D v_ga = new Vector3D(vector_ga.x, vector_ga.y, vector_ga.z);
+            new_x = v_ga.DotProduct(v_gh);
+            new_y = v_ga.DotProduct(v_gk);
+
+            var minLen = pRobot?.tools_len * Math.Sin(0.2 / 180 * Math.PI);//5轴要至少0.2度的偏差，否则就当作是0
+            double a4;
+
+            if (Math.Abs(new_x) < minLen && Math.Abs(new_y) < minLen)
+            {
+                a4 = 0;
+            }
+            else
+            {
+                a4 = -Math.Atan2(new_y, new_x);// - Math.PI;
+            }
+            a4 = angle_process(a4);
+            Main.WriteLine(pNode,"4=" + a4 + ",=" + Tools.to_degree(a4));
+
+            new_x = v_ba.DotProduct(v_bc.Normalize());
+            new_y = v_ba.DotProduct(v_ga.Normalize());
+            double a5 = Math.Atan2(new_y, new_x) - Math.PI;
+            a5 = angle_process(a5);
+            Main.WriteLine(pNode,"5=" + a5 + ",=" + Tools.to_degree(a5));
+
+            angle[0] = a1;
+            angle[1] = a2;
+            angle[2] = a3;
+
+            if (a4 > Math.PI / 2)
+            {
+                a4 -= Math.PI;
+                a5 = -a5;
+            }
+            else if (a4 < -Math.PI / 2)
+            {
+                a4 += Math.PI;
+                a5 = -a5;
+            }
+
+            angle[3] = a4;
+            angle[4] = a5;
+
+            (angle[5],double len1,double len2) = 计算第六轴角度(GroupID,pNode,A, B, C, list_arm);
+
+            Main.WriteLine(pNode,"角度6=" + angle[5]);
+
+            angle[5] += angle_dif / 180 * Math.PI; ;
+
+            (bool bError, Vector3[] bottom_L) = 验算ABC(file, pNode, angle, A, B, C2, C, D);
+
+            if (bError == false)
+            {
+                Main.WriteLine(pNode, "6=" + angle[5] + ",=" + Tools.to_degree(angle[5]));
+
+                angle[0] = angle[0] * 180 / Math.PI;
+                angle[1] = angle[1] * 180 / Math.PI;
+                angle[2] = angle[2] * 180 / Math.PI;
+                angle[3] = angle[3] * 180 / Math.PI;
+                angle[4] = angle[4] * 180 / Math.PI;
+                angle[5] = angle[5] * 180 / Math.PI;
+
+                if (Angle_Modify)
+                {
+                    //用 bottom_L[6],bottom_L[5] 判断吸盘是否朝上
+
+                    if (direction == "-x")
+                    {
+                        if (bottom_L[6].z < bottom_L[5].z)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+                    else if (direction == "z")
+                    {
+                        if (bottom_L[6].x < bottom_L[5].x)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+                    else if (direction == "zy")
+                    {
+                        if (bottom_L[6].y < bottom_L[5].y)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+
+                }
+
+
+                if (angle[0] < -170 || angle[0] > 170)
+                {
+                    return (new C_Result("", A, B, "角度1 超范围！"),len1,len2);
+                }
+                if (angle[1] < -90 || angle[1] > 155)
+                {
+                    return (new C_Result("", A, B, "角度2 超范围！"), len1, len2);
+                }
+                if (angle[2] < -85 || angle[2] > 150)
+                {
+                    return (new C_Result("", A, B, "角度3 超范围！"), len1, len2);
+                }
+                if (angle[3] < -200 || angle[3] > 200)
+                {
+                    return (new C_Result("", A, B, "角度4 超范围！"), len1, len2);
+                }
+                if (angle[4] < -150 || angle[4] > 150)
+                {
+                    return (new C_Result("", A, B, "角度5 超范围！"), len1, len2);
+                }
+
+
+
+                if (angle[5] > 180)
+                {
+                    angle[5] -= 360;
+                }
+                else if (angle[5] < -180)
+                {
+                    angle[5] += 360;
+                }
+                string strLine = string.Join(",", angle);
+
+                return (new C_Result(strLine, A, B),len1,len2);
+            }
+            Main.WriteLine(pNode, "@ 验算有问题！");
+
+            Main.WriteLine(pNode, "angle=========================");
+            for (var i = 0; i <= 5; i++)
+            {
+                Main.WriteLine(pNode,i + "=" + angle[i]);
+            }
+
+            Main.WriteLine(pNode,"A=" + A.ToString2());
+            Main.WriteLine(pNode, "B=" + B.ToString2());
+            Main.WriteLine(pNode, "C2=" + C2.ToString2());
+            Main.WriteLine(pNode, "C=" + C.ToString2());
+            Main.WriteLine(pNode, "D=" + D.ToString2());
+
+            验算ABC(file, pNode, angle, A, B, C2, C, D);
+
+            return (new C_Result("", A, B, "验算有问题！"), len1, len2);
+        }
+
+
+
+        public static (C_Result pResult, double len1, double len2) 根据坐标计算6轴角度(
+            string direction,
+            bool Angle_Modify,
+            C_Space space,
+            C_Node pNode,
+            C_Robot? pRobot,
+            int GroupID,
+            C_Point3D A,
+            C_Point3D B,
+            C_Point3D D,
+            string file)
+        {
+
+
+            pNode.save_var("_A_string", "string", A.ToString());
+            pNode.save_var("_B_string", "string", B.ToString());
+            pNode.save_var("_D_string", "string", D.ToString());
+
+
+            List<C_Point3D>? arr = 计算D和C2_C以及是否超范围(space, pNode, pRobot, GroupID, A, B);
+
+            if (arr == null || arr?.Count == 0)
+            {
+                Main.WriteLine(pNode, "GroupID=" + GroupID + " 前面超范围没有过滤！");
+                return (new C_Result("", A, B, "前面超范围没有过滤！"), 0, 0);
+            }
+
+            C_Point3D? C2 = arr?[0];
+            C_Point3D? C = arr?[2];
+
+            if (C == null || C2 == null)
+            {
+                Main.WriteLine(pNode, "GroupID=" + GroupID + " C,C2==null！");
+                return (new C_Result("", A, B, "C,C2==null！"), 0, 0);
+            }
+
+            Main.WriteLine(pNode, "计算旋转轴角度");
+            double[] angle = new double[6];
+            double a1 = Math.Atan2(D.y, D.x);//第一个轴
+            a1 = angle_process(a1);
+            Main.WriteLine(pNode, "1=" + a1 + ",=" + Tools.to_degree(a1));
+
+            C_Point3D vector_dc2 = C2.subtract(D);
+            C_Point3D vector_od_in_z0 = D.subtract(new C_Point3D(0, 0, D.z)).subtract(new C_Point3D(0, 0, 0));//od 在z=0平面的投影
+            double len_vector_dc2_in_z0 = vector_dc2.dotProduct(vector_od_in_z0.normalize());
+
+            double new_y = len_vector_dc2_in_z0;// Math.Sqrt(vector_dc2.x * vector_dc2.x + vector_dc2.y * vector_dc2.y);
+            double new_x = vector_dc2.z;
+            double a2 = Math.Atan2(new_y, new_x); //Math.PI / 2 - Math.Atan2(new_y, new_x);
+            a2 = angle_process(a2);
+
+            Main.WriteLine(pNode, "2=" + a2 + ",=" + Tools.to_degree(a2));
+
+
+            C_Point3D? vector_cb = B.subtract(C);
+            C_Point3D? vector_c2c = C.subtract(C2);
+
+            Vector3D v_dc2 = new Vector3D(vector_dc2.x, vector_dc2.y, vector_dc2.z);
+            Vector3D v_c2c = new Vector3D(vector_c2c.x, vector_c2c.y, vector_c2c.z);
+
+            C_Point3D Z = new C_Point3D(D.x, D.y, 0);
+
+            C_Point3D vector_oz = Z;
+            Vector3D v_oz = new Vector3D(vector_oz.x, vector_oz.y, vector_oz.z);
+            Vector3D v_c2r = v_dc2.CrossProduct(v_oz); //v_dc2.CrossProduct(v_z2);
+
+            if (v_dc2.DotProduct(new Vector3D(0, 0, 1)) < 0)
+            {
+                v_c2r = -v_c2r;
+            }
+
+            UnitVector3D J = v_dc2.CrossProduct(v_c2r).Normalize();
+
+            new_x = v_c2c.DotProduct(v_dc2.Normalize());
+            new_y = v_c2c.DotProduct(J);
+
+            double a3 = Math.Atan2(new_y, new_x);
+            a3 = angle_process(a3);
+            Main.WriteLine(pNode, "3=" + a3 + ",=" + Tools.to_degree(a3));
+
+            C_Point3D vector_ba = B.subtract(A);
+            C_Point3D vector_bc = B.subtract(C);
+
+            Vector3D v_ba = new Vector3D(vector_ba.x, vector_ba.y, vector_ba.z);
+            Vector3D v_bc = new Vector3D(vector_bc.x, vector_bc.y, vector_bc.z);
+
+            var len_bg = v_ba.DotProduct(v_bc.Normalize());
+
+            //G
+            C_Point3D G = B.add(C.subtract(B).scale(len_bg / v_bc.Length));
+
+            //J
+            C_Point3D vector_cd = C.subtract(D);
+            Vector3D v_cb = new Vector3D(vector_cb.x, vector_cb.y, vector_cb.z);
+            Vector3D v_cd = new Vector3D(vector_cd.x, vector_cd.y, vector_cd.z);
+            UnitVector3D v_cj = v_cb.CrossProduct(v_cd).Normalize();
+            v_cj.CrossProduct(v_cb);
+            UnitVector3D v_gk = v_cj;
+            C_Point3D vector_gc = G.subtract(C);
+            Vector3D v_gc = new Vector3D(vector_gc.x, vector_gc.y, vector_gc.z);
+            UnitVector3D v_gh = v_gk.CrossProduct(v_gc).Normalize();
+
+            C_Point3D vector_ga = G.subtract(A);
+            Vector3D v_ga = new Vector3D(vector_ga.x, vector_ga.y, vector_ga.z);
+            new_x = v_ga.DotProduct(v_gh);
+            new_y = v_ga.DotProduct(v_gk);
+
+            var minLen = pRobot?.tools_len * Math.Sin(0.2 / 180 * Math.PI);//5轴要至少0.2度的偏差，否则就当作是0
+            double a4;
+
+            if (Math.Abs(new_x) < minLen && Math.Abs(new_y) < minLen)
+            {
+                a4 = 0;
+            }
+            else
+            {
+                a4 = -Math.Atan2(new_y, new_x);// - Math.PI;
+            }
+            a4 = angle_process(a4);
+            Main.WriteLine(pNode, "4=" + a4 + ",=" + Tools.to_degree(a4));
+
+            new_x = v_ba.DotProduct(v_bc.Normalize());
+            new_y = v_ba.DotProduct(v_ga.Normalize());
+            double a5 = Math.Atan2(new_y, new_x) - Math.PI;
+            a5 = angle_process(a5);
+            Main.WriteLine(pNode, "5=" + a5 + ",=" + Tools.to_degree(a5));
+
+            angle[0] = a1;
+            angle[1] = a2;
+            angle[2] = a3;
+
+            if (a4 > Math.PI / 2)
+            {
+                a4 -= Math.PI;
+                a5 = -a5;
+            }
+            else if (a4 < -Math.PI / 2)
+            {
+                a4 += Math.PI;
+                a5 = -a5;
+            }
+
+            angle[3] = a4;
+            angle[4] = a5;
+
+            //(angle[5], double len1, double len2) = 计算第六轴角度(GroupID, pNode, A, B, C, list_arm);
+            angle[5] = 0;
+
+            Main.WriteLine(pNode, "角度6=" + angle[5]);
+
+            //angle[5] += angle_dif / 180 * Math.PI; ;
+
+            (bool bError, Vector3[] bottom_L) = 验算ABC(file, pNode, angle, A, B, C2, C, D);
+
+            if (bError == false)
+            {
+                Main.WriteLine(pNode, "6=" + angle[5] + ",=" + Tools.to_degree(angle[5]));
+
+                angle[0] = angle[0] * 180 / Math.PI;
+                angle[1] = angle[1] * 180 / Math.PI;
+                angle[2] = angle[2] * 180 / Math.PI;
+                angle[3] = angle[3] * 180 / Math.PI;
+                angle[4] = angle[4] * 180 / Math.PI;
+                angle[5] = angle[5] * 180 / Math.PI;
+
+                if (Angle_Modify)
+                {
+                    //用 bottom_L[6],bottom_L[5] 判断吸盘是否朝上
+
+                    if (direction == "-x")
+                    {
+                        if (bottom_L[6].z < bottom_L[5].z)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+                    else if (direction == "z")
+                    {
+                        if (bottom_L[6].x < bottom_L[5].x)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+                    else if (direction == "zy")
+                    {
+                        if (bottom_L[6].y < bottom_L[5].y)
+                        {
+                            angle[5] += 180; //保证bottom_6一直在上面
+                        }
+                    }
+
+                }
+
+
+                if (angle[0] < -170 || angle[0] > 170)
+                {
+                    return (new C_Result("", A, B, "角度1 超范围！"), 0, 0);
+                }
+                if (angle[1] < -90 || angle[1] > 155)
+                {
+                    return (new C_Result("", A, B, "角度2 超范围！"), 0, 0);
+                }
+                if (angle[2] < -85 || angle[2] > 150)
+                {
+                    return (new C_Result("", A, B, "角度3 超范围！"), 0, 0);
+                }
+                if (angle[3] < -200 || angle[3] > 200)
+                {
+                    return (new C_Result("", A, B, "角度4 超范围！"), 0, 0);
+                }
+                if (angle[4] < -150 || angle[4] > 150)
+                {
+                    return (new C_Result("", A, B, "角度5 超范围！"), 0, 0);
+                }
+
+
+
+                if (angle[5] > 180)
+                {
+                    angle[5] -= 360;
+                }
+                else if (angle[5] < -180)
+                {
+                    angle[5] += 360;
+                }
+                string strLine = string.Join(",", angle);
+
+                return (new C_Result(strLine, A, B), 0, 0);
+            }
+            Main.WriteLine(pNode, "@ 验算有问题！");
+
+            Main.WriteLine(pNode, "angle=========================");
+            for (var i = 0; i <= 5; i++)
+            {
+                Main.WriteLine(pNode, i + "=" + angle[i]);
+            }
+
+            Main.WriteLine(pNode, "A=" + A.ToString2());
+            Main.WriteLine(pNode, "B=" + B.ToString2());
+            Main.WriteLine(pNode, "C2=" + C2.ToString2());
+            Main.WriteLine(pNode, "C=" + C.ToString2());
+            Main.WriteLine(pNode, "D=" + D.ToString2());
+
+            验算ABC(file, pNode, angle, A, B, C2, C, D);
+
+            return (new C_Result("", A, B, "验算有问题！"), 0, 0);
+        }
+        public static bool check_finished(List<C_Space> spaces)
+        {
+            for (var i = 0; i < spaces.Count; i++)
+            {
+                var space2 = spaces[i];
+                if (space2 != null && space2.finished == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static List<C_Point3D> 生成点云(C_Point3D center, string fix = "x", int r = 200, int count = 200)
+        {
+
+            List<C_Point3D> pList2 = new List<C_Point3D>();
+
+
+            for (var i = 0; i < count; i++)
+            {
+                C_Point3D point;
+                if (fix == "x" || fix == "-x")
+                {
+                    Random random = new Random();
+                    double y = center.y + r * Math.Cos(random.NextDouble());
+                    double z = center.z + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(center.x, y, z);
+                    pList2.Add(point);
+                }
+                else if (fix == "y")
+                {
+                    Random random = new Random();
+                    double x = center.x + r * Math.Cos(random.NextDouble());
+                    double z = center.z + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(x, center.y, z);
+                    pList2.Add(point);
+                }
+                else if (fix == "z")
+                {
+                    Random random = new Random();
+                    double y = center.y + r * Math.Cos(random.NextDouble());
+                    double x = center.x + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(x, y, center.z);
+                    pList2.Add(point);
+                }
+            }
+
+
+            if (fix == "x" || fix == "-x")
+            {
+                C_Point3D point = new C_Point3D(center.x, center.y - 2 * r, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y + 2 * r, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y - 2 * r, center.z + r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y + 2 * r, center.z + r);
+                pList2.Add(point);
+            }
+            else if (fix == "y")
+            {
+                C_Point3D point = new C_Point3D(center.x - 2 * r, center.y, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - 2 * r, center.y, center.z + r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y, center.z + r);
+                pList2.Add(point);
+            }
+            else if (fix == "zx")
+            {
+                C_Point3D point = new C_Point3D(center.x - 2 * r, center.y - r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y - r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - 2 * r, center.y + r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y + r, center.z);
+                pList2.Add(point);
+            }
+            else if (fix == "z")
+            {
+                C_Point3D point = new C_Point3D(center.x - r, center.y - 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + r, center.y - 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - r, center.y + 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + r, center.y + 2 * r, center.z);
+                pList2.Add(point);
+            }
+            return pList2;
+        }
+
+
+
+        public static void 计算抓取面坐标和欧拉角等(C_Node pNode,C_Camera_Const camera1, C_Planet_Catch pPlanet)
+        {
+            pPlanet.arm_pCenter = pPlanet.center;// Tools.摄像头坐标转到机械臂坐标(camera1, pPlanet.center);
+            pPlanet.arm_faxiangliang = pPlanet.z_faxiangliang;// Tools.摄像头坐标转到机械臂坐标(camera1, pPlanet.z_faxiangliang.scale(1000.0)).subtract(Tools.摄像头坐标转到机械臂坐标(camera1, new C_Point3D(0f, 0f, 0f)));
+            Vector3D vector3D = new Vector3D(pPlanet.arm_faxiangliang.x, pPlanet.arm_faxiangliang.y, pPlanet.arm_faxiangliang.z);
+            pPlanet.rot_z = Angle.FromRadians(Math.Atan2(pPlanet.arm_faxiangliang.y, pPlanet.arm_faxiangliang.x));
+            pPlanet.rot_y = Angle.FromRadians(Math.Acos((double)(0f - pPlanet.arm_faxiangliang.z) / vector3D.Length));
+            
+            pPlanet.arm_pCatchCenter = pPlanet.arm_pCenter;// new C_Point3D(x, y, z);
+            Main.WriteLine(pNode,"arm_pCatchCenter=" + pPlanet.arm_pCatchCenter.ToString());
+
+            //pPlanet.arm_pCatch_Before = pPlanet.arm_pCenter;// new C_Point3D(x2, y2, z2);
+        }
+
+
+        public static double angle_process(double angle)
+        {
+            if (angle > Math.PI) angle = angle - Math.PI * 2;
+            if (angle < -Math.PI) angle = angle + Math.PI * 2;
+            angle = Math.Round(angle, 5);
+            return angle;
+        }
+
+
+
+        public static bool check_equal(double dbScale, Three.Net.Math.Vector3 v, C_Point3D p)
+        {
+            if (Math.Round(v.x * dbScale - p.x, 1) != 0)
+            {
+                return false;
+            }
+            if (Math.Round(v.y * dbScale - p.y, 1) != 0)
+            {
+                return false;
+            }
+            if (Math.Round(v.z * dbScale - p.z, 1) != 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+
+
+        public static void init_robot(C_Robot pRobot, string file)
+        {
+            IniFile ini = new IniFile(file);
+
+            float x = float.Parse(ini.ReadString("bottom0", "x", "0"));
+            float y = float.Parse(ini.ReadString("bottom0", "y", "0"));
+            float z = float.Parse(ini.ReadString("bottom0", "z", "0"));
+
+            float r_x = float.Parse(ini.ReadString("rotate0", "x", "0"));
+            float r_y = float.Parse(ini.ReadString("rotate0", "y", "0"));
+            float r_z = float.Parse(ini.ReadString("rotate0", "z", "1"));
+
+            pRobot.bottom_L[0] = new Vector3(x, y, z);//轴1的中心
+            pRobot.obj_rotate[0] = new Vector3(r_x, r_y, r_z);//, 0);//L1旋转的向量
+
+
+
+
+            x = float.Parse(ini.ReadString("bottom1", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom1", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom1", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate1", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate1", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate1", "z", "1"));
+
+            pRobot.bottom_L[1] = new Vector3(x, y, z);//轴2的中心
+            pRobot.obj_rotate[1] = new Vector3(r_x, r_y, r_z);//L2旋转的向量
+
+
+
+
+            x = float.Parse(ini.ReadString("bottom2", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom2", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom2", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate2", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate2", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate2", "z", "1"));
+            pRobot.bottom_L[2] = new Vector3(x, y, z);//轴3的中心
+            pRobot.obj_rotate[2] = new Vector3(r_x, r_y, r_z);//L3旋转的向量
+
+
+
+
+            x = float.Parse(ini.ReadString("bottom3", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom3", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom3", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate3", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate3", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate3", "z", "1"));
+            pRobot.bottom_L[3] = new Vector3(x, y, z);//轴4的中心
+            pRobot.obj_rotate[3] = new Vector3(r_x, r_y, r_z);//L4旋转的向量
+
+
+
+
+            x = float.Parse(ini.ReadString("bottom4", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom4", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom4", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate4", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate4", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate4", "z", "1"));
+            pRobot.bottom_L[4] = new Vector3(x, y, z);//轴5的中心
+            pRobot.obj_rotate[4] = new Vector3(r_x, r_y, r_z);//L5旋转的向量
+
+
+            x = float.Parse(ini.ReadString("bottom5", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom5", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom5", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate5", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate5", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate5", "z", "1"));
+            pRobot.bottom_L[5] = new Vector3(x, y, z);//轴6的中心
+            pRobot.obj_rotate[5] = new Vector3(r_x, r_y, r_z);//L6旋转的向量
+
+
+            x = float.Parse(ini.ReadString("bottom6", "x", "0"));
+            y = float.Parse(ini.ReadString("bottom6", "y", "0"));
+            z = float.Parse(ini.ReadString("bottom6", "z", "0"));
+
+            r_x = float.Parse(ini.ReadString("rotate6", "x", "0"));
+            r_y = float.Parse(ini.ReadString("rotate6", "y", "0"));
+            r_z = float.Parse(ini.ReadString("rotate6", "z", "1"));
+            pRobot.bottom_L[6] = new Vector3(x, y, z);//轴7的中心
+            pRobot.obj_rotate[6] = new Vector3(r_x, r_y, r_z);//L7旋转的向量
+        }
+
+
+        public static Vector3 get_Vector3_from_string(string strLine)
+        {
+            var strSplit = strLine.Split(',');
+
+            if (strSplit.Length > 2)
+            {
+                return new Vector3(float.Parse(strSplit[0]), float.Parse(strSplit[1]), float.Parse(strSplit[2]));
+            }
+            else
+            {
+                return new Vector3(0, 0, 0);
+            }
+        }
+
+
+
+        public static (bool bError, Vector3[] bottom_L) 验算ABC(
+            string file,
+            C_Node pNode,
+            double[] angle, C_Point3D A, C_Point3D B, C_Point3D C2, C_Point3D C, C_Point3D D)
+        {
+            C_Robot pRobot = new C_Robot();
+            init_robot(pRobot, file);
+
+
+            for (var i = 0; i < 6; i++)
+            {
+                double a = angle[i] * 180 / Math.PI;
+                Main.WriteLine(a+"");
+                pRobot.Rotate(i, angle[i]);
+            }
+
+            bool bError = true;
+            if (check_equal(100, pRobot.bottom_L[2], C2))
+            {
+                if (check_equal(100, pRobot.bottom_L[3], C))
+                {
+                    if (check_equal(100, pRobot.bottom_L[4], B))
+                    {
+                        bError = false;
+                    }
+                    else
+                    {
+                        Main.WriteLine(pNode,"B " + pRobot.bottom_L[4].ToString() + " " + B.ToString());//);
+                    }
+                }
+                else
+                {
+                    Main.WriteLine(pNode, "C " + pRobot.bottom_L[3].ToString() + " " + C.ToString());//);
+                }
+            }
+            else
+            {
+                Main.WriteLine(pNode, "C2 " + pRobot.bottom_L[2].ToString() + " " + C2.ToString());//);
+            }
+
+            //根据D算C2，
+            return (bError,pRobot.bottom_L);
+        }
+
+
+        /// <summary>
+        /// 所有点在抓取面上拟合一条直线的角度
+        /// </summary>
+        /// <param name="A"></param>
+        /// <param name="B"></param>
+        /// <param name="C"></param>
+        /// <param name="pList"></param>
+        /// <param name="pCatch"></param>
+        /// <returns></returns>
+        public static (double angle,double len1,double len2) 计算第六轴角度(
+            int Group_ID,
+            C_Node pNode,
+            C_Point3D A, C_Point3D B, C_Point3D C,
+            List<C_Point3D> pList)
+        {
+            if (pList == null)
+            {
+                return (0,0,0);
+            }
+
+            C_Point3D BC = C.subtract(B);
+            C_Point3D BA = A.subtract(B);
+            C_Point3D AB = B.subtract(A);
+            Vector3D v_bc = new Vector3D(BC.x, BC.y, BC.z);
+            Vector3D v_ba = new Vector3D(BA.x, BA.y, BA.z);
+            Vector3D v_ab = new Vector3D(AB.x, AB.y, AB.z);
+
+            C_Planet Planet_Project = new C_Planet(0, A, BA);
+
+            UnitVector3D v_OY = v_bc.CrossProduct(v_ba).Normalize();
+            UnitVector3D v_OX = v_OY.CrossProduct(v_ab).Normalize();
+
+            List<C_Point3D> pList_Point = new List<C_Point3D>();//投影面 Planet_Project 上的点的坐标
+
+            Main.WriteLine("=================");
+
+            List<C_Point3D> list2 = new List<C_Point3D>();
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+
+                C_Point3D p2 = Planet_Project.投影到一个面后的坐标(p);
+
+                list2.Add(p2);
+
+                //Main.WriteLine(p.distance(p2));
+                //if (p.distance(p2) < 20)
+                {
+                    //A 差不多是中心点，A_p也就是投影面Planet_Project上的点p在以A为原点的坐标下的坐标
+                    C_Point3D A_p = p2.subtract(A);
+
+                    Vector3D v_A_p = new Vector3D(A_p.x, A_p.y, A_p.z);
+
+                    double x = v_A_p.DotProduct(v_OX);
+                    double y = v_A_p.DotProduct(v_OY);
+                    pList_Point.Add(new C_Point3D(x, y, 0));
+                }
+            }
+
+
+            if (pList_Point.Count <= 4)
+            {
+                MessageBox.Show(pNode.Name + "点云个数<=4！");
+            }
+
+            
+
+            (List<C_Point3D> rect, double rect_angle, double len1, double len2) = m1.计算外接矩形(pList_Point);
+
+
+            Main.WriteLine("角度：" + rect_angle * 180 / Math.PI);
+
+            return (rect_angle,len1,len2);
+        }
+
+
+
+        /// <summary>
+        /// 用中位数的方法来算
+        /// </summary>
+        /// <param name="pList_Point"></param>
+        /// <returns></returns>
+        public static C_Point3D 计算中心点坐标(List<C_Point3D> pList_Point)
+        {
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.x - b.x);
+            });
+            float new_x = (pList_Point[0].x + pList_Point[pList_Point.Count - 1].x) / 2;
+
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.y - b.y);
+            });
+            float new_y = (pList_Point[0].y + pList_Point[pList_Point.Count - 1].y) / 2;
+
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.z - b.z);
+            });
+            float new_z = (pList_Point[0].z + pList_Point[pList_Point.Count - 1].z) / 2;
+
+            return new C_Point3D(new_x, new_y, new_z);
+        }
+
+
+        ///// <summary>
+        ///// 用中位数的方法来算
+        ///// </summary>
+        ///// <param name="pList_Point"></param>
+        ///// <returns></returns>
+        //public static C_Point3D 计算中心点坐标(List<C_Point3D> pList_Point)
+        //{
+        //    pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+        //    {
+        //        return Math.Sign(a.x - b.x);
+        //    });
+        //    float new_x = pList_Point[pList_Point.Count / 2].x;
+
+        //    pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+        //    {
+        //        return Math.Sign(a.y - b.y);
+        //    });
+        //    float new_y = pList_Point[pList_Point.Count / 2].y;
+
+        //    pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+        //    {
+        //        return Math.Sign(a.z - b.z);
+        //    });
+        //    float new_z = pList_Point[pList_Point.Count / 2].z;
+
+        //    return new C_Point3D(new_x, new_y, new_z);
+        //}
+
+
+
+        //public static void show_tip(string title,string msg)
+        //{
+        //    new ToastContentBuilder()
+        //        .AddArgument("action", "viewConversation")
+        //        .AddArgument("conversationId", 9813)
+        //        .AddText(title)
+        //        .AddText(msg)
+        //        .Show();
+        //}
+
+        public static void AddAddress(string address, string domain, string user)
+        {
+            string argsDll = string.Format(@"http delete urlacl url={0}", address);
+            string args = string.Format(@"http add urlacl url={0} user={1}", address, user);
+            //string args = string.Format(@"http add urlacl url={0} user={1}\{2}", address, domain, user);
+            ProcessStartInfo psi = new ProcessStartInfo("netsh", argsDll);
+            psi.Verb = "runas";
+            psi.CreateNoWindow = true;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.UseShellExecute = false;
+            
+            {
+                Process.Start(psi)?.WaitForExit();//删除urlacl
+            }
+            psi = new ProcessStartInfo("netsh", args);
+            psi.Verb = "runas";
+            psi.CreateNoWindow = true;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.UseShellExecute = false;
+            Process.Start(psi)?.WaitForExit();//添加urlacl
+        }
+
+
+
+        public static Bitmap CopyBmp(Bitmap bmp_source)
+        {
+            lock (bmp_source)
+            {
+
+                int width = bmp_source.Width;
+                int height = bmp_source.Height;
+
+                Rectangle rect = new Rectangle(0, 0, width, height);
+
+                Bitmap bmp = new Bitmap(width, height, bmp_source.PixelFormat);
+
+                PixelFormat format = bmp_source.PixelFormat;
+
+                lock (bmp_source)
+                {
+                    BitmapData bmpDataSrc = bmp_source.LockBits(rect, ImageLockMode.ReadOnly, format);
+                    // Get the address of the first line.获取首行地址
+                    IntPtr ptrSrc = bmpDataSrc.Scan0;
+
+                    BitmapData bmpDataDest = bmp.LockBits(rect, ImageLockMode.WriteOnly, format);
+                    IntPtr ptrDest = bmpDataDest.Scan0;
+
+
+                    // Declare an array to hold the bytes of the bitmap.定义数组保存位图
+                    int bytes = Math.Abs(bmpDataSrc.Stride) * height;
+                    byte[] rgbValues = new byte[bytes];
+
+                    // Copy the RGB values into the array.复制RGB值到数组
+                    Marshal.Copy(ptrSrc, rgbValues, 0, bytes);
+                    //复制到新图
+                    Marshal.Copy(rgbValues, 0, ptrDest, bytes);
+
+                    // Unlock the bits.解锁
+                    bmp_source.UnlockBits(bmpDataSrc);
+                    bmp.UnlockBits(bmpDataDest);
+                }
+
+
+                return bmp;
+            }
+        }
+
+
+        public void CPP_Callback(byte[] RData, int status, string message)
+        {
+            Main.WriteLine("当前状态：" + status);
+            switch (status)
+            {
+                case 0:
+                    string strData = Encoding.UTF8.GetString(RData); // TCPServer.ToHexString(RData);
+                    Main.WriteLine("收到消息：" + strData);
+
+                    //C_Send.发送给CPP("hello,你好，中国");
+
+                    if (strData == "123")
+                    {
+                        Main.WriteLine("123");
+                        C_Send.发送给CPP("234！");
+                    }
+                    break;
+                case 1: //连接成功
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_plc, space.vars.port_plc) + "连接成功...");
+                    break;
+                default:
+                    //断开连接
+                    //Main.WriteLine(
+                    //    string.Format("【IP:{0} 端口:{1}】", space.vars.ip_plc, space.vars.port_plc) + "断开连接...");
+
+                    break;
+            }
+        }
+
+
+
+
+        public void 下一步()
+        {
+            //Count_Arm_Time.clear();
+            //if (space.vars.b_send_to_robot_arm)
+            {
+                //启动的时候，移动到放置点
+                //C_Result pResult = C_Send.计算放置点坐标(null, null);
+                //space.vars.array_command.Add(
+                //    new C_Robot_Command(C_Robot_Command.Command_Type.Robot, 2, pResult.A, pResult.strLine, ""));
+                //Thread.Sleep(1500);
+            }
+
+            //C_Send.First_Count = 0;
+
+            //space.vars.Position_History.Clear(); //清空历史数据
+
+            space.vars.count_put = -1;
+            FileStream fs_debug = new FileStream("D:\\log_debug.txt", FileMode.Create, FileAccess.Write);
+            TextWriter w_debug = new StreamWriter(fs_debug, Encoding.UTF8);
+
+            var line = Tools.TimeNow();
+            w_debug.WriteLine(line);
+
+            w_debug.Close();
+            fs_debug.Close();
+
+            space.vars.pTimeStart = new TimeSpan(DateTime.Now.Ticks);
+            //C_Main.actives_Nodes.Clear();
+            //m1.照相机模块.Run(true);
+        }
+
+        public static double get_double_from_obj(C_Node pNode, object? obj)
+        {
+            double ret = 0;
+            if (obj == null)
+            {
+                Main.WriteLine(pNode, "错误 get_double_from_obj = null");
+                return 0;
+            }
+            if (obj.GetType().Name == "Int32")
+            {
+                ret = (int)obj;
+            }
+            else if (obj.GetType().Name == "Double")
+            {
+                ret = (double)obj;
+            }
+            else if (obj.GetType().Name == "String")
+            {
+                if ((string)obj == "")
+                {
+                    ret = 0;
+                }
+                else
+                {
+                    try
+                    {
+                        ret = double.Parse((string)obj);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                    }
+                }
+            }
+            else
+            {
+                MessageBox.Show(pNode.Name+ "error type=" +obj.GetType().Name );
+            }
+            return ret;
+        }
+
+        public static string hex(object obj,int min=2)
+        {
+            string type = obj.GetType().Name.ToLower();
+
+            string line = "";
+            switch (type)
+            {
+                case "int32":
+                    line = ((int)obj).ToString("X");
+                    break;
+                case "double":
+                    double m1 = (double)obj;
+                    line = ((int)m1).ToString("X");
+                    break;
+                case "string":
+                    string m2 = (string)obj;
+                    line = int.Parse(m2).ToString("X");
+                    break;
+            }
+            while (line.Length < min)
+            {
+                line= "0"+line ;
+            }
+            return line;
+        }
+
+
+        public static string switch_if(bool check, string strTrue, string strFalse)
+        {
+            if (check)
+            {
+                return strTrue;
+            }
+            else
+            {
+                return strFalse;
+            }
+        }
+
+        public static DenseMatrix Read_Camera(string file_camera)
+        {
+            DenseMatrix m = new DenseMatrix(3, 3);
+
+            string content=File.ReadAllText(file_camera);
+
+            string[] strSplit=content.Split("\r\n");
+
+            double[,] d = new double[3, 3];
+            for (var i = 0; i < Math.Min(3, strSplit.Length); i++)
+            {
+                string[] strSplit2= strSplit[i].Split(" ");
+                for(var j = 0; j < 3; j++)
+                {
+                    d[i,j]= double.Parse(strSplit2[j]);
+                }
+            }
+
+            m = DenseMatrix.OfArray(d);//坐标变换矩阵
+
+            return m;
+        }
+
+
+        public static byte[] AutoBalance(
+            byte[] buffer,int width,int height)
+        {
+
+            double max_r = 0;
+            double max_g = 0;
+            double max_b = 0;
+            double min_r = 255;
+            double min_g = 255;
+            double min_b = 255;
+
+            for (var i = 0; i < buffer.Length; i += 4)
+            {
+                if (buffer[i] > max_r)
+                {
+                    max_r = buffer[i];
+                }
+                if (buffer[i+1] > max_g)
+                {
+                    max_g = buffer[i+1];
+                }
+                if (buffer[i+2] > max_b)
+                {
+                    max_b = buffer[i+2];
+                }
+
+                if (buffer[i] < min_r)
+                {
+                    min_r = buffer[i];
+                }
+                if (buffer[i + 1] < min_g)
+                {
+                    min_g = buffer[i + 1];
+                }
+                if (buffer[i + 2] < min_b)
+                {
+                    min_b = buffer[i + 2];
+                }
+            }
+
+            return ApplyWhiteBalance(buffer, max_r, max_g, max_b, min_r, min_g, min_b);
+        }
+
+        public static byte[] ApplyWhiteBalance(byte[] buffer,
+            double max_r, double max_g, double max_b,
+            double min_r, double min_g, double min_b)
+        {
+            byte[] buffer2=new byte[buffer.Length];
+
+            int count = 0;
+            for (var i = 0; i < buffer.Length; i += 4)
+            {
+                count += 1;
+
+                double r= buffer[i];
+                double g = buffer[i + 1];
+                double b = buffer[i + 2];
+
+                double r_new = (r - min_r) / (max_r - min_r) * 255;
+                double g_new = (g - min_g) / (max_g - min_g) * 255;
+                double b_new = (b - min_b) / (max_b - min_b) * 255;
+
+                buffer2[i] = (byte)Main.Trim_To_Int(r_new,0,255);
+                buffer2[i+1] = (byte)Main.Trim_To_Int(g_new, 0, 255);
+                buffer2[i+2] = (byte)Main.Trim_To_Int(b_new, 0, 255); 
+                buffer2[i+3] = buffer[i+3];
+            }
+
+            return buffer2;
+        }
+
+        public static int Trim_To_Int(double value,int min,int max)
+        {
+            int a = (int)Math.Round(value);
+            if (a < min) a = min;
+            if (a > max) a = max;
+            return a;
+        }
+
+        public static Bitmap convert_byte_to_bmp(byte[] imageData,int w,int h)
+        {
+            //int w = 100;
+            //int h = 200;
+            int ch = 4; //number of channels (ie. assuming 32 bit ARGB in this case)
+
+            //byte[] imageData = new byte[w * h * ch]; //you image data here
+            Bitmap bitmap = new Bitmap(w, h, PixelFormat.Format32bppArgb);// .Format24bppRgb);
+            BitmapData bmData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadWrite, bitmap.PixelFormat);
+            IntPtr pNative = bmData.Scan0;
+            Marshal.Copy(imageData, 0, pNative, w * h * ch);
+            bitmap.UnlockBits(bmData);
+            return bitmap;
+        }
+
+        public static string File_Log="";
+
+        public static List<string> Logs=new List<string>();
+
+        public static void WriteLine(C_Node? pNode, string strLine)
+        {
+            string time = DateTime.Now.ToString("mm:ss.fff");
+            string line = time + " " + pNode?.Name + " " + strLine;
+
+            if (pNode!=null &&  pNode.space.vars_ui.ContainsKey("#ui_console"))
+            {
+                S_Cmd_View pCmd = (S_Cmd_View)pNode.space.vars_ui["#ui_console"];
+
+                if (pNode?.pTrain?.mode == "不记录")
+                {
+                }
+                else
+                {
+                    pCmd?.ui_item?.WriteOutput(line + "\r\n", System.Drawing.Color.White);
+                    pCmd?.ui_item?.scroll_last();
+                }
+            }
+
+            if (pNode?.pTrain?.mode == "不记录")
+            {
+            }
+            else
+            {
+                Console.WriteLine(line);
+                pNode.space.Log(line);
+            }
+        }
+
+        public static void WriteLine(string strLine)
+        {
+            string time = DateTime.Now.ToString("mm:ss.fff");
+            string line = time + " " + strLine;
+            Console.WriteLine(line);
+            //C_Space.Log(line);
+        }
+
+
+        public static bool 计算是否碰撞到障碍物(
+            C_Node pNode,
+            C_Matrix? camera1,
+            double r, List<C_Point3D> pListArray_Objs, C_Planet_Catch pPlanet)
+        {
+            //
+
+            if (pListArray_Objs == null)
+            {
+                Main.WriteLine(pNode, "没有设置障碍物!");
+                return false;
+            }
+            C_Point3D A = pPlanet.arm_a;
+            C_Point3D B = pPlanet.arm_b;
+
+            //判断AB为轴，r为半径的圆柱是否和障碍物的点会碰撞
+            for (var i = 0; i < pListArray_Objs.Count; i++)
+            {
+                C_Point3D position_camera = pListArray_Objs[i];
+                C_Point3D? C = Tools.摄像头坐标转到机械臂坐标(camera1, position_camera);
+
+                C_Point3D AB = B.subtract(A);
+                C_Point3D AC = C.subtract(A);
+                C_Point3D BC = C.subtract(AB);
+                Vector3D v_AB = new Vector3D(AB.x, AB.y, AB.z);
+                Vector3D v_AC = new Vector3D(AC.x, AC.y, AC.z);
+                Vector3D v_BC = new Vector3D(BC.x, BC.y, BC.z);
+                double alpha = v_AB.Normalize().DotProduct(v_AC);
+                double beta = -v_AB.Normalize().DotProduct(v_BC);
+                if (alpha > 0 && beta > 0)
+                {
+                    Vector3D v_AD = v_AB.Normalize().ScaleBy(alpha);
+                    Vector3D v_DC = v_AC - v_AD;
+                    if (v_DC.Length < r)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        public static double[] 计算变换矩阵所有参数(string strFile)
+        {
+            List<C_Point3D> arrayList = new List<C_Point3D>();
+            List<C_Point3D> arrayList2 = new List<C_Point3D>();
+            StreamReader? streamReader = new StreamReader(strFile);
+            double num = 0.0;
+            double num2 = 0.0;
+            double num3 = 0.0;
+            double num4 = 0.0;
+            double num5 = 0.0;
+            double num6 = 0.0;
+            int num7 = 0;
+            string? line;
+            while ((line = streamReader?.ReadLine()) != null)
+            {
+                if (line.StartsWith("//"))
+                {
+                    continue;
+                }
+
+                line = line.Replace("，", ",");
+                line = line.Replace(" ", ",");
+                line = line.Replace(",,", ",");
+                string[] array = line.Split(',');
+                if (array.Length > 5)
+                {
+                    try
+                    {
+                        double num8 = double.Parse(array[0]);
+                        double num9 = double.Parse(array[1]);
+                        double num10 = double.Parse(array[2]);
+                        double num11 = double.Parse(array[3]);
+                        double num12 = double.Parse(array[4]);
+                        double num13 = double.Parse(array[5]);
+                        num += num8;
+                        num2 += num9;
+                        num3 += num10;
+                        num4 += num11;
+                        num5 += num12;
+                        num6 += num13;
+                        arrayList.Add(new C_Point3D(num8, num9, num10));
+                        arrayList2.Add(new C_Point3D(num11, num12, num13));
+                        num7++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Main.WriteLine(ex.ToString());
+                        Main.WriteLine("error:" + line);
+                    }
+                }
+            }
+
+            streamReader?.Close();
+
+            C_Point3D c_Point3D = new C_Point3D(num / (double)num7, num2 / (double)num7, num3 / (double)num7);
+            C_Point3D c_Point3D2 = new C_Point3D(num4 / (double)num7, num5 / (double)num7, num6 / (double)num7);
+            double[,] array2 = new double[arrayList.Count, 3];
+            double[,] array3 = new double[arrayList.Count, 3];
+            for (int i = 0; i < arrayList.Count; i++)
+            {
+                C_Point3D c_Point3D3 = arrayList[i];
+                C_Point3D c_Point3D4 = arrayList2[i];
+                array2[i, 0] = c_Point3D3.x - c_Point3D.x;
+                array2[i, 1] = c_Point3D3.y - c_Point3D.y;
+                array2[i, 2] = c_Point3D3.z - c_Point3D.z;
+                array3[i, 0] = c_Point3D4.x - c_Point3D2.x;
+                array3[i, 1] = c_Point3D4.y - c_Point3D2.y;
+                array3[i, 2] = c_Point3D4.z - c_Point3D2.z;
+            }
+
+            DenseMatrix denseMatrix = DenseMatrix.OfArray(array2);
+            DenseMatrix other = DenseMatrix.OfArray(array3);
+            Matrix<double> matrix = denseMatrix.Transpose().Multiply(other);
+            Svd<double> svd = matrix.Svd();
+            Matrix<double> u = svd.U;
+            Matrix<double> matrix2 = svd.VT.Transpose();
+            double num14 = Math.Sign(matrix2.Multiply(u.Transpose()).Determinant());
+            double[,] array4 = new double[3, 3]
+            {
+                { 1.0, 0.0, 0.0 },
+                { 0.0, 1.0, 0.0 },
+                { 0.0, 0.0, num14 }
+            };
+            Matrix<double> other2 = DenseMatrix.OfArray(array4);
+            Matrix<double> matrix3 = matrix2.Multiply(other2).Multiply(u.Transpose()).Transpose();
+            C_Point3D c_Point3D5 = c_Point3D2.subtract(c_Point3D);
+            return new double[18]
+            {
+                matrix3[0, 0],
+                matrix3[0, 1],
+                matrix3[0, 2],
+                matrix3[1, 0],
+                matrix3[1, 1],
+                matrix3[1, 2],
+                matrix3[2, 0],
+                matrix3[2, 1],
+                matrix3[2, 2],
+                c_Point3D5.x,
+                c_Point3D5.y,
+                c_Point3D5.z,
+                c_Point3D.x,
+                c_Point3D.y,
+                c_Point3D.z,
+                c_Point3D2.x,
+                c_Point3D2.y,
+                c_Point3D2.z
+            };
+        }
+
+        public static (
+            C_Point3D p1_center,
+            C_Point3D p2_center, 
+            DenseMatrix M_Rotate) 
+            读取标定文件(string strFile)
+        {
+            double[] m = Main.计算变换矩阵所有参数(strFile);
+            //X^T=(a1 a2 a3 a4 a5 a6 a7 a8 a9 m1 m2 m3)
+            double a1 = m[0];
+            double a2 = m[1];
+            double a3 = m[2];
+            double a4 = m[3];
+            double a5 = m[4];
+            double a6 = m[5];
+            double a7 = m[6];
+            double a8 = m[7];
+            double a9 = m[8];
+
+            double _m1 = m[9];
+            double m2 = m[10];
+            double m3 = m[11];
+
+
+            C_Point3D p1_center = new C_Point3D(m[12], m[13], m[14]);
+            C_Point3D p2_center = new C_Point3D(m[15], m[16], m[17]);
+
+            Main.WriteLine("(a1 a2 a3 a4 a5 a6 a7 a8 a9 m1 m2 m3)="
+                + a1 + "," + a2 + "," + a3 + ","
+                + a4 + "," + a5 + "," + a6 + ","
+                + a7 + "," + a8 + "," + a9 + ","
+                + _m1 + "," + m2 + "," + m3);
+
+
+            double[,] d = new double[3, 3];
+            d[0, 0] = a1;
+            d[0, 1] = a2;
+            d[0, 2] = a3;
+            //d[0, 3] = m1;
+            d[1, 0] = a4;
+            d[1, 1] = a5;
+            d[1, 2] = a6;
+            //d[1, 3] = m2;
+            d[2, 0] = a7;
+            d[2, 1] = a8;
+            d[2, 2] = a9;
+            //d[2, 3] = m3;
+            //d[3, 0] = 0;
+            //d[3, 1] = 0;
+            //d[3, 2] = 0;
+            //d[3, 3] = 1;
+
+            //camera1.M_Rotate = DenseMatrix.OfArray(d);//坐标变换矩阵
+            DenseMatrix M_Rotate = DenseMatrix.OfArray(d);//坐标变换矩阵
+            return (p1_center, p2_center, M_Rotate);
+        }
+
+        public static void 计算标定数据误差(C_Node pNode,string strFile, DenseMatrix m1, C_Point3D p1, C_Point3D p2)
+        {
+
+            //验证采集数据
+
+            StreamReader? file = new StreamReader(strFile);
+            string? line;
+            while ((line = file.ReadLine()) != null)
+            {
+
+                if (line.StartsWith("//"))
+                {
+                    continue;
+                }
+                line = line.Replace("，", ",");
+                line = line.Replace(" ", ","); ;
+                line = line.Replace(",,", ",");
+                string[] strSplit = line.Split(',');
+
+                if (strSplit.Length > 5)
+                {
+                    try
+                    {
+                        double x = double.Parse(strSplit[0]) - p1.x;
+                        double y = double.Parse(strSplit[1]) - p1.y;
+                        double z = double.Parse(strSplit[2]) - p1.z;
+                        double x1 = double.Parse(strSplit[3]);
+                        double y1 = double.Parse(strSplit[4]);
+                        double z1 = double.Parse(strSplit[5]);
+
+
+                        double[,] d2 = new double[3, 1];
+                        d2[0, 0] = x;
+                        d2[1, 0] = y;
+                        d2[2, 0] = z;
+
+                        DenseMatrix R = m1;// camera1.M_Rotate;// Tools.M_Rotate;
+                        DenseMatrix xyz = DenseMatrix.OfArray(d2);
+                        Matrix<double> xyz1 = xyz.Transpose().Multiply(R);// M.Multiply(xyz);
+
+                        double dx = Math.Round(xyz1[0, 0] + p2.x - x1, 2);
+                        double dy = Math.Round(xyz1[0, 1] + p2.y - y1, 2);
+                        double dz = Math.Round(xyz1[0, 2] + p2.z - z1, 2);
+
+
+                        if (Math.Abs(dx) > 10 || Math.Abs(dy) > 10 || Math.Abs(dz) > 10)
+                        {
+                            S_TTS.speak_async("注意安全，注意安全！");
+                            Main.WriteLine(pNode,"标定误差太大！" + dx + "," + dy + "," + dz + "=>" + line);
+                        }
+                        else
+                        {
+
+                            Main.WriteLine(pNode, "d=\t"
+                                + format(dx) + "\t" + format(dy) + "\t" + format(dz)
+                                + "\t\t" + x1 + "\t" + y1 + "\t" + z1);
+                        }
+
+                    }
+                    catch (Exception e)
+                    {
+                        Main.WriteLine(pNode, e.ToString());
+                    }
+
+                }
+            }
+            file.Close();
+        }
+
+
+        /// <summary>
+        /// 用中位数的方法来算
+        /// </summary>
+        /// <param name="pList_Point"></param>
+        /// <returns></returns>
+        public static (C_Point3D center,C_Point3D min,C_Point3D max) 计算中位数中心点坐标(List<C_Point3D> pList_Point)
+        {
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.x - b.x);
+            });
+            float new_x = pList_Point[pList_Point.Count / 2].x;
+            float x_min = pList_Point[0].x;
+            float x_max = pList_Point[pList_Point.Count - 1].x;
+
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.y - b.y);
+            });
+            float new_y = pList_Point[pList_Point.Count / 2].y;
+            float y_min = pList_Point[0].y;
+            float y_max = pList_Point[pList_Point.Count - 1].y;
+
+            pList_Point.Sort(delegate (C_Point3D a, C_Point3D b)
+            {
+                return Math.Sign(a.z - b.z);
+            });
+            float new_z = pList_Point[pList_Point.Count / 2].z;
+            float z_min = pList_Point[0].z;
+            float z_max = pList_Point[pList_Point.Count - 1].z;
+
+
+
+            return (new C_Point3D(new_x, new_y, new_z),
+                new C_Point3D(x_min,y_min,z_min), 
+                new C_Point3D(x_max, y_max, z_max));
+        }
+
+
+
+        public static double? cloud_get_mid(C_Node pNode, List<C_Point3D> list, string xyz, int index)
+        {
+            List<double> list_height = new List<double>();
+            switch (xyz)
+            {
+                case "x":
+                case "0":
+                    for (var i = 0; i < list?.Count; i++)
+                    {
+                        C_Point3D pPoint2 = list[i];
+                        list_height.Add(pPoint2.x);
+                    }
+                    break;
+                case "y":
+                case "1":
+                    for (var i = 0; i < list?.Count; i++)
+                    {
+                        C_Point3D pPoint2 = list[i];
+                        list_height.Add(pPoint2.y);
+                    }
+                    break;
+                case "z":
+                case "2":
+                    for (var i = 0; i < list?.Count; i++)
+                    {
+                        C_Point3D pPoint2 = list[i];
+                        list_height.Add(pPoint2.z);
+                    }
+                    break;
+            }
+            list_height.Sort();
+
+
+            double? value = null;
+            if (list_height?.Count > 0)
+            {
+                if (index < list_height?.Count && index >= 0)
+                {
+                    value = list_height[index];
+                }
+                else if (index == -1)
+                {
+                    value = list_height[list_height.Count - 1];
+                }
+            }
+            return value;
+        }
+        public static string format(double x)
+        {
+            if (x >= 0)
+            {
+                return "+" + x;
+            }
+            else
+            {
+                return "" + x;
+            }
+        }
+
+        public static (float max, int idx) get_max(List<C_Planet_Catch> list_draw,string stype="z")
+        {
+            float maxval = -10000;
+            int maxidx = -1;
+
+            if (stype=="z")
+            {
+                for (int i = 0; i < list_draw.Count; ++i)
+                {
+                    if (maxval < list_draw[i].arm_a.z)
+                    {
+                        maxval = list_draw[i].arm_a.z;
+                        maxidx = i;
+                    }
+                }
+            }
+            else if (stype=="x")
+            {
+                for (int i = 0; i < list_draw.Count; ++i)
+                {
+                    if (maxval < list_draw[i].arm_a.x)
+                    {
+                        maxval = list_draw[i].arm_a.x;
+                        maxidx = i;
+                    }
+                }
+            }
+            return (maxval, maxidx);
+        }
+
+        public static (float minval, int minidx) get_min(List<C_Planet_Catch> list_draw, string stype = "z")
+        {
+            float minval = 10000;
+            int minidx = -1;
+
+            if (stype == "z")
+            {
+                for (int i = 0; i < list_draw.Count; ++i)
+                {
+                    if (minval > list_draw[i].arm_a.z)
+                    {
+                        minval = list_draw[i].arm_a.z;
+                        minidx = i;
+                    }
+                }
+            }
+            else if (stype == "x")
+            {
+
+                for (int i = 0; i < list_draw.Count; ++i)
+                {
+                    if (minval > list_draw[i].arm_a.x)
+                    {
+                        minval = list_draw[i].arm_a.x;
+                        minidx = i;
+                    }
+                }
+            }
+
+            return (minval, minidx);
+            
+        }
+
+
+
+        public static int 计算启用的吸盘个数(List<C_Cup> list_cup, ConcurrentDictionary<string, string> dic_regions)
+        {
+            int count = 0;
+            for(var i = 0; i < list_cup.Count; i++)
+            {
+                var item = list_cup[i];
+                if (dic_regions.ContainsKey(item.region)==false)
+                {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
+        public static byte[] hext_to_byte(string hex)
+        {
+            byte[] b = new byte[hex.Length / 2];
+            for (var i = 0; i < hex.Length; i += 2)
+            {
+                string a = hex.Substring(i, 2);
+                b[i / 2] = Convert.ToByte(a, 16);
+            }
+            return b;
+        }
+
+
+        public static byte[] ConvertHexStringToByteArray(string[] strSplit)
+        {
+            byte[] data = new byte[strSplit.Length];
+            for (int index = 0; index < data.Length; index++)
+            {
+                string byteValue = strSplit[index];
+                try
+                {
+                    data[index] = byte.Parse(byteValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                }
+                catch(Exception ex)
+                {
+                    MessageBox.Show("hex error " + byteValue+","+ ex.ToString());
+                }
+            }
+
+            return data;
+        }
+
+
+
+        public static (List<C_Point3D> save1, List<C_Point3D> save2) cloud_filter2(
+            List<C_Point3D>? read1, List<C_Point3D>? read2,string xyz, float f_min, float f_max)
+        {
+            List<C_Point3D> save1 = new List<C_Point3D>();
+            List<C_Point3D> save2 = new List<C_Point3D>();
+            lock (save1)
+            {
+                switch (xyz)
+                {
+                    case "x":
+                    case "0":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.x && p.x <= f_max)
+                            {
+                                save1.Add(p);
+
+                                C_Point3D p2 = read2[i];
+                                save2.Add(p2);
+                            }
+                        }
+                        break;
+                    case "y":
+                    case "1":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.y && p.y <= f_max)
+                            {
+                                save1.Add(p);
+                                C_Point3D p2 = read2[i];
+                                save2.Add(p2);
+                            }
+                        }
+                        break;
+                    case "z":
+                    case "2":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.z && p.z <= f_max)
+                            {
+                                save1.Add(p);
+                                C_Point3D p2 = read2[i];
+                                save2.Add(p2);
+                            }
+                        }
+                        break;
+                }
+            }
+            return (save1,save2);
+        }
+
+
+
+        public static List<C_Point3D> cloud_filter(List<C_Point3D> read1,string xyz,float f_min,float f_max)
+        {
+            List<C_Point3D> save1 = new List<C_Point3D>();
+            lock (save1)
+            {
+                switch (xyz)
+                {
+                    case "x":
+                    case "0":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.x && p.x <= f_max)
+                            {
+                                save1.Add(p);
+                            }
+                        }
+                        break;
+                    case "y":
+                    case "1":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.y && p.y <= f_max)
+                            {
+                                save1.Add(p);
+                            }
+                        }
+                        break;
+                    case "z":
+                    case "2":
+                        for (var i = 0; i < read1.Count; i++)
+                        {
+                            C_Point3D p = read1[i];
+                            if (f_min <= p.z && p.z <= f_max)
+                            {
+                                save1.Add(p);
+                            }
+                        }
+                        break;
+                }
+            }
+            return save1;
+        }
+
+
+
+        ////计算x，y，z最大，最小值
+        public static C_Point3D[] 计算最大最小值(List<C_Point3D> pList)
+        {
+            double x_min = 100000;
+            double x_max = -100000;
+            double y_min = 100000;
+            double y_max = -100000;
+            double z_min = 100000;
+            double z_max = -100000;
+
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = pList[i];
+                if (p.x < x_min) x_min = p.x;
+                if (p.y < y_min) y_min = p.y;
+                if (p.z < z_min) z_min = p.z;
+
+                if (p.x > x_max) x_max = p.x;
+                if (p.y > y_max) y_max = p.y;
+                if (p.z > z_max) z_max = p.z;
+            }
+
+            //C_Planet pPlanet = new C_Planet();
+            C_Point3D[] arr = new C_Point3D[3];
+
+            arr[0] = new C_Point3D(x_min, y_min, z_min);
+            arr[1] = new C_Point3D(x_max, y_max, z_max);
+
+            double x = (arr[0].x + arr[1].x) / 2;
+            double y = (arr[0].y + arr[1].y) / 2;
+            double z = (arr[0].z + arr[1].z) / 2;
+            arr[2] = new C_Point3D(x, y, z);
+            return arr;
+        }
+        public static double 计算最小外接正矩形面积(List<C_Point3D> currentPolygon)
+        {
+            (C_Point3D x0y0, C_Point3D x1y1) = Tools.计算最大最小值(currentPolygon);
+
+            return Math.Abs(x0y0.x - x1y1.x) * Math.Abs(x0y0.y - x1y1.y);
+        }
+
+        public static List<C_Point3D> 旋转点云(double angle, List<C_Point3D> currentPolygon)
+        {
+            List<C_Point3D> polygon2 = new List<C_Point3D>();
+
+            for (int i = 0; i < currentPolygon.Count; i++)
+            {
+                C_Point3D a = currentPolygon[i];
+                double angle2 = Math.Atan2(a.y, a.x);
+
+                double distance = a.distance(new C_Point3D(0, 0, 0));
+                if (distance > 0)
+                {
+                    double x = distance * Math.Cos(angle2 - angle);
+                    double y = distance * Math.Sin(angle2 - angle);
+                    C_Point3D b = new C_Point3D(x, y, 0);
+                    polygon2.Add(b);
+                }
+                else
+                {
+                    polygon2.Add(a);
+                }
+            }
+            return polygon2;
+        }
+
+        public static double 计算最小外接矩形(List<C_Point3D> currentPolygon)
+        {
+            if (currentPolygon.Count < 3)
+            {
+                Main.WriteLine("Error");
+                MessageBox.Show("Error");
+            }
+            C_Point3D a = currentPolygon[0];
+            C_Point3D b = currentPolygon[1];
+            List<C_Point3D> currentPolygon2;
+
+            double min_angle = Math.Atan2(b.y - a.y, b.x - a.x);
+            currentPolygon2 = 旋转点云(min_angle, currentPolygon);
+            double min_area = 计算最小外接正矩形面积(currentPolygon2);
+
+            C_Point3D c, d;
+            double angle2, min_area2;
+            for (int i = 0; i < currentPolygon.Count - 1; i++)
+            {
+                c = currentPolygon[i];
+                d = currentPolygon[i + 1];
+                angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+                currentPolygon2 = 旋转点云(angle2, currentPolygon);
+                min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+                if (min_area2 < min_area)
+                {
+                    min_area = min_area2;
+                    min_angle = angle2;
+                }
+            }
+            c = currentPolygon[currentPolygon.Count - 1];
+            d = currentPolygon[0];
+            angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+            currentPolygon2 = 旋转点云(angle2, currentPolygon);
+            min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+            if (min_area2 < min_area)
+            {
+                min_area = min_area2;
+                min_angle = angle2;
+            }
+
+            return min_angle;// *180/Math.PI;
+        }
+
+
+        public static C_Node? get_node_from_parent_vars_steps(C_Space space, string key_ui)
+        {
+            C_Node pItem;
+            C_Space space2 = space;
+
+            if (key_ui != null && space2.vars_step.ContainsKey(key_ui))
+            {
+                pItem = (C_Node)space2.vars_step[key_ui];
+                return pItem;
+            }
+
+
+            while (space2.parent != null)
+            {
+                space2 = space2.parent;
+                if (key_ui != null && space2.vars_step.ContainsKey(key_ui))
+                {
+                    pItem = (C_Node)space2.vars_step[key_ui];
+                    return pItem;
+                }
+            }
+            return null;
+        }
+
+
+
+        public static S_UI? get_ui_from_parent_vars_steps(C_Space space, string key_ui)
+        {
+            S_UI pItem;
+            C_Space space2 = space;
+
+            if (key_ui != null && space2.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_UI)space2.vars_ui[key_ui];
+                return pItem;
+            }
+
+
+            while (space2.parent != null)
+            {
+                space2 = space2.parent;
+                if (key_ui != null && space2.vars_ui.ContainsKey(key_ui))
+                {
+                    pItem = (S_UI)space2.vars_ui[key_ui];
+                    return pItem;
+                }
+            }
+            return null;
+        }
+    }
+}

@@ -1,0 +1,65 @@
+﻿using Common_Robot;
+using ConverxHull;
+using System;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 简单块
+    /// </summary>
+    public class C_Block_Simple
+    {
+        public C_Point3D pos = new C_Point3D(0,0,0);//这个位置是相对所放置空间的
+        public int x_len;
+        public int y_len;
+        public int z_len;
+        public int nx, ny, nz;
+        public bool 用完 = false;
+
+        public C_Box_Type box_type;
+        public int count=0;
+        public C_Block_Simple Roate90=null;//旋转90度的形状
+
+        public C_Block_Simple(
+            C_Box_Type box_Type,
+            int x_len, int y_len, int z_len,
+            int nx,int ny,int nz)
+        {
+            this.box_type=box_Type;
+            if (this.box_type.ID >= 55)
+            {
+                Console.WriteLine(0);
+            }
+            this.x_len = x_len;
+            this.y_len = y_len;
+            this.z_len = z_len;
+            this.nx = nx;
+            this.ny = ny;
+            this.nz = nz;
+        }
+
+        public int count_box()
+        {
+            return nx * ny * nz;
+        }
+
+        public double space()
+        {
+            return x_len * y_len * z_len;
+        }
+
+        public double space_used()
+        {
+            return box_type.x_len * box_type.y_len * box_type.z_len*this.count_box();
+        }
+
+
+        public C_Block_Simple Clone(C_Box_Type box_type)
+        {
+            C_Block_Simple p = new C_Block_Simple(box_type, x_len,y_len,z_len,nx,ny,nz);
+            
+            return p;
+        }
+    }
+}

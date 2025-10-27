@@ -1,0 +1,98 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class C_Cloud_Max : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_save = "min";
+        public string xyz = "0";//1,2
+
+        public C_Cloud_Max(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> pList;
+            if (this.key_read== "%main.3d")
+            {
+                C_Data pData = (C_Data)space.read_vars(pTrain, this, "main","C_Data");
+                pList = pData.list_3D_Point;
+            }
+            else
+            {
+                pList = (List<C_Point3D>)space.read_vars(pTrain, this, this.key_read, "List<C_Point3D>");
+            }
+
+            if (pList==null || pList.Count==0)
+            {
+                MessageBox.Show(this.Name + " pList=null or count==0");
+                return ;
+            }
+
+
+            double f_max = -10000;
+
+            for (var i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p =  pList[i];
+                switch (xyz)
+                {
+                    case "0":
+                        if (p.x > f_max)
+                        {
+                            f_max = p.x;
+                        }
+                        break;
+                    case "1":
+                        if (p.y > f_max)
+                        {
+                            f_max = p.y;
+                        }
+                        break;
+                    case "2":
+                        if (p.z > f_max)
+                        {
+                            f_max = p.z;
+                        }
+                        break;
+                }
+            }
+            if (f_max == -10000)
+            {
+                MessageBox.Show(this.Name + " f_max error");
+                return;
+            }
+            if (this.Name == "计算#放置位置z最小")
+            {
+                Main.WriteLine(this, "D");
+            }
+            this.save_var(this.key_save, "double", f_max);
+
+        }
+    }
+}

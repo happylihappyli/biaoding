@@ -1,0 +1,106 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class U_Label_Show : C_Node
+    {
+        public Label pLabel;
+        public string key_ui = "";
+        public string msg = "";
+        public U_Label_Show(string Name,C_Space space_parent, C_Space space) : base(space_parent,space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            S_Label pItem = null;
+            if (space.vars.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_Label)space.vars.vars_ui[key_ui];
+            }
+            else if (space_parent.vars.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_Label)space_parent.vars.vars_ui[key_ui];
+            }
+            else
+            {
+                MessageBox.Show(this.Name +"UI没有这个控件");
+            }
+
+            if (pLabel == null)
+            {
+                pLabel = pItem.label;
+            }
+
+            Main.WriteLine(this, " run");
+
+            string value = "";
+            if (msg.StartsWith("@"))
+            {
+                string key=msg.Substring(1);
+                object obj = this.read_var(key, "");
+                if (obj != null)
+                {
+                    if (obj.GetType().Name == "Double")
+                    {
+                        value = obj.ToString();
+                    }
+                    else if (obj.GetType().Name == "String")
+                    {
+                        value = (string)obj;
+                        Console.WriteLine(this.Name + "=>" + value+" key="+ key+ " pTrain.ID="+ pTrain.get_ID());
+                    }
+                    else if (obj.GetType().Name == "List<string>")
+                    {
+                        StringBuilder sb = new StringBuilder();
+                        List<string> list = (List<string>)obj;
+                        for(var i = 0; i < list.Count; i++)
+                        {
+                            sb.Append(list[i]+"\r\n");
+                        }
+                        value = sb.ToString();
+                    }
+                }
+            }
+            else
+            {
+                value = msg;
+            }
+             
+
+            Action act = delegate ()
+            {
+                if (pLabel != null)
+                {
+
+                    pLabel.Text = value;
+                }
+            };
+            if (pLabel != null)
+                pLabel.BeginInvoke(act, null);
+
+        }
+
+        public void init()
+        {
+        }
+    }
+}

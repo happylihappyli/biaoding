@@ -1,0 +1,945 @@
+﻿
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text;
+using Test1;
+
+namespace Common_Robot2
+{
+    public abstract class C_Node
+    {
+        public string alias = "";//附加名字，lgraph模式Name是key，需要这个字段
+        public static string File_Lock = "";//锁定日志
+
+        public static int run_id = 0;
+
+        public enum Node_Next
+        {
+            None = 0,
+            True = 1,
+            False = 2
+        }
+
+        public Node_Next Next_Step = Node_Next.False;// .True;
+        
+        
+        
+        
+        //================================
+        public List<C_Node> pNext_True = new List<C_Node>(); //这两个淘汰，以后用all_next
+        public List<C_Node> pNext_False = new List<C_Node>(); //这两个淘汰，以后用all_next
+        public List<C_Link> all_next = new List<C_Link>();
+        //================================
+        
+        public List<C_Node> input_nodes = new List<C_Node>();
+
+        public I_Train? pTrain = null;
+        public C_Space space_parent;
+        public C_Space space;
+        
+        public bool bBreak = false;
+        public bool bContinue = false;
+        public bool bNew_Train = false;
+        public bool auto_active = true;//自动激活下一个节点
+
+        public int[] active_now = new int[10];
+        public int active_input_count = 1;//如果 active_input_count>1 那么需要多个都激活，才能运行
+
+        public long time_last = 0;
+        public long time_use = 0;
+
+        public string train_from = "";
+        public string group = "";
+        public string css = "";
+        public int state = 0;//"";
+        public string log_index = "1";
+        public string code = "";
+        public string code_output = "";
+        public string mode = "";//运行模式，比如 robot_move 只在机器人移动的时候运行
+
+        private string name = "";
+        public string Name { get => name; set => name = value; }
+
+
+        private string _key = "";
+        public string key { get => _key; set => _key = value; }
+
+
+        private string _memo = "";//备注信息
+        public string memo { get => _memo; set => _memo = value; }
+
+
+        private string _tts = "";
+        public string tts { get => _tts; set => _tts = value; }
+
+        private bool _all_active_mode = true;
+        /// <summary>
+        /// =true 所有输入节点都激活，就算激活
+        /// </summary>
+        public bool all_active_mode { get => _all_active_mode; set => _all_active_mode = value; }
+
+        public bool new_debug = false;
+        public bool b_quick = false;
+
+
+        /// <summary>
+        /// zzz
+        /// </summary>
+        /// <param name="str"></param>
+        public delegate void speak_async2(string str);
+
+        /// <summary>
+        /// zzz
+        /// </summary>
+        public speak_async2? i_speak = null;
+        public List<string> list_var_read=new List<string>();
+        public List<string> list_var_save = new List<string>();
+        public static ConcurrentDictionary<string, string> dic_stop = new ConcurrentDictionary<string, string>();
+        public C_Node? pPre;
+        public List<string> list_log;
+        public bool sub_log = false;//是否记录增强日志
+        private string time_start;
+
+        public C_Node(string name,C_Space space_parent, C_Space space)
+        {
+            this.Name = name;
+
+            if (this is S_UI==false)
+            {
+                if (space.vars_step.ContainsKey(name) == false)
+                {
+                    space.vars_step.TryAdd(name, this);
+                }
+            }
+                
+
+            space.parent= space_parent;
+            this.space_parent = space_parent;
+            this.space = space;
+        }
+
+        public abstract void init();
+
+
+        /// <summary>
+        /// 读取保存的字符串等对象
+        /// </summary>
+        public void run_sub_read()
+        {
+            string str_file = "D:\\data\\" + this.space.Name + "_" + this.key + ".txt";
+            string str_json = File.ReadAllText(str_file);
+            JArray arr=JArray.Parse(str_json);
+
+            Dictionary<string,string> dic = new Dictionary<string,string>();    
+            for(var i=0;i<arr.Count; i++)
+            {
+                JObject obj = (JObject)arr[i];
+                string name = obj["name"].ToString();
+                string value = obj["value"].ToString();
+                dic.Add(name, value);
+            }
+
+
+            Type type = this.GetType();
+            PropertyInfo[] properties = type.GetProperties();
+
+            foreach (PropertyInfo property in properties)
+            {
+                string name = property.Name;
+
+                if (dic.ContainsKey(name))
+                {
+                    string value= dic[name];
+
+                    if (property.PropertyType.Name=="Boolean")
+                    {
+                        property.SetValue(this,Boolean.Parse(value));
+                    }
+                    else
+                    {
+
+                        property.SetValue(this, value);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 调试模式，运行之前就自动保存所有变量
+        /// </summary>
+        public void run_sub_pre()
+        {
+            Type type = this.GetType();
+            PropertyInfo[] properties= type.GetProperties();
+
+            JArray arr = new JArray();
+            foreach (PropertyInfo property in properties)
+            {
+                string name= property.Name;
+                object? value= property.GetValue(this);
+                
+                Console.WriteLine("Property:{0},Value:{1}", name, value);
+
+                JObject obj = new JObject();
+                obj["name"] = name;
+                obj["value"] = value.ToString();
+
+                arr.Add(obj);
+            }
+
+            string str_file = "D:\\data\\"+this.space.Name+"_"+this.key+".txt";
+            File.WriteAllText(str_file, arr.ToString());
+        }
+
+        public abstract Task run_sub();
+
+
+        public void init_setting()
+        {
+            this.b_quick = false;
+            //init 程序要调用这个，才会实现快速模式
+            if (this.pNext_False.Count == 1 && this.pNext_True.Count == 0)
+            {
+                //当前节点，后面激活的只有一个节点，没有判断
+                C_Node pNext=this.pNext_False[0];
+                if (pNext.input_nodes.Count == 1)
+                {
+                    //后面节点的输入也只有当前一个节点
+                    this.b_quick = true;
+                }
+            }
+        }
+
+
+        public void save_code(C_Node pNode,string line, string key)
+        {
+
+            string[] strSplit = line.Split(new string[] { "<===split===>" }, StringSplitOptions.None);
+            for (var i = 0; i < strSplit.Length; i++)
+            {
+                if (space.contains(pTrain, pNode, key + "_" + i, "StringBuilder") == false)
+                {
+                    space.save_vars(pTrain, pNode,  key + "_" + i, "StringBuilder", new StringBuilder());
+                }
+                StringBuilder? p = (StringBuilder?)space.read_vars(pTrain,pNode, key + "_" + i, "StringBuilder");
+
+                string line2 = strSplit[i];
+
+                while (line2.EndsWith("\r\n"))
+                {
+                    line2 = line2.Substring(0, line2.Length - 2);
+                }
+
+                while (line2.StartsWith("\r\n"))
+                {
+                    line2 = line2.Substring(2);
+                }
+
+                if (line2 != "")
+                {
+                    p?.AppendLine(line2 + "\r\n");
+                }
+            }
+        }
+
+        public void call_next_new(I_Train pTrain)
+        {
+
+            DateTime DateTime2 = DateTime.Now; //仅从当前时间获得毫秒
+            this.time_use = (DateTime2.Ticks - this.time_last) / 10000;
+
+            if (b_quick && this.Next_Step==Node_Next.False) //如果是快速模式
+            {
+                C_Node pNext = this.pNext_False[0];
+                Thread thread = new Thread(() =>
+                {
+                    pNext.pPre = this;
+                    if (pTrain != null)
+                    {
+                        pNext.pTrain = pTrain;
+                        pNext.Run(pTrain);
+                    }
+                    else
+                    {
+                        pNext.Run(null);
+                    }
+                });
+                thread.Start();
+                return;
+            }
+
+
+            if (space.vars.debug_mode)
+            {
+                Thread.Sleep(1000);
+            }
+
+            if (this.auto_active)
+            {
+                this.Add_Next(pTrain);
+            }
+        }
+
+        /// <summary>
+        /// 初始化输入节点
+        /// </summary>
+        /// <param name="pArray"></param>
+        public void init_inputs(List<C_Node> pArray)
+        {
+            input_nodes = pArray;
+            for (var i = 0; i < pArray.Count; i++)
+            {
+                C_Node pNode = (C_Node)pArray[i];
+                bool bExists = false;//如果有了就不添加了
+                for (var k = 0; k < pNode.pNext_True.Count; k++)
+                {
+                    if (pNode.pNext_True[k] == this)
+                    {
+                        bExists = true;
+                    }
+                }
+                if (bExists == false)
+                    pNode.pNext_True.Add(this);
+            }
+            active_input_count = pArray.Count;
+        }
+
+        public void init_input(C_Node? pNode, bool true_false = true)
+        {
+            input_nodes.Add(pNode);
+
+            //如果有了就不添加了
+            bool bExists = false;
+
+            if (true_false)
+            {
+
+                for (var k = 0; k < pNode.pNext_True.Count; k++)
+                {
+                    if (pNode.pNext_True[k] == this)
+                    {
+                        bExists = true;
+                    }
+                }
+            }
+            else
+            {
+                for (var k = 0; k < pNode.pNext_False.Count; k++)
+                {
+                    if (pNode.pNext_False[k] == this)
+                    {
+                        bExists = true;
+                    }
+                }
+            }
+            if (bExists == false)
+            {
+                if (true_false)
+                {
+                    pNode.pNext_True.Add(this);
+                }
+                else
+                {
+                    pNode.pNext_False.Add(this);
+                }
+            }
+            active_input_count = input_nodes.Count;
+        }
+
+
+        public void set_active(C_Node pState)
+        {
+            if (active_input_count == 1)
+            {
+                set_active_sub(0);
+                return;
+            }
+
+            for (var i = 0; i < active_input_count; i++)
+            {
+                if (input_nodes[i] == pState)
+                {
+                    set_active_sub(i);
+                }
+            }
+        }
+
+
+        public void set_active_sub(int index)
+        {
+            active_now[index] = 1;
+        }
+
+
+        /// <summary>
+        /// 检查这个节点是否激活
+        /// </summary>
+        /// <returns></returns>
+        public bool check_active(I_Train pTrain)
+        {
+            if (all_active_mode)
+            {
+                if (this.train_from == "")
+                {
+                    //如果小火车没有设置，那么所有输入节点
+                    //必须在当前这个小火车上，并且已经运行
+                    ConcurrentDictionary<string,C_Node> dict = new ConcurrentDictionary<string, C_Node>();
+                    var ran_step = pTrain.get_ran_step();
+
+                    lock (ran_step)
+                    {
+                        for (var i = 0; i < ran_step.Count; i++)
+                        {
+                            C_Node pNode = ran_step[i];
+                            if (dict.ContainsKey(pNode.key) == false)
+                            {
+                                dict.TryAdd(pNode.key, pNode);
+                            }
+                        }
+                    }
+                        
+                    for (var i = 0; i < input_nodes.Count; i++)
+                    {
+                        C_Node pNode = input_nodes[i];
+                        if (dict.ContainsKey(pNode.key) == false)
+                            return false;
+                    }
+                    return true;
+                }
+                else
+                {
+                    for (var i = 0; i < active_input_count; i++)
+                    {
+                        CommonMain.WriteLine(this.Name + " check=" + i + "=" + active_now[i] +
+                            " from=" + this.input_nodes[i].Name);
+                        if (active_now[i] == 0)
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+            else
+            {
+                for (var i = 0; i < active_input_count; i++)
+                {
+                    if (active_now[i] == 1)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        public string read_string(string? key)
+        {
+            return read_string_sub(pTrain, this, key);
+        }
+
+        public int read_var_int(string? strName)
+        {
+            object? obj = this.read_var(strName, "");
+            if (obj == null) return 0;
+            var type = obj.GetType().Name.ToLower();
+            switch (type)
+            {
+                case "string":
+                    string value2 = (string)obj;
+                    return (int)double.Parse(value2);
+                case "double":
+                    return (int)(double)obj;
+                case "float":
+                    return (int)(float)obj;
+                case "int32":
+                case "int":
+                    return (int)obj;
+            }
+            return 0;
+        }
+
+        public double read_double(string? key)
+        {
+            return read_double_sub(pTrain, this, key);
+        }
+
+        public int read_int(string? key)
+        {
+            return (int)read_double_sub(pTrain, this, key);
+        }
+
+
+        private double read_double_sub(I_Train? pTrain, C_Node pNode, string? value)
+        {
+            string? value2 = value;
+            if (value2 == null) return 0;
+
+            if (value2.StartsWith("@"))
+            {
+                value2 = value2.Substring(1);
+
+                object? obj = pNode.read_var(value2, "");
+                if (obj == null) return 0;
+                var type = obj.GetType().Name.ToLower();
+                switch (type)
+                {
+                    case "string":
+                        value2 = (string)obj;
+                        return double.Parse(value2);
+                    case "double":
+                        return  (double)obj;
+                    case "float":
+                        return (double)(float)obj;
+                        break;
+                    case "int32":
+                    case "int":
+                        return  (double)(int)obj;
+                }
+            }
+            return double.Parse(value2);
+        }
+
+
+
+        private string read_string_sub(I_Train? pTrain, C_Node pNode, string? value)
+        {
+            string? value2 = value;
+            if (value2 == null) return "";
+
+            if (value2.StartsWith("@"))
+            {
+                value2 = value2.Substring(1);
+
+                object? obj = pNode.read_var(value2, "");
+                if (obj == null) return "";
+                var type = obj.GetType().Name.ToLower();
+                if (obj == null)
+                {
+
+                }
+                else
+                {
+                    switch (type)
+                    {
+                        case "string":
+                            value2 = (string)obj;
+                            break;
+                        case "double":
+                            value2 = (double)obj + "";
+                            break;
+                        case "single":
+                        case "float":
+                            value2 = (float)obj + "";
+                            break;
+                        case "int32":
+                        case "int":
+                            value2 = (int)obj + "";
+                            break;
+                        case "byte":
+                            value2 = (int)((byte)obj + 0)+"";
+                            break;
+                    }
+                }
+            }
+            return value2;
+        }
+
+        public double read_double_from_string(string r)
+        {
+            string str_r = this.read_string(r);
+            if (str_r == "")
+            {
+                return 0;
+            }
+            return double.Parse(str_r);
+        }
+        public string read_var_string(string? key)
+        {
+            return (string)this.read_var(key, "string");
+        }
+
+        public object? read_var(string? key,string str_type)
+        {
+            if (key==null || key == "")
+            {
+                Main.WriteLine(this, "read_var no this key error="+key);
+                return null;
+            }
+
+
+            object? obj = space.read_vars(pTrain, this, key, str_type);
+
+            if (obj != null)
+            {
+                string type = obj.GetType().Name.ToLower();
+                if (type == "String".ToLower())
+                {
+                    if (str_type!="" && str_type != "*" && str_type.ToLower() != type.ToLower())
+                    {
+                        Main.WriteLine(this, "类型不对:要读取的类型"+str_type+",实际类型"+type);
+                    }
+                    string value = (string)obj;
+                    value = value.Replace("\\", "\\\\");
+                    value = value.Replace("\"", "\\\"");
+                    value = value.Replace("\r", "\\r");
+                    value = value.Replace("\n", "\\n");
+                    this.list_var_read.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+
+                }else if (type == "double".ToLower())
+                {
+                    double value = (double)obj;
+                    this.list_var_read.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                }else if (type == "int".ToLower() || type == "int32".ToLower())
+                {
+                    int value = (int)obj;
+                    this.list_var_read.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                }else if (type == "C_Point3D".ToLower())
+                {
+                    string value = ((C_Point3D)obj).ToString();
+                    this.list_var_read.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                }
+            }
+
+            return obj;
+        }
+
+
+        public void save_var(string? key, string str_type,object obj)
+        {
+            if (obj != null)
+            {
+                string type = obj.GetType().Name.ToLower();
+                if (type == "string".ToLower())
+                {
+                    string value = (string)obj;
+                    value = value.Replace("\\", "\\\\");
+                    value = value.Replace("\"", "\\\"");
+                    value = value.Replace("\r", "\\r");
+                    value = value.Replace("\n", "\\n");
+
+                    this.list_var_save.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                    C_Space.Save_Var_History(this.Name + "\t\t" + key + "\t\t" + value);
+                }else if (type == "double")
+                {
+                    string value = (double)obj+"";
+                    value = value.Replace("\\", "\\\\");
+                    value = value.Replace("\"", "\\\"");
+                    this.list_var_save.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                    C_Space.Save_Var_History(this.Name+"\t\t"+ key + "\t\t" + value);
+                }
+                else if (type == "int" || type == "int32")
+                {
+                    int value = (int)obj;
+                    this.list_var_save.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                }
+                else if (type == "C_Point3D".ToLower())
+                {
+                    string value = ((C_Point3D)obj).ToString();
+                    this.list_var_save.Add($"{{\"name\":\"{key}\",\"value\":\"{value}\"}}");
+                }
+            }
+            space.save_vars(pTrain, this, key, str_type,obj);
+
+
+            if (key == "%space.sleep_time")
+            {
+                string value = (string)obj;
+                space.sleep_time = int.Parse(value);
+            }
+
+            if (key == "%debug")
+            {
+                string value = (string)obj;
+                if (value == "1")
+                {
+                    space.vars.debug_mode = true;
+                    space.step_stop = true;
+                }
+                else
+                {
+                    space.vars.debug_mode = false;
+                    space.step_stop = false;
+                }
+            }
+            if (key == "%mode")
+            {
+                string value = (string)obj;
+                space.mode = value;
+            }
+
+        }
+
+        public void remove_var(string key,string str_type)
+        {
+            space.remove_var(pTrain, this, key, str_type);
+        }
+
+        public bool contain_var(string key,string str_type)
+        {
+            return space.contains(pTrain, this, key, str_type);
+        }
+
+
+
+        /// <summary>
+        /// 清除所有的激活状态
+        /// </summary>
+        public void clear_active()
+        {
+            for (var i = 0; i < active_input_count; i++)
+            {
+                active_now[i] = 0;
+            }
+        }
+
+        //async
+        public void Run(I_Train? pTrain_Input)
+        {
+
+            Main.WriteLine(this, "start");
+
+            if (pTrain_Input != null) pTrain = pTrain_Input;
+
+            if (this.train_from != "")
+            {
+                if (space.vars_step.ContainsKey(space.Name + this.train_from))
+                {
+                    pTrain = space.vars_step[space.Name + this.train_from]?.pTrain;
+                }
+            }
+
+            if (pTrain == null)
+            {
+                pTrain = Get_Train_From_Input();
+
+                if (pTrain == null)
+                {
+                    if (space.pTrain != null)
+                    {
+                        pTrain = space.pTrain;
+                    }
+                    else
+                    {
+                        Random rnd = new Random();
+                        int train_id=rnd.Next(100, 900);
+                        pTrain = CommonMain.create_train(train_id + "");
+                        space.pTrain = pTrain;
+                    }
+                }
+            }
+
+            if (pTrain == null)
+            {
+                CommonMain.WriteLine(this.Name + "错误，Train = null ：" + this.Name + " ");
+                return;
+            }
+
+            this.state = 0;// "开始运行";
+
+            DateTime DateTime1 = DateTime.Now;
+            this.time_last = DateTime1.Ticks;//仅从当前时间获得毫秒
+
+            if (this.tts != "")
+            {
+                if (CommonMain.i_speak != null)
+                {
+                    CommonMain.i_speak(this.tts);
+                }
+            }
+
+
+            Thread thread = new Thread(async () =>
+            {
+                try
+                {
+                    C_Node.run_id++;
+                    this.state = C_Node.run_id;
+                    this.list_var_read.Clear();
+                    this.list_var_save.Clear();
+                    if (C_Node.dic_stop.ContainsKey(this.Name))
+                    {
+                        Debugger.Break();
+                    }
+                    this.Next_Step = Node_Next.False;// .True;
+
+                    {
+                        if (this.sub_log) { 
+                            this.list_log = new List<string>();
+                            this.list_log.Add(DateTime.Now.ToString("HH:mm:ss::fff") + "启动" );
+                        }
+                        this.time_start = DateTime.Now.ToString("HH:mm:ss::fff");
+                        await this.run_sub();//调用子程序
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this.Name + ex.ToString());
+                    CommonMain.WriteLine(ex.ToString());
+                }
+                DateTime DateTime2 = DateTime.Now;//仅从当前时间获得毫秒
+
+                if (pTrain.mode != "不记录")
+                {
+                    //写运行节点json日志
+                    lock (File_Lock)
+                    {
+                        long times = (DateTime2.Ticks - this.time_last) / 10000; //毫秒数
+
+                        string read = get_read_string();
+                        string save = get_save_string();
+                        long memory_use = GC.GetTotalMemory(false);
+
+                        string line = "{\"space\":\"" + space.Name + "\"," +
+                             "\"name\":\"" + this.Name + "\"," +
+                             "\"key\":\"" + this.key + "\"," +
+                             "\"type\":\"" + this.GetType().Name + "\"," +
+                             "\"time\":\"" + times + "\"," +
+                             "\"now_start\":\"" + this.time_start + "\"," +
+                             "\"now\":\"" + DateTime.Now.ToString("HH:mm:ss::fff") + "\"," +
+                             "\"read\":" + read + "," +
+                             "\"save\":" + save + "," +
+                             "\"memory\":" + memory_use + "," +
+                             "\"train\":\"" + pTrain?.get_ID() + "\"," +
+                             "\"state\":\"" + this.state + "\"},\r\n";
+
+                        this.space.Log_Debug(line);
+                        if (this.sub_log)
+                        {
+                            StringBuilder sb = new StringBuilder();
+                            for(var i=0;i < this.list_log.Count; i++)
+                            {
+                                sb.AppendLine(this.list_log[i].ToString());
+                            }
+                            string time = DateTime.Now.ToString("HH_mm_ss__fff");
+                        }
+                    }
+                }
+
+                var ran_step =pTrain?.get_ran_step();
+                if (ran_step != null)
+                {
+                    lock (ran_step)
+                    {
+                        ran_step.Add(this);//运行完毕加入火车已运行步骤
+                    }
+                }
+                if (pTrain != null)
+                {
+                    call_next_new(pTrain);
+                }
+                this.clear_active();//运行完毕，清空输入的激活
+                Main.WriteLine(this, "end");
+            });
+            thread.Start();
+        }
+
+
+
+        public string get_read_string()
+        {
+            StringBuilder sb=new StringBuilder();
+
+            for (var i = 0; i < list_var_read.Count; i++)
+            {
+                sb.Append(list_var_read[i]+",");
+            }
+            string line = sb.ToString();
+            if (line.EndsWith(","))
+            {
+                line = line.Substring(0, line.Length - 1);
+            }
+            return "[" + line + "]";
+        }
+        public string get_save_string()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for (var i = 0; i < list_var_save.Count; i++)
+            {
+                sb.Append(list_var_save[i] + ",");
+            }
+            string line=sb.ToString();
+            if (line.EndsWith(","))
+            {
+                line = line.Substring(0, line.Length - 1);
+            }
+            return "["+line+"]";
+        }
+
+        public I_Train? Get_Train_From_Input()
+        {
+            if (input_nodes == null || input_nodes.Count == 0)
+            {
+                return this.pTrain;
+            }
+
+            //for (int i = 0; i < active_input_count; i++)
+            if (active_input_count>0)
+            {
+                C_Node pState = input_nodes[0];
+                return pState.pTrain;
+            }
+
+            if (input_nodes.Count > 0)
+            {
+                C_Node pState = input_nodes[0];
+                return pState.pTrain;
+            }
+            return null;
+        }
+
+
+
+        /// <summary>
+        /// 计算下一个激活的节点
+        /// 判断节点有两个出口，true的时候勇pNext的节点，False的时候勇pNext2
+        /// </summary>
+        /// <param name="actives_Nodes"></param>
+        public void Add_Next(I_Train pTrain)
+        {
+            //lock (space.vars.actives_Nodes)
+            {
+                if (this.Next_Step == Node_Next.True)
+                {
+                    for (var i = 0; i < pNext_True.Count; i++)
+                    {
+                        C_Node pNode = pNext_True[i];
+
+                        pNode.set_active(this);
+                        if (pNode.check_active(pTrain))
+                        {
+                            pNode.pPre = this;
+                            lock (space.actives_Nodes)
+                            {
+                                space.actives_Nodes.Add(new C_Node_and_Train(pNode, pTrain));
+                            }
+                        }
+                    }
+                }
+                else if (this.Next_Step == Node_Next.False)
+                {
+                    for (var i = 0; i < pNext_False.Count; i++)
+                    {
+                        C_Node pNode = pNext_False[i];
+
+                        pNode.set_active(this);
+                        if (pNode.check_active(pTrain))
+                        {
+                            pNode.pPre = this;
+                            lock (space.actives_Nodes)
+                            {
+                                space.actives_Nodes.Add(new C_Node_and_Train(pNode, pTrain));
+                            }
+                        }
+                    }
+                }
+            }
+                
+
+        }
+    }
+}

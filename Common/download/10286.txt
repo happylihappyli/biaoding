@@ -1,0 +1,328 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Common_Robot2;
+using ConverxHull;
+using static System.Windows.Forms.AxHost;
+
+namespace Test1 
+{
+	//if
+    public class F_If : C_Node
+    {
+        public string left_function = "";
+        public string right_function = "";
+
+        public string key_type = "";
+        public string left = "";
+        public string right = "";
+
+        public string str_operator = "";
+
+
+        private string? left_key = null;
+        private string? right_key = null;
+
+
+        public double left_value = 0;
+        public double right_value = 0;
+
+
+        public F_If(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            this.init_setting();
+
+            if (this.left.StartsWith("@"))
+            {
+                this.left_key = this.left.Substring(1);
+            }
+            else
+            {
+                if (this.key_type != "string")
+                {
+                    try
+                    {
+                        this.left_value = double.Parse(this.left);
+                    }catch(Exception e)
+                    {
+                        MessageBox.Show(this.Name + "不是double类型！"+e.ToString());
+                    }
+                }
+
+            }
+
+            if (this.right.StartsWith("@"))
+            {
+                this.right_key = this.right.Substring(1);
+            }
+            else
+            {
+                if (this.key_type != "string")
+                {
+                    try
+                    {
+                        this.right_value = double.Parse(this.right);
+                    }
+                    catch (Exception e)
+                    {
+                        MessageBox.Show(this.Name + "不是double类型！"+e.ToString());
+                    }
+                }
+            }
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+
+            if (key_type == "string")
+            {
+                compare_string();
+            }
+            else if (key_type == "date")
+            {
+                compare_date();
+            }
+            else
+            {
+                compare_number();
+            }
+        }
+
+        private void compare_date()
+        {
+            string? left_value = left;
+            if (left_key != null)
+            {
+                left_value = (string?)this.read_var(left_key, "string");
+            }
+            if (left_value == null) left_value = "";
+
+            string? right_value = right;
+            if (right == null)
+            {
+                right_value = "";
+            }
+            else if (right.StartsWith("@"))
+            {
+                right_value = (string?)this.read_var(right.Substring(1), "string");
+            }
+
+            Main.WriteLine(this, left_value + str_operator + right_value);
+            if (left_value == "")
+            {
+                left_value = "2000-1-1";
+            }
+            if (right_value == "")
+            {
+                right_value = "2000-1-1";
+            }
+
+            DateTime dt1 = Convert.ToDateTime(left_value);
+            DateTime dt2 = Convert.ToDateTime(right_value);
+
+            int value=dt1.CompareTo(dt2);
+            if (value == 0)
+            {
+                if (str_operator == "" || str_operator == "=" || str_operator == ">=" || str_operator == "<=")
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (value <0)
+            {
+                if (str_operator == "<" || str_operator == "<=")
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (value > 0)
+            {
+                if (str_operator == ">" || str_operator == ">=")
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else 
+            {
+                Next_Step = Node_Next.False;
+            }
+        }
+
+        public void compare_number()
+        {
+            if (left_key != null)
+            {
+                object? obj = this.read_var(left_key, "double");
+
+                if (obj == null)
+                {
+                    left_value = 0;
+                }
+                else
+                {
+                    left_value = Main.get_double_from_obj(this, obj);
+                }
+            }
+
+            if (right_key != null)
+            {
+                object? obj = this.read_var(right_key, "double");
+                if (obj == null)
+                {
+                    right_value = 0;
+                }
+                else
+                {
+                    if (obj.GetType().Name == "Int32" || obj.GetType().Name == "Double")
+                    {
+                        right_value = (double)obj;
+                    }
+                    else if (obj.GetType().Name == "String")
+                    {
+                        string? strTmp = (string?)obj.ToString();
+                        if (strTmp == null)
+                        {
+                            right_value = 0;
+                        }
+                        else
+                        {
+                            right_value = double.Parse(strTmp);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("error" + this.Name);
+                    }
+                }
+            }
+
+
+            if (left_function == "abs")
+            {
+                left_value = Math.Abs(left_value);
+            }
+            if (right_function == "abs")
+            {
+                right_value = Math.Abs(right_value);
+            }
+
+            this.save_var("_left","string", left_value);
+            this.save_var("_right", "string", right_value);
+
+            Main.WriteLine(this, left_value + str_operator + right_value);
+
+            if (str_operator == "" || str_operator == "=")
+            {
+                if (left_value == right_value)
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (str_operator == ">")
+            {
+                if (left_value > right_value)
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (str_operator == ">=")
+            {
+                if (left_value >= right_value)
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (str_operator == "<")
+            {
+                if (left_value < right_value)
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+            else if (str_operator == "<=")
+            {
+                if (left_value <= right_value)
+                {
+                    Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    Next_Step = Node_Next.False;
+                }
+            }
+        }
+
+        public void compare_string()
+        {
+            string? left_value = left;
+            if (left_key != null)
+            {
+                left_value = (string?)this.read_var(left_key, "string");
+            }
+            if (left_value == null) left_value = "";
+
+            string? right_value = right;
+            if (right == null)
+            {
+                right_value = "";
+            }
+            else if (right.StartsWith("@"))
+            {
+                right_value = (string?)this.read_var(right.Substring(1), "string");
+            }
+
+            if (left_value == right_value)
+            {
+                Next_Step = Node_Next.True;
+            }
+            else
+            {
+                Next_Step = Node_Next.False;
+            }
+        }
+    }
+}

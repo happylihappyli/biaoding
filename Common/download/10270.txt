@@ -1,0 +1,80 @@
+﻿
+using MathNet.Numerics.LinearAlgebra.Double;
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    public partial class Form1 : Form
+    {
+		C_Space space = new C_Space();
+		C_Space space2 = new C_Space();
+        C_Space space3 = new C_Space();
+		public string unload_step="";
+		public bool bEnv = false;
+
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        
+        public void clear_module()
+        {
+        }
+
+		
+		//===模块===
+
+
+        public void load_init(C_Space space_parent,C_Space space,string space_name){
+			//===初始化===
+			space.vars.bClosingWindows = false;
+			space.vars.bAutoMode = true;
+			Task.Run(() => {
+				space.检查步骤状态();
+			});
+        }
+		
+		public void set_input(C_Space space, string name, string from,bool true_false=true)
+		{
+			var p1 = space.vars.vars_step[name];
+			var p2 = space.vars.vars_step[from];
+			p1.init_input(p2, true_false);
+		}
+		
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+			Task.Run(() =>
+			{
+			
+//#code
+
+			});
+
+
+            //===调试窗口===
+        }
+
+        
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+			if (this.unload_step!=""){
+				var p1 = space3.vars.vars_step[this.unload_step];
+				p1.Run(null);
+			}
+			Thread.Sleep(500);
+
+			
+			space.vars.bClosingWindows = true;
+			space2.vars.bClosingWindows = true;
+			space3.vars.bClosingWindows = true;
+
+
+			//===unload===
+		}
+    }
+}

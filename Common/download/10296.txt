@@ -1,0 +1,50 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Run_Cmd : C_Node
+    {
+        public string key_read = "";
+        public string control_step = "";
+
+        public S_Run_Cmd(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            List<string>? pList = (List<string>?)this.read_var(this.key_read, "List<string>");
+
+            if (space.vars_step.ContainsKey(this.control_step) == false)
+            {
+                return ;
+            }
+
+            S_Cmd? pCmd=(S_Cmd?)space.vars_step[control_step];// (pTrain, this, this.key_save, "string", output);
+
+            for (var i = 0; i < pList?.Count; i++)
+            {
+                string line = pList[i] + "\n";
+                pCmd?.Send(line);
+                Main.WriteLine(line);
+            }
+
+
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+    
+}

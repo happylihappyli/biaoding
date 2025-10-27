@@ -1,0 +1,74 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 计算卸货的时候抓取的箱子的信息
+    /// </summary>
+    public class Cal_Move_Box_Table: C_Node
+    {
+        public string LA = "-15";
+        public string LB = "15";
+
+        public string RA = "-40";
+        public string RB = "40";
+
+        public string dz = "1";
+        public string camera_index = "";// 当前相机高度，1，2，3，代表上 中 下，3个相机
+
+        public string? key_table { get;  set; }
+
+        public Cal_Move_Box_Table(string name,C_Space space_parent,C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string str_camera_index = this.read_string(this.camera_index);
+
+            Dictionary<string, List<C_BoxInfo>>? dic = 
+                (Dictionary<string, List<C_BoxInfo>>?)this.read_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>");
+
+            if (dic == null)
+            {
+                dic = new Dictionary<string, List<C_BoxInfo>>();
+                this.save_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>", dic);
+            }
+
+            string[] angle = { LA, LB, RA, RB };
+
+            for(var i = 2; i <= 4; i++)
+            {
+                for(var j=0; j< angle.Length; j++)
+                {
+                    string key = angle[j] + "," + i;
+                    string key2 = angle[j] + "," + (i - 1);
+                    if (dic.ContainsKey(key))
+                    {
+                        List<C_BoxInfo> list = dic[key];
+                        dic.Remove(key);
+                        if (dic.ContainsKey(key2)) dic.Remove(key2);
+                        dic.Add(key2, list);
+                    }
+                }
+            }
+            
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

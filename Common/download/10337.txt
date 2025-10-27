@@ -1,0 +1,45 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class F_Next : C_Node
+    {
+        public string wait = "1";
+        public F_Next(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            // this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+            
+        }
+
+        private void run_sub_main()
+        {
+            if (wait != "")
+            {
+                int iWait=this.read_int(wait);
+                Thread.Sleep(iWait);
+            }
+        }
+    }
+}

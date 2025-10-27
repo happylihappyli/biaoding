@@ -1,0 +1,80 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    //读取过滤框
+    public class File_Read_Filter_Box: C_Node
+    {
+        //多边形过滤框变量","var_type":"string"
+        public string key_save = "#过滤多边形";
+        //文件","var_type":"string"
+        public string file = "D:\\data\\{fold}\\cloud_filter_{angle}_{row}.txt";
+
+
+        public string? dir = "@#过滤目录";
+        public string? angle = "@#全局角度";
+        public string? row = "@#行计数器";
+
+
+        public override void init()
+        {
+
+        }
+
+        public File_Read_Filter_Box(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+
+            string? strDir = this.read_string(this.dir);
+            string str_angle = this.read_string(this.angle);
+            if (str_angle == "")
+            {
+                S_TTS.speak_async(this.Name + " 角度 错误");
+                return;
+            }
+            int i_angle = int.Parse(str_angle);
+
+            string str_row = this.read_string(this.row);
+            if (str_row == "")
+            {
+                S_TTS.speak_async(this.Name + " 行计数器 错误");
+                return;
+            }
+            int i_row = int.Parse(str_row);
+
+            string str_file_polygon = file;
+            str_file_polygon = str_file_polygon.Replace("{fold}", strDir + "");
+            str_file_polygon = str_file_polygon.Replace("{angle}", i_angle + "");
+            str_file_polygon = str_file_polygon.Replace("{row}", i_row + "");
+
+            List<C_Point3D>? list_edge = null;
+            if (File.Exists(str_file_polygon))
+            {
+                Main.WriteLine(this, "过滤框：" + str_file_polygon);
+                list_edge = Main.cloud_read(this, str_file_polygon, ",");
+                this.save_var(this.key_save, "List<C_Point3D>", list_edge);
+            }
+            else
+            {
+                string fold_path=Path.GetDirectoryName(str_file_polygon);
+                Directory.CreateDirectory(fold_path);
+                File.WriteAllText(str_file_polygon, "");
+            }
+        }
+
+    }
+}

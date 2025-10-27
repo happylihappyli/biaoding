@@ -1,0 +1,174 @@
+﻿using Common_Robot;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using static Common_Robot.C_Mp3;
+using Test1.Common.Data;
+using System.IO;
+using System.Web;
+
+namespace Test1
+{
+    public partial class Form1 : Form
+    {
+		C_Space space = new C_Space();
+		C_Space space2 = new C_Space();
+        C_Space space3 = new C_Space();
+		public string unload_step="";
+		public bool bEnv = false;
+
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        
+        public void clear_module()
+        {
+        }
+
+		
+		//===模块===
+
+
+        public void load_init(C_Space space_parent,C_Space space,string space_name){
+				//===初始化===
+				space.vars.bClosingWindows = false;
+				space.vars.bAutoMode = true;
+				Task.Run(() => {
+					space.检查步骤状态();
+				});
+        }
+		
+		public void set_input(C_Space space, string name, string from,bool true_false=true)
+		{
+			var p1 = space.vars.vars_step[name];
+			var p2 = space.vars.vars_step[from];
+			p1.init_input(p2, true_false);
+		}
+		
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+		
+			EncodingProvider provider = CodePagesEncodingProvider.Instance;
+			Encoding.RegisterProvider(provider);
+
+			string name = Environment.MachineName;
+			string strFile = Application.StartupPath + "\\set_" + name + ".ini";
+			if (File.Exists(strFile) == false)
+			{
+				string file1 = Application.StartupPath + "\\set.ini";
+				if (File.Exists(file1))
+					File.Copy(file1, strFile);
+			}
+
+			IniFile myIni = new IniFile(strFile);
+			string serial = myIni.ReadString("main", "serial", "");
+			
+			C_Space_Load.form1 = this;
+
+			m1.Path_Main= Application.StartupPath;
+            
+            Label pLabel=new Label();
+			
+			Console.WriteLine("x 正在加载数据");
+			pLabel.Text = "正在加载数据...";
+			pLabel.Location = new Point(200, 200);
+			this.Controls.Add(pLabel);
+
+			space.console.pLog = (ILog)Logger.GetInstance(space);
+            space2.console.pLog = (ILog)Logger.GetInstance(space2);
+            space3.console.pLog = (ILog)Logger.GetInstance(space3);
+
+			S_Form pNode = new S_Form("Form1", space, space2);
+            space.vars.save_vars(null, pNode, "#serial", "string", serial);
+			space2.vars.save_vars(null, pNode, "#serial", "string", serial);
+
+			Task.Run(() =>
+			{
+				space2.vars.copy_from(space,pNode);
+				try
+				{
+					Console.WriteLine("x 正在env");
+					env(space, space2, "env","");
+					Console.WriteLine("x end env");
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show(ex.ToString());
+					Console.WriteLine(ex.ToString());
+				}
+				
+				//if (this.bEnv)
+                {
+                    int iCount = 0;
+                    while (space2.finished == false)
+                    {
+                        iCount++;
+                        if (iCount > 30)
+                        {
+                            break;
+                        }
+                        Thread.Sleep(100);
+                    }
+                    space2.vars.bClosingWindows = true;
+                    space.vars.copy_from(space2,pNode);
+                }
+
+
+				try
+				{
+					space3.vars.save_vars(null, pNode, "#serial", "string",serial);
+					space3.vars.copy_from(space, pNode);
+					Console.WriteLine("x 正在load_init");
+					load_init(space, space3, "main");
+					Console.WriteLine("x end load_init");
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show(ex.ToString());
+					Console.WriteLine(ex.ToString());
+				}
+
+				
+				Action act = delegate ()
+				{
+					this.Controls.Remove(pLabel);
+					this.CenterToScreen();
+				};
+				if (this != null)
+					this.BeginInvoke(act, null);
+
+			});
+
+
+            //===调试窗口===
+        }
+
+        
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+			if (this.unload_step!=""){
+				var p1 = space3.vars.vars_step[this.unload_step];
+				p1.Run(null);
+			}
+			Thread.Sleep(500);
+
+			
+			space.vars.bClosingWindows = true;
+			space2.vars.bClosingWindows = true;
+			space3.vars.bClosingWindows = true;
+
+
+			//===unload===
+		}
+    }
+}

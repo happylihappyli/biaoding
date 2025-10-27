@@ -1,0 +1,328 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System.Diagnostics;
+
+namespace Test1
+{
+
+    public class Cal_Catch_Sucker_B : C_Node
+    {
+        public string key_save = "pPlanet_Top";
+        public string max_ry = "70";
+        public string key_array_main = "mains";
+        public string key_last = "";//上次抓取的面
+
+        public string debug = "1";
+        public string use_last = "0";
+        public string calculate_type = "x";
+        public string z_min = "-1680";
+        public string key_cloud_save = "";//抓取面所对应的箱子点云
+        
+
+        public List<C_Data> not_move;
+        public C_Train pTrain_Old = null;
+        public C_Train pTrain_Finished = null;
+
+        public string key_save_len1 = "";
+        public string key_save_len2 = "";
+        public string key_robot = "";
+        public string file = "";//机器人旋转轴文件
+        public string angle_dif = "0";
+        public string key_sucker1 = "吸盘1";//吸盘变量1
+        public string key_sucker2 = "吸盘2";//吸盘变量1
+        public string key_sucker3 = "吸盘2";//吸盘变量1
+        public string y_min= "-870";
+        public string sucker_y_span="193";
+        public string key_planets;
+        public string key_list_data = "";
+        public string key_missing = "";//是否有遗漏的，保存变量
+
+        public Cal_Catch_Sucker_B(
+            string name,
+            C_Space space_parent,
+            C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string type =this.read_string(this.calculate_type);
+            run_sub_main1(type);
+        }
+
+
+
+        private void run_sub_main1(string direction)
+        {
+
+            List<C_Data> list_data4 = (List<C_Data>)this.read_var(this.key_list_data, "List<C_Data>");
+
+            int[] 吸盘 = { 1, 0, 0 };
+
+            List<C_Data> list_data_catch = new List<C_Data>();//按照法向量过滤，默认一般是x方向
+            //横过来找右边第二个，第三个箱子....
+            for (var i = 0; i < list_data4.Count; i++)
+            {
+                C_Data pData_Catch = list_data4[i];//选择第一个
+                if (pData_Catch.bFilter == false && pData_Catch.planet != null)
+                {
+                    list_data_catch.Add(pData_Catch);
+                }
+            }
+
+
+            if (list_data_catch.Count==0)
+            {
+                this.remove_var(this.key_cloud_save, "List<C_Point3D>");
+                S_TTS.speak_async(this.Name+ " No,No,No 方向：" + direction);
+                Main.WriteLine(this, " No,No,No 方向：" + direction);
+                this.Next_Step = Node_Next.False;
+            }
+            else
+            {
+                C_Data pData_Catch = list_data_catch[0];
+
+                List<C_Planet_Catch> list_draw = new List<C_Planet_Catch>();//要抓取的3个（最多3个）
+                List<C_Planet_Catch> list_draw2 = new List<C_Planet_Catch>();//条件更松一些，同一行的都放进来
+                list_draw.Add(pData_Catch.planet);
+                list_draw2.Add(pData_Catch.planet);
+
+                C_Data pData_Catch2 = null; //第二个吸取位置
+                for (var i =1; i < list_data_catch.Count; i++)
+                {
+                    pData_Catch2 = list_data_catch[i];//选择第2个
+                    if (Math.Abs(pData_Catch.planet.arm_a.x - pData_Catch2.planet.arm_a.x)<50)
+                    {
+                        if (Math.Abs(pData_Catch.planet.arm_a.z - pData_Catch2.planet.arm_a.z) < 50)
+                        {
+                            double y1 = pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy;
+                            double y2 = pData_Catch.planet.arm_a.y - pData_Catch.planet.dy;
+                            if (y1 > y2 - 193 * 2.3333 ) // && y1 < y2 - 193 * 1)
+                            {
+                                list_draw.Add(pData_Catch2.planet);
+                            }
+
+                            list_draw2.Add(pData_Catch2.planet);
+                        }
+                    }
+                }
+
+                string str_y_min = this.read_string(this.y_min);
+                double db_y_min = double.Parse(str_y_min);//-670
+
+                if (pData_Catch.planet.arm_a.y > db_y_min) //如果是左边
+                {
+                    //A-B-C 三个分区，盒子中心位置A-B，记为L1,B-C记为L2，现在用L1,L2表示主要特征
+                    if (list_draw.Count == 2)
+                    {
+                        pData_Catch2 = list_data_catch[1];//选择第2个
+                        吸盘[1] = 1;
+                        吸盘[2] = 1;
+                        float y1 = pData_Catch.planet.arm_a.y - pData_Catch.planet.dy;
+                        float y2 = pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy;
+                        float y3 = (y1+y2 ) / 2;
+                        //float y2 = (pData_Catch.planet.arm_a.y + pData_Catch2.planet.arm_a.y) / 2;
+                        pData_Catch.planet.arm_a.y = y3 ;
+                        if (direction == "z")
+                        {
+                            //
+                            pData_Catch.planet.arm_a.z -= 10;
+                        }
+
+                        //Main.save_cloud("D:\\cloud\\g1\\@.txt", pData_Catch.list_3D_Point_arm);
+                        //Main.save_cloud("D:\\cloud\\g2\\@.txt", pData_Catch2.list_3D_Point_arm);
+                    }
+                    else if (list_draw.Count == 1)
+                    {
+                        //如果只有一个箱子，用AB分区的中心来吸取箱子中心，原先计算是A的中心，所以要左移 193 / 2
+                        吸盘[1] = 1;
+                        吸盘[2] = 0;
+                        pData_Catch.planet.arm_a.y += 193 / 2;
+                        //Main.save_cloud("D:\\cloud\\g1\\@.txt", pData_Catch.list_3D_Point_arm);
+                    }
+                    else
+                    {
+                        Main.WriteLine("D");
+                        Debugger.Break();
+                    }
+                }
+                else
+                {
+                    Main.WriteLine("最右边，要撞右边墙！");
+                }
+
+
+                this.save_var(this.key_planets, "List<C_Planet_Catch>", list_draw);
+                if (list_draw2.Count>list_draw.Count)
+                {
+                    this.save_var(this.key_missing, "string", "1");
+                }
+                else
+                {
+                    this.save_var(this.key_missing, "string", "0");
+                }
+
+                C_Planet_Catch pCatch = pData_Catch.planet;
+                C_Robot pRobot = (C_Robot)this.read_var(this.key_robot, "C_Robot");
+
+                C_Point3D A_new = pCatch.arm_a;
+
+                C_Point3D B_new;
+                if (direction == "x")
+                {
+                    B_new = pCatch.arm_a.add(new C_Point3D(-264, 0, 0));//AB=264     pCatch.arm_b;
+                }
+                else if (direction == "z")
+                {
+                    B_new = pCatch.arm_a.add(new C_Point3D(0, 0, 264));//AB=264     pCatch.arm_b;
+                }
+                else
+                {
+                    B_new= pCatch.arm_b;
+                }
+
+                float sucker_y_span = float.Parse(this.sucker_y_span);//193
+
+                //如果超出范围，左移一个分区
+
+                double max = -193;
+                for(var i=0;i< list_draw2.Count; i++)
+                {
+                    var item= list_draw2[i];
+                    if (item.dy > max)
+                    {
+                        max = item.dy;
+                    }
+                }
+
+
+                if (max >= 0)
+                {
+                    吸盘[2] = 吸盘[1];
+                    吸盘[1] = 吸盘[0];
+                    吸盘[0] = 1;
+                    if (max >= 193)
+                    {
+                        吸盘[2] = 吸盘[1];
+                        吸盘[1] = 吸盘[0];
+                        吸盘[0] = 1;
+                        if (list_draw.Count == 1)
+                        {
+                            Console.WriteLine("D");
+                        }
+                    }
+                }
+
+                //保存吸盘状态到变量
+                {
+                    this.save_var(key_sucker1, "", 吸盘[0] + "");
+                    this.save_var(key_sucker2, "", 吸盘[1] + "");
+                    this.save_var(key_sucker3, "", 吸盘[2] + "");
+                }
+
+                Task.Run(() =>
+                {
+                    Thread.Sleep(3000);
+                    Main.show_tip("吸盘位置" , 吸盘[0] + "," + 吸盘[1] + "," + 吸盘[2]);
+                });
+
+
+                //这个吸盘最多吸2个
+                List<C_Point3D> list_new = Main.生成点云(A_new, direction);
+                C_Point3D D = C_Planet_Catch.计算D坐标(pRobot, B_new);
+
+                this.save_var(this.key_cloud_save, "List<C_Point3D>", list_new);// pData_Catch.list_3D_Point_arm);
+                this.save_var(this.key_save, "C_Planet_Catch", pData_Catch.planet);
+
+
+                (C_Result pResult,_ ,_) = Main.根据坐标计算6轴角度(space,
+                    this, pRobot, pCatch.Group_ID, A_new, B_new, D, list_new, this.file, this.angle_dif);
+
+                (_, double len1, double len2) = Main.根据坐标计算6轴角度(space,
+                    this, pRobot, pCatch.Group_ID, A_new, B_new, D, pData_Catch.list_3D_Point_arm, this.file, this.angle_dif);
+                //if (len2 < 250)
+                //{
+                //    Console.WriteLine("D");
+
+                //    pData_Catch.planet.arm_a.y -= 193 / 2;
+
+                //    string value = (string)this.read_var("#放置高度1", "");
+                //    this.save_var("#放置高度", "", value);
+                //}
+
+                if (key_save_len1 != "")
+                {
+                    this.save_var(key_save_len1, "double", len1);
+                    this.save_var(key_save_len2, "double", len2);
+                }
+
+                if (pData_Catch2 != null)
+                {
+                    (C_Result pResult2, double len1B, double len2B) = Main.根据坐标计算6轴角度(space,
+                        this, pRobot, pData_Catch2.Group_ID, A_new, B_new, D, pData_Catch2.list_3D_Point_arm, this.file, this.angle_dif);
+                    //if (len2B < 250)
+                    //{
+                    //    Console.WriteLine("D");
+                    //    pData_Catch.planet.arm_a.y -= 193 / 2;
+                    //    string value = (string)this.read_var("#放置高度1", "");
+                    //    this.save_var("#放置高度", "", value);
+                    //}
+
+                }
+
+                pData_Catch.list_3D_Point_arm = list_new;// 点云处理(pData_Catch.list_3D_Point_arm);
+
+                Main.WriteLine(this, " Train.ID=" + pTrain.get_ID() + " 保存抓取面=" + this.key_save + "===" + pData_Catch.planet.center.ToString());
+
+                bool bRecord = false;
+                C_Planet_Catch pLast = (C_Planet_Catch)this.read_var(this.key_last, "C_Planet_Catch");
+                if (pLast!=null)
+                {
+                    if (pData_Catch.planet.arm_a.z < pLast.arm_a.z + 50)
+                    {
+                        bRecord = true;
+                    }
+                }
+                else
+                {
+                    bRecord = true;
+                }
+                if (bRecord)
+                {
+                    this.save_var(this.key_last, "C_Planet_Catch", pData_Catch.planet);
+                }
+                this.Next_Step = Node_Next.True;
+            }
+        }
+
+
+        public bool check_finished(List<C_Space> spaces)
+        {
+            for (var i = 0; i < spaces.Count; i++)
+            {
+                var space2 = spaces[i];
+                if (space2 != null && space2.finished == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public void init()
+        {
+        }
+    }
+}

@@ -1,0 +1,112 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class File_Delete : C_Node
+    {
+        public string file = "";
+        public string folder_name = "";
+        public string extension = "";
+
+
+        public File_Delete(string name,C_Space space_parent, C_Space space) :
+            base(name,space_parent,space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            string file2 = this.read_string(file);
+            if (file2 != "")
+            {
+                File.Delete(file2);
+            }
+
+            string str_fold = this.read_string(folder_name);
+            string str_extension = this.read_string(extension);
+            if (str_fold != "")
+            {
+                FileHelper.DeleteSpecificFilesInDir(str_fold, str_extension);
+            }
+        }
+    }
+
+    public class FileHelper
+    {
+        /// <summary>
+        /// 获取当前目录下的所有文件（不含子目录下的文件）
+        /// </summary>
+        /// <param name="floderPath">目录路径</param>
+        /// <returns>返回当前目录下的所有文件</returns>
+        public static FileInfo[] GetAllFileNoSubDir(string floderPath)
+        {
+            if (string.IsNullOrEmpty(floderPath)) return null;
+
+            DirectoryInfo fdir = new DirectoryInfo(floderPath);
+            FileInfo[] fileInfos = fdir.GetFiles();
+            return fileInfos;
+        }
+
+
+        /// <summary>
+        /// 异步删除指定目录下的指定扩展名的文件,返回成功删除文件的数量
+        /// </summary>
+        /// <param name="floderPath">目录地址</param>
+        /// <param name="extension">扩展名</param>
+        /// <returns></returns>
+        public static async Task<int> DeleteSpecificFilesInDirAsync(string floderPath, string extension)
+        {
+            if (string.IsNullOrEmpty(floderPath)) return 0;
+            int deleteCnt = 0;
+            deleteCnt = await Task<int>.Run(() =>
+            {
+                int i = 0;
+                DirectoryInfo fdir = new DirectoryInfo(floderPath);
+                FileInfo[] fileInfos = fdir.GetFiles();
+                foreach (var ele in fileInfos)
+                {
+                    if (ele.Extension == extension)
+                    {
+                        ele.Delete();
+                        i++;
+                    }
+                }
+                return i;
+            });
+
+            return deleteCnt;
+        }
+
+        /// <summary>
+        /// 同步删除指定目录下的指定扩展名的文件
+        /// </summary>
+        /// <param name="floderPath">目录地址</param>
+        /// <param name="extension">扩展名</param>
+        /// <returns></returns>
+        public static void DeleteSpecificFilesInDir(string floderPath, string extension)
+        {
+            if (string.IsNullOrEmpty(floderPath)) return;
+            DirectoryInfo fdir = new DirectoryInfo(floderPath);
+            FileInfo[] fileInfos = fdir.GetFiles();
+            foreach (var ele in fileInfos)
+            {
+                if (ele.Extension == extension)
+                {
+                    ele.Delete();
+                }
+            }
+        }
+
+    }
+
+}

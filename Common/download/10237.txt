@@ -1,0 +1,55 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class S_Set_Rects : C_Node
+    {
+        private string _json = "";        //[[[10,10],[100,100]],[[50,50],[100,100]]]
+        public string key_saves = "";   //a,b,c可以设置多个key
+
+        public string json { get => _json; set => _json = value; }
+
+        public S_Set_Rects(string name, C_Space space_parent, C_Space space) : base(name, space_parent,space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            JArray array = JArray.Parse(_json);
+
+            string[] strSplit = this.key_saves.Split(",");
+
+            for(var i=0;i<Math.Min(array.Count,strSplit.Length);i++)
+            {
+                JArray item= (JArray)array[i];
+                string key_save = strSplit[i];
+
+                JArray p1 = (JArray)item[0];
+                JArray p2 = (JArray)item[1];
+
+                float x1 = float.Parse(p1[0].ToString());
+                float y1 = float.Parse(p1[1].ToString());
+                float x2 = float.Parse(p2[0].ToString());
+                float y2 = float.Parse(p2[1].ToString());
+
+                C_Rect pRect1 = new C_Rect(new C_Point3D(x1, y1, 0), new C_Point3D(x2, y2, 0));
+
+                this.save_var(key_save, "C_Rect", pRect1);
+            }
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

@@ -1,0 +1,51 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Gen_Boxs : C_Node
+    {
+        public string x_len = "0";
+        public string y_len = "0";
+        public string z_len = "0";
+        public string count = "100";
+        public string key_save = "";
+
+        public S_Gen_Boxs(string name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_x_len = space.tools.var_read(pTrain, this, this.x_len);
+            string str_y_len = space.tools.var_read(pTrain, this, this.y_len);
+            string str_z_len = space.tools.var_read(pTrain, this, this.z_len);
+
+            int i_x_len = int.Parse(str_x_len);
+            int i_y_len = int.Parse(str_y_len);
+            int i_z_len = int.Parse(str_z_len);
+
+            List<C_Box_Type> list = new List<C_Box_Type>();
+
+
+            C_Box_Type type = new C_Box_Type(0, 0, i_x_len, i_y_len, i_z_len, 0);
+            type.count=int.Parse(this.count);
+            list.Add(type);
+            this.save_var(this.key_save, "List<C_Box_Type>", list);
+        }
+
+        public void init()
+        {
+        }
+    }
+
+}

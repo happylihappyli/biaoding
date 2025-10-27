@@ -1,0 +1,41 @@
+﻿
+using Common_Robot2;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //上取整函数","inPorts": ["in"],"outPorts": ["out"],"image_url": "","image": "","content":"说明信息"}
+    public class Cal_Ceiling: C_Node
+    {
+        //"读取的数字变量","var_type":"string","required":"1","var":"1","type_group":"","help": ""}
+        public string key_read = "";
+        //"保存的数字变量"
+        public string key_save = "";
+
+        
+        public override void init()
+        {
+
+        }
+
+        public Cal_Ceiling(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string num = this.read_string("@" + this.key_read);
+            double db_num = double.Parse(num);
+            this.save_var(this.key_save, "string", Math.Ceiling(db_num));
+        }
+
+    }
+}

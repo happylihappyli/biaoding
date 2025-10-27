@@ -1,0 +1,1497 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Diagnostics;
+
+namespace Test1
+{
+
+    public class Cal_Catch_Sucker_LB : C_Node
+    {
+        public string key_save = "pPlanet_Top";
+        public string key_array_main = "mains";
+        public string key_last = "";//上次抓取的面
+        public string key_angle = "#全局角度";//全局角度
+        public string key_z = "#抓取坐标z";//#抓取坐标z,上次抓取的位置的z（最左边的抓取位置的z分量的变量）
+
+        public string calculate_type = "x";
+        public string key_cloud_save = "";//抓取面所对应的箱子点云
+        
+        public string key_save_len1 = "";
+        public string key_save_len2 = "";
+        public string key_robot = "";
+        public string file = "";//机器人旋转轴文件
+        public string angle_dif = "0";
+        public string key_sucker1 = "吸盘1";//吸盘变量1
+        public string key_sucker2 = "吸盘2";//吸盘变量1
+        public string key_sucker3 = "吸盘2";//吸盘变量1
+        public string sucker_y_span = "193";
+        public string? key_planets;
+        public string key_list_data = "";
+        public string key_missing = "";//是否有遗漏的，保存变量
+        public float delta_z_thres = 7;
+
+        public string y_min = "-870";
+        public string y_max = "870";
+        public string key_sum_move_len = "";
+        public string key_move_len = "";
+        public string dy="-10";
+        public string? key_cloud;
+
+        public string? key_read { get;  set; }
+
+        public Cal_Catch_Sucker_LB(
+            string name,
+            C_Space space_parent,
+            C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string type =this.read_string(this.calculate_type);
+            run_sub_main1(type);
+        }
+
+
+        private void run_sub_main1(string direction)
+        {
+            int minDZ = 100; // 吸盘分区高度的一半
+            int minDZ2 = -30; //左边箱子z的下边界不能比右边箱子z的下边界低太多，最多-30
+
+            string str_angle = this.read_string("@" + key_angle);
+            double angle = double.Parse(str_angle);
+
+            List<C_Data>? list_data4 = (List<C_Data>?)this.read_var(this.key_list_data, "List<C_Data>");
+            
+
+            if (list_data4 == null || list_data4.Count==0)
+            {
+                S_TTS.speak_async(this.Name + " key_list_data 为空");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            int[] 吸盘 = { 1, 0, 0 };
+
+
+            List<C_Data> list_result = new List<C_Data>();//最后准备抓取的箱子，ID
+            List<C_Data> list_data_catch = new List<C_Data>();//按照法向量过滤，默认一般是x方向
+            //横过来找右边第二个，第三个箱子....
+            for (var i = 0; i < list_data4.Count; i++)
+            {
+                C_Data pData_Catch = list_data4[i];//选择第一个
+                if (pData_Catch.bFilter == false && pData_Catch.planet != null)
+                {
+                    list_data_catch.Add(pData_Catch);
+                }
+            }
+
+            string str_ids = "";
+            if (list_data_catch.Count==0)
+            {
+                this.remove_var(this.key_cloud_save, "List<C_Point3D>");
+                S_TTS.speak_async(this.Name+ " No,No,No 方向：" + direction);
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            else
+            {
+                Main.WriteLine(this, "list_data_catch");
+                str_ids = "";
+                for (var i = 0; i < list_data_catch.Count; i++)
+                {
+                    C_Data pCatch2 = list_data_catch[i];
+                    str_ids += pCatch2.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+
+
+                List<C_Data> list_data_catch3 = new List<C_Data>();
+                double db_delta_height = 7; //高度差最大
+
+                {
+                    list_data_catch3 = list_data_catch;
+                }
+
+
+                if (list_data_catch3.Count == 0)
+                {
+                    Main.WriteLine(this, "list_data_catch3.Count == 0！");
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+
+                Main.WriteLine(this, "list_data_catch3");
+                str_ids = "";
+                for (var i = 0; i < list_data_catch3.Count; i++)
+                {
+                    C_Data pCatch2 = list_data_catch3[i];
+                    str_ids += pCatch2.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+
+
+
+                C_Data pData_Catch = list_data_catch3[0];
+                List<C_Data> list_tmp = new List<C_Data>();//要抓取的3个（最多3个）
+                List<C_Planet_Catch> list_draw2 = new List<C_Planet_Catch>();//条件更松一些，同一行的都放进来
+                
+                list_draw2.Add(pData_Catch.planet);
+                List<C_Point3D>? list_3d_point_arm = (List<C_Point3D>?)this.read_var(key_cloud, "List<C_Point3D>");
+                if (list_3d_point_arm == null)
+                {
+                    S_TTS.speak_async(this.Name + " 点云为空！");
+                    return;
+                }
+
+                float z_max = pData_Catch.pBoxInfo.z_max;//最右边这个，z最大值
+                float z_min = pData_Catch.pBoxInfo.z_min + 20;//最右边这个，z最小值,2cm是误差范围
+                float y_max = pData_Catch.pBoxInfo.y_min;
+                float y_min = pData_Catch.pBoxInfo.y_min - 100; //吸盘抓边上会往右拉 100 mm
+                float x_min = pData_Catch.pBoxInfo.x_min - 100;
+                float x_max = pData_Catch.pBoxInfo.x_min + 100;
+
+                {
+                    list_tmp.Add(pData_Catch);
+                }
+
+                for (var i =1; i < list_data_catch3.Count; i++)
+                {
+                    C_Data pData_Catch2 = list_data_catch3[i];//选择第2个
+                    if (Math.Abs(pData_Catch.planet.arm_a.x - pData_Catch2.planet.arm_a.x)< Main.x_distance)
+                    {
+                        if (Math.Abs(pData_Catch.planet.arm_a.z - pData_Catch2.planet.arm_a.z) < 150)
+                        {
+                            double y1 = pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy;
+                            double y2 = pData_Catch.planet.arm_a.y - pData_Catch.planet.dy;
+
+                            if (direction == "z")
+                            {
+                                if (Math.Abs(y1 - y2) < 193 * 2.3333 )
+                                {
+                                    list_tmp.Add(pData_Catch2);
+                                }
+                            }
+                            else
+                            {
+                                double dz = pData_Catch.pBoxInfo.center.z - pData_Catch2.pBoxInfo.z_min;
+                                double dz2 = pData_Catch2.pBoxInfo.z_min - pData_Catch.pBoxInfo.z_min;
+                                Main.WriteLine("dz=" + dz);
+                                Main.WriteLine("dz2=" + dz2);
+                                if (Math.Abs(y1 - y2) < 193 * 2.3333 && dz > minDZ && dz2 > minDZ2)
+                                {
+                                    list_tmp.Add(pData_Catch2);
+                                }
+                            }
+
+                            list_draw2.Add(pData_Catch2.planet);
+                        }
+                    }
+                }
+
+
+                list_tmp.Sort(delegate (C_Data p1, C_Data p2)
+                {
+                    //先比较z
+                    double d1 = Math.Round(p1.planet.arm_a.z);
+                    double d2 = Math.Round(p2.planet.arm_a.z);
+                    if (Math.Abs(d1 - d2) < 100)
+                    {   //先比较z
+                        d1 = Math.Round(p1.planet.arm_a.x);
+                        d2 = Math.Round(p2.planet.arm_a.x);
+                        if (Math.Abs(d1 - d2) < 100)
+                        {   //如果z一样，就比较y  
+                            d1 = p1.planet.arm_a.y - p1.planet.dy;
+                            d2 = p2.planet.arm_a.y - p2.planet.dy;
+                            return Math.Sign(d2 - d1);//y从大到小
+                        }
+                        else
+                        {
+                            return Math.Sign(d2 - d1);//x从小到大
+                        }
+                    }
+                    else
+                    {
+                        return Math.Sign(d2 - d1);//z从大到小
+                    }
+                });
+
+
+                if (list_tmp.Count > 0)
+                {
+                    pData_Catch = list_tmp[0];
+                }
+
+                double? db_left = 0;
+                if (pData_Catch.vars.ContainsKey("*点云y最大值"))
+                {
+                    db_left = (double?)pData_Catch.vars["*点云y最大值"].pObj;
+                }
+
+                List <C_Planet_Catch> list_draw = new List<C_Planet_Catch>();//要抓取的3个（最多3个）
+
+                Main.WriteLine(this, "======================== list_draw2");
+                
+                for (var i = 0; i < list_draw2.Count; i++)
+                {
+                    C_Planet_Catch pCatch2 = list_draw2[i];
+                    str_ids += pCatch2.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+
+                Main.WriteLine(this, "======================== list_tmp");
+                str_ids = ""; 
+                for (var i = 0; i < list_tmp.Count; i++)
+                {
+                    C_Data pCatch2 = list_tmp[i];
+                    list_draw.Add(pCatch2.planet);
+                    str_ids += pCatch2.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+
+                string str_y_min = this.read_string(this.y_min);
+                double db_y_min =  double.Parse(str_y_min);
+                string str_y_max = this.read_string(this.y_max);
+                double db_y_max = float.Parse(str_y_max);
+                double db_dy = float.Parse(this.dy);
+
+                if (db_left != null)
+                {
+                    db_y_max = (double)db_left - 300 + db_dy;
+                }
+                int 偏移 = 0;
+                int delta_count = 0;
+
+
+
+                {//A-B-C 三个分区，盒子中心位置A-B，记为L1,B-C记为L2，现在用L1,L2表示主要特征
+                    if (list_draw.Count >= 3)
+                    {
+                        delta_count = 抓取3个(list_result, 吸盘,list_draw,pData_Catch,direction,angle);
+                        //if (angle==db_angle_left) 
+                        偏移 = -1;
+                    }
+                    else if (list_draw.Count == 2)
+                    {
+                        (delta_count,偏移) = 抓取2个(list_result,吸盘, list_tmp, pData_Catch, direction, angle);
+                        偏移 = -1;
+                    }
+                    else if (list_draw.Count == 1)
+                    {
+                        吸盘[0] = 0;
+                        吸盘[1] = 0;
+                        吸盘[2] = 0;
+
+                        if (pData_Catch.planet.dy == -193)
+                        {
+                            {
+                                吸盘[0] = 1;
+                                pData_Catch.sucker.Add(0);
+                            }
+                            list_result.Add(pData_Catch);
+                        }
+                        else if (pData_Catch.planet.dy == 0)
+                        {
+                            吸盘[1] = 1;
+                            pData_Catch.sucker.Add(1);
+                            list_result.Add(pData_Catch);
+                        }
+                        else if (pData_Catch.planet.dy == 193)
+                        {
+                            吸盘[2] = 1;
+                            pData_Catch.sucker.Add(2);
+                            list_result.Add(pData_Catch);
+                        }
+                        else if(pData_Catch.planet.dy < -193)
+                        {
+                            吸盘[0] = 1;
+                            pData_Catch.sucker.Add(0);
+                            list_result.Add(pData_Catch);
+                        }
+                        else
+                        {
+                            Debugger.Break();
+                        }
+                        偏移 = -1;
+                    }
+                    else
+                    {
+                        //没有需要抓取的
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                }
+
+
+                //list_result 是所有要抓取的面的信息
+                偏移 = -1;
+                if (偏移 == -1)
+                {
+                    //如果要往中间偏移，看看是否有箱子阻挡偏移
+
+                    Dictionary<int, C_Data> dic_result = new Dictionary<int, C_Data>();
+                    for (var i = 0; i < list_result.Count; i++)
+                    {
+                        C_Data pData = list_result[i];
+                        dic_result.Add(pData.Group_ID, pData);
+                    }
+
+
+                    //所有不在 list_result 的箱子放到 list_box
+                    List<C_BoxInfo>? list_all_box = (List<C_BoxInfo>?)this.read_var(this.key_read, "List<C_BoxInfo>");
+                    if (list_all_box == null)
+                    {
+                        Main.WriteLine(this, "box信息没有");
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                    Main.WriteLine(this, "============= list_all_box  =============");
+                    List<C_BoxInfo> list_box = new List<C_BoxInfo>();
+                    str_ids = "";
+                    for (var i = 0; i < list_all_box.Count; i++)
+                    {
+                        C_BoxInfo box = list_all_box[i];
+                        str_ids += box.Group_ID + ",";
+                        if (dic_result.ContainsKey(box.Group_ID)==false)
+                        {
+                            list_box.Add(box);
+                        }
+                    }
+                    Main.WriteLine(this, str_ids);
+                    //然后看看下边界是否会撞到某个箱子，如果撞到就去掉这个箱子，以及去掉这个吸盘的状态。
+
+
+                    for (var j = list_result.Count-1; j>=0; j--)
+                    {
+                        C_Data pData = list_result[j];
+                        C_BoxInfo box_move = pData.pBoxInfo;
+                        Main.WriteLine(this, "box_move=" + box_move.Group_ID);
+                        Main.WriteLine(box_move.Group_ID + ";  z=" + box_move.z_min + "," + box_move.z_max + ";y=" + box_move.y_min + "," + box_move.y_max + ";x=" + box_move.x_min + "," + box_move.x_max);
+                        compare_box(list_box, box_move, list_result,pData,ref 吸盘);
+
+                        if (box_move.extend == null)
+                        {
+                            continue;
+                        }
+                        box_move = box_move.extend;
+                        Main.WriteLine(this, "box_move=" + box_move.Group_ID);
+                        Main.WriteLine(box_move.Group_ID + ";  z=" + box_move.z_min + "," + box_move.z_max + ";y=" + box_move.y_min + "," + box_move.y_max + ";x=" + box_move.x_min + "," + box_move.x_max);
+                        compare_box(list_box, box_move, list_result, pData, ref 吸盘);
+
+                    }
+                    if (list_result.Count == 0)
+                    {
+                        Main.WriteLine(this, "碰撞过滤掉了！");
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                }
+
+                Main.WriteLine(this, "list_result===");
+                str_ids = "";
+                for (var i = 0; i < list_result.Count; i++)
+                {
+                    C_Data pData = list_result[i];
+                    str_ids += pData.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+
+
+
+                this.save_var(this.key_planets, "List<C_Planet_Catch>", list_draw);
+                string missing = "0";
+                if (list_draw2.Count > list_draw.Count) missing = "1";
+                if (delta_count>0) missing = "1";
+
+                if (missing == "0")
+                {
+                    if (this.contain_var(this.key_z,"string"))
+                    {
+                        string str_z = this.read_string("@"+this.key_z);
+                        double db_z = str_z == "" ? 0 : double.Parse(str_z);// Main.get_double_from_obj(this,obj_z==null?0:obj_z);
+                        if (pData_Catch.planet.arm_a.z - db_z > 50)
+                        {
+                            missing = "1";
+                        }
+                    }
+                }
+
+                this.save_var(this.key_missing, "string", missing);
+
+                C_Planet_Catch pCatch = pData_Catch.planet;
+                C_Robot? pRobot = (C_Robot?)this.read_var(this.key_robot, "C_Robot");
+                C_Point3D A_new = pData_Catch.planet.arm_a;
+                C_Point3D B_new= pCatch.arm_b;
+
+
+                if (A_new.y < 400)
+                {
+                    偏移 = 0;
+                }
+
+                this.save_var("#是否往中间偏移", "string", 偏移 + "");
+
+
+
+                float sucker_y_span = float.Parse(this.sucker_y_span);//193
+                if (A_new.y > db_y_max)
+                {
+                    A_new.y = (float)db_y_max;// - 10;
+                    B_new.y = (float)db_y_max;// - 10;
+                }
+                //else
+                //{
+                //    if (A_new.y < db_y_min)
+                //    {
+                //        A_new.y = (float)db_y_min;// + 10;
+                //        B_new.y = (float)db_y_min;// + 10;
+                //    }
+                //}
+
+                //抓取位置如果不在左边
+                for (var i = 0; i < 2; i++)
+                {
+                    if (吸盘[2] == 1)
+                    {
+                        continue;
+                    }
+                    if (A_new.y < 0)
+                    {
+                        吸盘[2] = 吸盘[1];
+                        吸盘[1] = 吸盘[0];
+                        吸盘[0] = 0;
+                        A_new.y += 200;
+                        B_new.y += 200;
+                        pData_Catch.planet.dy += 200;
+                    }
+                }
+                if (y_max < 200 * 4)
+                {
+                    偏移 = 0;
+                    this.save_var("#是否往中间偏移", "string", 偏移 + "");
+                }
+
+
+                {//保存吸盘状态到变量
+                    this.save_var(key_sucker1, "", 吸盘[0] + "");
+                    this.save_var(key_sucker2, "", 吸盘[1] + "");
+                    this.save_var(key_sucker3, "", 吸盘[2] + "");
+                }
+
+
+
+                double directx_x_min = 1050;
+                double directx_x_max = 1800;
+                double directx_x_move = 1100;
+                double directz_z_min = -600;
+
+                if (direction == "z" && A_new.z < directz_z_min)
+                {
+                    directx_x_min = 1200;// 1200;
+                    directx_x_max = 1800;// 1300;
+                    directx_x_move = 1250;
+                }
+
+
+                {
+                    double car_move_len = 0;
+                    if (A_new.x > directx_x_max && A_new.x < 2000)
+                    {
+                        car_move_len = Math.Round(A_new.x - directx_x_move);
+                        get_save_sum_move(car_move_len);
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                    if (A_new.x < directx_x_min)
+                    {
+                        car_move_len = Math.Round(A_new.x - directx_x_move);
+                        get_save_sum_move(car_move_len);
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                }
+
+
+
+                //这个吸盘最多吸3个
+                List<C_Point3D> list_new = Main.生成点云(A_new, direction);
+                if (list_new.Count == 0)
+                {
+                    Main.WriteLine(this,"点云个数=0");
+                    S_TTS.speak_async("点云个数=0");
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+                C_Point3D? D = C_Planet_Catch.计算D坐标(pRobot, B_new);
+                if (D == null)
+                {
+                    Main.WriteLine(this, "点云个数=0");
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+                pData_Catch.list_3D_Point_arm = list_new;
+
+                this.save_var(this.key_cloud_save, "List<C_Point3D>", list_new);
+                this.save_var(this.key_save, "C_Planet_Catch", pData_Catch.planet);
+
+                double db_angle_dif = double.Parse(this.read_string(this.angle_dif));
+
+                (C_Result pResult,double len1,double len2) = Main.根据坐标计算6轴角度(
+                    direction, false, space,this, pRobot, pCatch.Group_ID,
+                    A_new, B_new, D, list_new, this.file, db_angle_dif);
+
+                if (this.key_save_len1 != "")
+                {
+                    this.save_var(this.key_save_len1, "", len1 + "");
+                    this.save_var(this.key_save_len2, "", len2 + "");
+                }
+                if (pTrain != null)
+                {
+                    Main.WriteLine(this, " Train.ID=" + pTrain.get_ID() + " 保存抓取面=" + this.key_save + "===" + pData_Catch.planet.center.ToString());
+                }
+                string? finished = (string?)this.read_var("_finished", "string");
+
+                if (finished == "1")
+                {
+                    S_TTS.speak_async("已用");
+                    this.Next_Step = Node_Next.False;
+                }
+                else
+                {
+                    bool bRecord = true;
+                    C_Planet_Catch? pLast = (C_Planet_Catch?)this.read_var(this.key_last, "C_Planet_Catch");
+                    if (pLast!=null)
+                    {
+                        if (pData_Catch.planet.arm_a.z >= pLast.arm_a.z + 50)
+                        {
+                            bRecord = false;
+                        }
+                    }
+                    if (bRecord)
+                    {
+                        this.save_var(this.key_last, "C_Planet_Catch", pData_Catch.planet);
+                    }
+                    this.Next_Step = Node_Next.True;
+                }
+            }
+        }
+
+        public void compare_box(List<C_BoxInfo> list_box, C_BoxInfo box_move, List<C_Data> list_result, C_Data pData,ref int[] 吸盘)
+        {
+            for (var i = 0; i < list_box.Count; i++)
+            {
+                C_BoxInfo box = list_box[i];
+                if (box_move.Group_ID == box.Group_ID)
+                {
+                    continue;  //不和自己对比
+                }
+                if (box_move.extend?.Group_ID == box.Group_ID)
+                {
+                    continue;  //不和自己另一面对比
+                }
+                Main.WriteLine(box.Group_ID + ";  z=" + box.z_min + "," + box.z_max + ";y=" + box.y_min + "," + box.y_max + ";x=" + box.x_min + "," + box.x_max);
+                //如果有一个盒子在box_move 的z_min，z_max 之间，并且在右边不远的地方
+
+                double box_z_max = box.z_max - 30;
+                double box_x_max = box.x_max + 30;
+
+                if (box_move.z_min < box_z_max && box_z_max <= box_move.z_max)
+                {
+                    //，并且在右边
+                    if (box.y_min < box_move.y_min)
+                    {
+                        double dy = Math.Abs(box_move.y_min - box.y_max);
+                        if (dy < 100)
+                        {
+                            if (box_move.x_max > box_x_max || Math.Abs(box.x_min - box_move.x_min) < 100) //x轴两种情况，一种是看到box_move,x最小，一种看不到
+                            {
+                                for (var k = 0; k < pData.sucker.Count; k++)
+                                {
+                                    int index = pData.sucker[k];
+                                    吸盘[index] = 0;
+                                }
+                                list_result.Remove(pData);
+                                Main.WriteLine("碰撞过滤：" + box.Group_ID + ";  z=" + box.z_min + "," + box.z_max + ";y=" + box.y_min + "," + box.y_max + ";x=" + box.x_min + "," + box.x_max);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public void get_save_sum_move(double car_move_len)
+        {
+            S_TTS.speak_async("移动小车距离 " + car_move_len);
+            string? str_sum_db_move = (string?)this.read_var(this.key_sum_move_len, "string");
+            if (str_sum_db_move == null) str_sum_db_move = "0";
+            double sum_db_move = double.Parse(str_sum_db_move);
+            sum_db_move += car_move_len;
+            this.save_var(this.key_sum_move_len, "string", sum_db_move + "");
+            this.save_var(this.key_move_len, "string", car_move_len + "");
+            this.Next_Step = Node_Next.False;
+        }
+
+        public (int delta,int 偏移) 抓取2个(
+            List<C_Data> list_result,
+            int[] 吸盘,  List<C_Data> list_tmp,
+            C_Data pData_Catch, string direction, double angle)
+        {
+            int 偏移 = 0;//如果=1 就会往中间拉一下。
+            int delta_count = 0;
+            Main.WriteLine(this, "count=2");
+            C_Data pData_Catch2 = list_tmp[1];//选择第2个
+            double L1 = Math.Abs((pData_Catch.planet.arm_a.y - pData_Catch.planet.dy) - (pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy));
+
+            Main.WriteLine(this, "W=" + pData_Catch.point_x_len);
+            Main.WriteLine(this, "h=" + pData_Catch.point_y_len);
+
+            Main.WriteLine("=================Feature===L1===" + L1);
+
+            //double db_angle_left = double.Parse(angle_left);
+
+            if (L1 < 193 * 1.66666)
+            {
+                //如果第一，第二个箱子小于AB最大可吸取距离
+                吸盘[0] = 1;
+                吸盘[1] = 1;
+                吸盘[2] = 0;
+                float y2 = ((pData_Catch.planet.arm_a.y - pData_Catch.planet.dy) + (pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy)) / 2;
+
+                if (direction == "z")
+                {
+                    (int delta,偏移)= process_z_two_17(list_result, pData_Catch, pData_Catch2, angle, 吸盘, y2);
+                    delta_count += delta;
+                }
+                else if (direction == "x" || direction == "-x")
+                {
+                    int delta = process_x_two_17(list_result, pData_Catch, pData_Catch2, angle, 吸盘, y2);
+                    list_result.Add(list_tmp[0]);
+                    list_result.Add(list_tmp[1]);
+                    pData_Catch.sucker.Add(0);
+                    pData_Catch2.sucker.Add(1);
+
+                    delta_count += delta;
+                    偏移 = -1;
+                }
+                else
+                {
+                    MessageBox.Show("只支持两个方向，其他方向可能有错误！");
+                    //pData_Catch.planet.arm_a.y = y2 - 193 / 2;
+                    //pData_Catch.planet.dy = 0;
+                    //pData_Catch.planet.arm_b.y = pData_Catch.planet.arm_a.y;
+                    //if (angle == -30) 偏移 = 1;
+                    //list_result.Add(list_tmp[0]);
+                    //list_result.Add(list_tmp[1]);
+                }
+            }
+            else
+            {
+                if (direction == "z")
+                {
+                    delta_count += process_z_two_18(list_result, pData_Catch, pData_Catch2, 吸盘, angle);
+                }else if (direction == "x" || direction == "-x")
+                {
+                    delta_count += process_x_two_18(list_result, pData_Catch, pData_Catch2, 吸盘, angle);
+                }
+                偏移 = -1;
+            }
+            return (delta_count, 偏移);
+        }
+
+
+        public int process_x_two_18(
+            List<C_Data> list_result,
+            C_Data pData_Catch, C_Data pData_Catch2, int[] 吸盘, double angle)
+        {
+            int delta_count = 0;
+            if (pData_Catch.point_y_len * 2 > 193 * 3)
+            {
+                //如果是比200宽的箱子
+                float y2 = ((pData_Catch.planet.arm_a.y - pData_Catch.planet.dy) + (pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy)) / 2;
+                吸盘[0] = 吸盘[1] = 吸盘[2] = 1;
+                pData_Catch.planet.arm_a.y = y2;
+                pData_Catch.planet.dy = 0;
+                pData_Catch.planet.arm_b.y = pData_Catch.planet.arm_a.y;
+                
+                list_result.Add(pData_Catch);
+                list_result.Add(pData_Catch2);
+                pData_Catch.sucker.Add(0);
+                pData_Catch.sucker.Add(1);
+                pData_Catch2.sucker.Add(1);
+                pData_Catch2.sucker.Add(2);
+            }
+            else
+            {
+                //如果第一，第二个箱子小于AB最大可吸取距离
+                吸盘[0] = 1;
+                吸盘[1] = 0;
+                吸盘[2] = 1;
+                delta_count = 1;
+
+                {
+                    float delta_x = pData_Catch.planet.arm_a.x - pData_Catch2.planet.arm_a.x;
+
+                    if (delta_x < 0)
+                    {
+                        pData_Catch.planet.arm_a.x -= delta_x;
+                        pData_Catch.planet.arm_b.x -= delta_x;
+                    }
+                    list_result.Add(pData_Catch);
+                    list_result.Add(pData_Catch2);
+                    pData_Catch.sucker.Add(0);
+                    pData_Catch2.sucker.Add(2);
+                }
+            }
+            return delta_count;
+        }
+
+
+
+        public int process_z_two_18(List<C_Data> list_result, C_Data pData_Catch, C_Data pData_Catch2, int[] 吸盘,double angle)
+        {
+            int delta_count = 0;
+            if (pData_Catch.point_y_len * 2 > 193 * 3)
+            {
+                //如果是比200宽的箱子，
+                float y2 = ((pData_Catch.planet.arm_a.y - pData_Catch.planet.dy) + (pData_Catch2.planet.arm_a.y - pData_Catch2.planet.dy)) / 2;
+                吸盘[0] = 吸盘[1] = 吸盘[2] = 1;
+                pData_Catch.planet.arm_a.y = y2;
+                pData_Catch.planet.dy = 0;
+                pData_Catch.planet.arm_b.y = pData_Catch.planet.arm_a.y;
+
+                pData_Catch.sucker.Add(0);
+                pData_Catch.sucker.Add(1);
+                list_result.Add(pData_Catch);
+                list_result.Add(pData_Catch2);
+                pData_Catch2.sucker.Add(1);
+                pData_Catch2.sucker.Add(2);
+            }
+            else
+            {
+                //如果第一，第二个箱子小于AB最大可吸取距离
+                吸盘[0] = 1;
+                吸盘[1] = 0;
+                吸盘[2] = 1;
+                delta_count = 1;
+                
+                float delta_z = pData_Catch.planet.arm_a.z - pData_Catch2.planet.arm_a.z;
+                if (delta_z > delta_z_thres)
+                {
+                    S_TTS.speak_async("高度差" + delta_z);
+                    //左边高，右边低
+                    Main.WriteLine(this, "大于高度差 100 or 0001");
+                    if (angle < 0)
+                    {
+                        if (pData_Catch.planet.arm_a.y < 193 * 2)
+                        {
+                            吸盘[0] = 1;
+                            吸盘[1] = 0;
+                            吸盘[2] = 0;
+                            list_result.Add(pData_Catch);
+                            pData_Catch.sucker.Add(0);
+                        }
+                        else
+                        {
+                            Main.WriteLine(this, "只抓右边这个  100 //左边高，右边低");
+                            吸盘[0] = 1;
+                            吸盘[1] = 0;
+                            吸盘[2] = 0;
+                            delta_count = 1;
+                            //只抓右边这个 
+                            pData_Catch.planet.arm_a = pData_Catch2.planet.arm_a;
+                            pData_Catch.planet.arm_b = pData_Catch2.planet.arm_b;
+                            pData_Catch.planet.arm_a.z = Math.Min(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                            pData_Catch.planet.arm_b.z = Math.Min(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+                            list_result.Add(pData_Catch2);
+                            pData_Catch2.sucker.Add(0);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("error 437");
+                    }
+                }
+                else if (delta_z < -delta_z_thres)
+                {
+                    S_TTS.speak_async("高度差" + delta_z);
+                    //左边低，右边高
+                    Main.WriteLine(this, "大于高度差 001");
+                    if (angle < 0)
+                    {
+                        if (pData_Catch.planet.arm_a.y < 193 * (3 + 1))
+                        {
+                            吸盘[0] = 0;
+                            吸盘[1] = 0;
+                            吸盘[2] = 1;
+                            //位置不动，只抓高的
+                            pData_Catch.planet.arm_a.z = Math.Max(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                            pData_Catch.planet.arm_b.z = Math.Max(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+                            list_result.Add(pData_Catch2);
+                            pData_Catch2.sucker.Add(2);
+                        }
+                        else
+                        {
+                            吸盘[0] = 1;
+                            吸盘[1] = 0;
+                            吸盘[2] = 0;
+                            //位置移动到右边，只抓右边高的
+                            pData_Catch.planet.arm_a = pData_Catch2.planet.arm_a;
+                            pData_Catch.planet.arm_b = pData_Catch2.planet.arm_b;
+                            pData_Catch.planet.arm_a.z = Math.Max(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                            pData_Catch.planet.arm_b.z = Math.Max(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+                            list_result.Add(pData_Catch2);
+                            pData_Catch2.sucker.Add(0);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("error 437");
+                    }
+                }
+                else
+                {
+                    吸盘[0] = 1;
+                    吸盘[1] = 0;
+                    吸盘[2] = 1;
+                   
+                    list_result.Add(pData_Catch);
+                    list_result.Add(pData_Catch2);
+                }
+            }
+            return delta_count;
+        }
+
+        public int process_x_two_17(
+            List<C_Data> list_result, 
+            C_Data pData_Catch, C_Data pData_Catch2, double angle, int[] 吸盘, float y2)
+        {
+            int delta_count = 0;
+            float delta_x = pData_Catch.planet.arm_a.x - pData_Catch2.planet.arm_a.x;
+
+            S_TTS.speak_async("x差" + delta_x);
+            if (delta_x < 0)
+            {
+                pData_Catch.planet.arm_a.x -= delta_x;
+                pData_Catch.planet.arm_b.x -= delta_x;
+            }
+            return delta_count;
+        }
+
+
+
+        public (int delta,int 偏移) process_z_two_17(
+            List<C_Data> list_result, 
+            C_Data pData_Catch, C_Data pData_Catch2, double angle, int[] 吸盘, float y2)
+        {
+            int 偏移 = 0;
+            int delta_count = 0;
+            float delta_z = pData_Catch.planet.arm_a.z - pData_Catch2.planet.arm_a.z;
+            if (delta_z > delta_z_thres)
+            {
+                S_TTS.speak_async("高度差" + delta_z);
+                //左边高，右边低
+                if (angle < 0)
+                {
+                    if (pData_Catch.planet.arm_a.y < 193 * 2)
+                    {
+                        //中间的，先抓高的，这种不会偏移
+                        吸盘[0] = 1;
+                        吸盘[1] = 0;
+                        吸盘[2] = 0;
+                        delta_count = 1;
+                        list_result.Add(pData_Catch);
+                        pData_Catch.sucker.Add(0);
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "只抓右边这个  100 //左边高，右边低");
+                        吸盘[0] = 1;
+                        吸盘[1] = 0;
+                        吸盘[2] = 0;
+                        delta_count = 1;
+                        偏移 = -1;
+                        //只抓右边这个 
+                        pData_Catch.planet.arm_a = pData_Catch2.planet.arm_a;
+                        pData_Catch.planet.arm_b = pData_Catch2.planet.arm_b;
+                        pData_Catch.planet.arm_a.z = Math.Min(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                        pData_Catch.planet.arm_b.z = Math.Min(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+                        list_result.Add(pData_Catch2);
+                        pData_Catch2.sucker.Add(0);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Error 681");
+                }
+            }
+            else if (delta_z < -delta_z_thres)
+            {
+                S_TTS.speak_async("高度差" + delta_z);
+                //左边低，右边高
+                if (angle < 0) 
+                {
+                    if (pData_Catch.planet.arm_a.y < 193 * 2)
+                    {
+                        //中间的，先抓高的
+                        吸盘[0] = 0;
+                        吸盘[1] = 1;
+                        吸盘[2] = 0;
+                        delta_count = 1;
+                        偏移 = 0;
+                        pData_Catch.planet.arm_a.z = Math.Max(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                        pData_Catch.planet.arm_b.z = Math.Max(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+
+                        list_result.Add(pData_Catch2);
+                        pData_Catch2.sucker.Add(1);
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "只抓右边这个  //左边低，右边高");
+                        吸盘[0] = 1;
+                        吸盘[1] = 0;
+                        吸盘[2] = 0;
+                        delta_count = 1;
+                        偏移 = -1;
+                        pData_Catch.planet.arm_a = pData_Catch2.planet.arm_a;
+                        pData_Catch.planet.arm_b = pData_Catch2.planet.arm_b;
+                        pData_Catch.planet.arm_a.z = Math.Max(pData_Catch.planet.arm_a.z, pData_Catch2.planet.arm_a.z);
+                        pData_Catch.planet.arm_b.z = Math.Max(pData_Catch.planet.arm_b.z, pData_Catch2.planet.arm_b.z);
+
+                        list_result.Add(pData_Catch2);
+                        pData_Catch2.sucker.Add(0);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Error 681");
+                }
+            }
+            else
+            {
+                吸盘[0] = 1;
+                吸盘[1] = 1;
+                吸盘[2] = 0;
+                偏移 = -1;
+                list_result.Add(pData_Catch);
+                list_result.Add(pData_Catch2);
+            }
+            return (delta_count, 偏移 );
+        }
+
+
+        public int 抓取3个(
+            List<C_Data> list_result, 
+            int[] 吸盘,List<C_Planet_Catch> list_draw,C_Data pData_Catch,string direction,double angle)
+        {
+            int delta_count = 0;
+            吸盘[0] = 1;
+            吸盘[1] = 1;
+            吸盘[2] = 1;
+
+            //if ((list_draw[0].arm_a.y - list_draw[2].arm_a.y) > 193 * 2.3)
+            {
+                pData_Catch.planet.arm_a.y = ((list_draw[0].arm_a.y - list_draw[0].dy) + (list_draw[2].arm_a.y - list_draw[2].dy)) / 2;
+                pData_Catch.planet.arm_b.y = pData_Catch.planet.arm_a.y;
+            }
+
+            if (direction == "z")
+            {
+                (float max_z, int maxidx) = Main.get_max(list_draw, "z");
+                (float min_z, int minidx) = Main.get_min(list_draw, "z");
+                List<float> list_z_sort = new List<float>();
+                for (var i = 0; i < list_draw.Count; i++)
+                {
+                    list_z_sort.Add(list_draw[i].arm_a.z);
+                }
+                list_z_sort.Sort();
+                float mid_z = list_z_sort[1];
+                delta_count += process_z_three(list_result, pData_Catch, list_draw, maxidx,minidx,max_z,min_z,mid_z,angle, 吸盘);
+            }else if (direction == "x" || direction == "-x")
+            {
+                (float max_x, int maxidx) = Main.get_max(list_draw, "x");
+                (float min_x, int minidx) = Main.get_min(list_draw, "x");
+                List<float> list_x_sort = new List<float>();
+                for (var i = 0; i < list_draw.Count; i++)
+                {
+                    list_x_sort.Add(list_draw[i].arm_a.x);
+                }
+                list_x_sort.Sort();
+                float mid_x = list_x_sort[1];
+                delta_count += process_x_three(list_result, pData_Catch, list_draw, maxidx, minidx, max_x, min_x, mid_x, angle, 吸盘);
+            }
+            return delta_count;
+        }
+
+
+
+        public int process_x_three(
+            
+            List<C_Data> list_result,
+            C_Data pData_Catch,
+            List<C_Planet_Catch> list_draw,
+            int maxidx, int minidx, float max_x, float min_x, float mid_x, double angle, int[] 吸盘)
+        {
+            int delta_count = 0;
+            Main.WriteLine(this, "max idx=" + maxidx + "，v=" + max_x);
+            Main.WriteLine(this, "min idx=" + minidx + "，v=" + min_x);
+            Main.WriteLine(this, "mid v=" + mid_x);
+
+            吸盘[0] = 1;
+            吸盘[1] = 1;
+            吸盘[2] = 1;
+
+            float deltaX = max_x - pData_Catch.planet.arm_a.x;
+            pData_Catch.planet.arm_a.x += deltaX;
+            pData_Catch.planet.arm_b.x += deltaX;
+
+            list_result.Add(list_draw[0].pData);
+            list_draw[0].pData.sucker.Add(0);
+            list_result.Add(list_draw[1].pData);
+            list_draw[1].pData.sucker.Add(1);
+            list_result.Add(list_draw[2].pData);
+            list_draw[2].pData.sucker.Add(2);
+
+
+            return delta_count;
+        }
+
+
+
+
+        public int process_z_three(
+            List<C_Data> list_result,
+            C_Data pData_Catch,
+            List<C_Planet_Catch> list_draw,
+            int maxidx,int minidx,float max_z,float min_z,float mid_z,double angle, int[] 吸盘)
+        {
+            int delta_count = 0;//没有抓的
+            Main.WriteLine(this, "max idx=" + maxidx + "，v=" + max_z);
+            Main.WriteLine(this, "min idx=" + minidx + "，v=" + min_z);
+            Main.WriteLine(this, "mid v=" + mid_z);
+
+            if (max_z - min_z > delta_z_thres)
+            {
+                S_TTS.speak_async("高度差" + (max_z - min_z));
+
+                if (list_draw[2].arm_a.y > 200)
+                {
+                    //如果是边上，先抓右边的
+                    吸盘[0] = 1;
+                    吸盘[1] = 0;
+                    吸盘[2] = 0;
+                    pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                    pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                    list_result.Add(list_draw[2].pData);
+                    list_draw[2].pData.sucker.Add(0);
+                    delta_count = 2;
+                }
+                else if (angle < 0)
+                {
+                    if (pData_Catch.planet.arm_a.y < 193 * (3 + 1))
+                    {
+                        Main.WriteLine(this, "minidx=" + minidx);
+                        //如果是中间
+                        switch (minidx)
+                        {
+                            case 0:
+                                Main.WriteLine(this, "maxidx=" + mid_z);
+                                if (maxidx == 1 || maxidx == 2)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=799");
+                                        吸盘[0] = 0;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 1;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+                                        delta_count = 1;
+
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(1);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(2);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=811");
+                                        吸盘[0] = 0;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        吸盘[maxidx] = 1;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[maxidx].pData);
+                                        list_draw[maxidx].pData.sucker.Add(maxidx);
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                            case 1:
+                                if (maxidx == 0)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=833");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 1;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        delta_count = 1;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(2);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=843");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                    }
+                                }
+                                else if (maxidx == 2)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=856");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 1;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = list_draw[2].arm_a.z;
+                                        pData_Catch.planet.arm_b.z = list_draw[2].arm_b.z;
+                                        delta_count = 1;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(2);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=868");
+                                        吸盘[0] = 0;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 1;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = list_draw[2].arm_a.z;
+                                        pData_Catch.planet.arm_b.z = list_draw[2].arm_b.z;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(2);
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                            case 2:
+                                if (maxidx == 0)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=888");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        delta_count = 1;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=899");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                    }
+                                }
+                                else if (maxidx == 1)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=912");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = list_draw[1].arm_a.z;
+                                        pData_Catch.planet.arm_b.z = list_draw[1].arm_b.z;
+                                        delta_count = 1;
+                                        list_result.Add(list_draw[0].pData);
+                                        list_draw[0].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=924");
+                                        吸盘[0] = 0;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                                        pData_Catch.planet.arm_a.z = list_draw[1].arm_a.z;
+                                        pData_Catch.planet.arm_b.z = list_draw[1].arm_b.z;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(1);
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        //如果是左边
+                        switch (minidx)
+                        {
+                            case 0:
+                                if (maxidx == 1 || maxidx == 2)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=951");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[1].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[1].arm_b;
+                                        delta_count = 1;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=964");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(0);
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                            case 1:
+                                if (maxidx == 0)
+                                {
+                                    if (mid_z - min_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=983");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[1].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[1].arm_b;
+                                        delta_count = 1;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=995");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(0);
+                                    }
+                                }
+                                else if (maxidx == 2)
+                                {
+                                    if (max_z - mid_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=1007");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[1].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[1].arm_b;
+                                        delta_count = 1;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=1020");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(0);
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                            case 2:
+                                if (maxidx == 0)
+                                {
+                                    if (mid_z - min_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=1038");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[1].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[1].arm_b;
+                                        delta_count = 1;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=1050");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(0);
+                                    }
+                                }
+                                else if (maxidx == 1)
+                                {
+                                    if (max_z - min_z < delta_z_thres)
+                                    {
+                                        Main.WriteLine(this, "step=1065");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 1;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[1].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[1].arm_b;
+                                        delta_count = 1;
+                                        pData_Catch.planet.arm_a.z = Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z);
+                                        pData_Catch.planet.arm_b.z = Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z);
+
+                                        list_result.Add(list_draw[1].pData);
+                                        list_draw[1].pData.sucker.Add(0);
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(1);
+                                    }
+                                    else
+                                    {
+                                        Main.WriteLine(this, "step=1075");
+                                        吸盘[0] = 1;
+                                        吸盘[1] = 0;
+                                        吸盘[2] = 0;
+                                        pData_Catch.planet.arm_a = list_draw[2].arm_a;
+                                        pData_Catch.planet.arm_b = list_draw[2].arm_b;
+                                        delta_count = 2;
+                                        list_result.Add(list_draw[2].pData);
+                                        list_draw[2].pData.sucker.Add(0);
+
+                                    }
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error 不可能跳到这里，否则有错误！");
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                //高度差小于delta_z_thres
+                //1,1,1
+                吸盘[0] = 1;
+                吸盘[1] = 1;
+                吸盘[2] = 1;
+                pData_Catch.planet.arm_a = list_draw[0].arm_a;
+                pData_Catch.planet.arm_b = list_draw[0].arm_b;
+                pData_Catch.planet.arm_a.z = Math.Max(list_draw[0].arm_a.z, Math.Max(list_draw[1].arm_a.z, list_draw[2].arm_a.z));
+                pData_Catch.planet.arm_b.z = Math.Max(list_draw[0].arm_b.z, Math.Max(list_draw[1].arm_b.z, list_draw[2].arm_b.z));
+                delta_count = 0;
+                list_result.Add(list_draw[0].pData);
+                list_result.Add(list_draw[1].pData);
+                list_result.Add(list_draw[2].pData);
+            }
+
+            return delta_count;
+        }
+
+ 
+        public override void init()
+        {
+        }
+    }
+}

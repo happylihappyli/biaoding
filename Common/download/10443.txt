@@ -1,0 +1,58 @@
+﻿
+using Common_Robot2;
+
+
+namespace Test1
+{
+    public class Cal_Row_Height : C_Node
+    {
+        public string key_read = "#第一个角度抓取坐标z";
+        public string key_save = "#行计数器";
+        public string key_height = "#箱子高度";
+        public string key_direction = "#抓取方向";
+        public Cal_Row_Height(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+            this.Name = name;
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string? z = (string?)this.read_var(key_read, "string");
+            string? direction = (string?)this.read_var(this.key_direction, "string");
+            string? box_height = (string?)this.read_var(key_height, "string");
+
+            if (z == null) return;
+            if (direction == null) return;
+            if (box_height == null) return;
+
+            double d_z=double.Parse(z)+1090;
+            double d_box_height = double.Parse(box_height);
+
+            if (direction == "z")
+            {
+                double d_row = Math.Round(d_z / d_box_height);
+                int row = (int)d_row;
+
+                this.save_var(key_save, "string", row);
+            }
+            else if(direction == "x" || direction == "-x")
+            {
+                double d_row = Math.Floor(d_z / d_box_height) +1;
+                int row = (int)d_row;
+
+                this.save_var(key_save, "string", row);
+            }
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

@@ -1,0 +1,267 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using MathNet.Numerics.RootFinding;
+using MathNet.Spatial.Euclidean;
+using MathNet.Spatial.Units;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Metadata;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Math;
+
+
+namespace Test1
+{
+    public class S_Calculate_Six_From_Planet2 : C_Node
+    {
+        public string key_read = "";
+        public string key_save = "";
+        public string key_six = "";
+        public string key_robot = "";//C_Robot
+
+        public string key_save_len1 = "";
+        public string key_save_len2 = "";
+
+        public string file = "";//机器人旋转轴文件
+        public string angle_dif = "0";
+
+        public string dxyz = "0,0,0";//dx,dy,dz
+        public string key_dxyz = "";
+        public string min_len= "200";
+        public string direction = "";
+
+        public bool filter = false;//如果true，点云太小就会自动过滤
+
+        public S_Calculate_Six_From_Planet2(string name, C_Space space_parent, C_Space space) : base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            C_Planet_Catch pCatch = (C_Planet_Catch)this.read_var(this.key_read, "C_Planet_Catch");
+            if (pCatch == null)
+            {
+                Main.WriteLine(this," pCatch  ==  null");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            C_Robot pRobot = (C_Robot)this.read_var(this.key_robot, "C_Robot");
+            Main.WriteLine(this, "根据坐标计算6轴角度 GID=" + pCatch.Group_ID);
+
+            C_Result pResult;
+            string dxyz2 = "";
+            
+            if (key_dxyz != "")
+            {
+                dxyz2 =(string)this.read_var(key_dxyz, "string");
+            }
+
+            if (dxyz2 == "")
+            {
+                dxyz2 =this.read_string(this.dxyz);
+            }
+
+
+            string[] strSplit=dxyz2.Split(',');
+            if (strSplit.Length < 3)
+            {
+                MessageBox.Show(this.Name + " dxyz 设置有错误");
+                return; 
+            }
+            double dx = double.Parse(strSplit[0]);
+            double dy = double.Parse(strSplit[1]);
+            double dz = double.Parse(strSplit[2]);
+
+            Main.WriteLine(this, "===========pCatch.arm_a=" + pCatch.arm_a.ToString());
+
+            //list_3D_Point_filter 现在是机械臂坐标！！不需要转换
+            List<C_Point3D> list_arm = pCatch.pMain.list_3D_Point_arm;// pCatch.pMain.list_3D_Point_filter;
+            if (list_arm == null)
+            {
+                list_arm = pCatch.pMain.list_3D_Point;
+            }
+            List<C_Point3D> list_arm2=new List<C_Point3D> ();
+
+            if (list_arm != null)
+            {
+                for (var i = 0; i < list_arm.Count; i++)
+                {
+                    C_Point3D p1 = list_arm[i];
+                    C_Point3D p2 = p1.add(new C_Point3D(dx, dy, dz));
+                    list_arm2.Add(p2);
+                }
+            }
+
+            C_Point3D A_new = pCatch.arm_a.add(new C_Point3D(dx, dy, dz));
+
+            C_Point3D B_new;
+            {
+                B_new = pCatch.arm_b.add(new C_Point3D(dx, dy, dz));
+            }
+
+            C_Point3D D = C_Planet_Catch.计算D坐标(pRobot, B_new);
+
+            Main.WriteLine(this, " A_new=" + A_new.ToString());
+            Main.WriteLine(this, " B_new=" + B_new.ToString());
+            Main.WriteLine(this, " D=" + D.ToString());
+
+
+            string str_angle = this.read_string(this.angle_dif);
+            (pResult,double len1,double len2) = Main.根据坐标计算6轴角度(
+                direction, true,space,
+                this, pRobot, pCatch.Group_ID,
+                A_new, B_new, D, list_arm2, this.file,double.Parse(str_angle));
+
+            Main.WriteLine(this, " 六轴=" + pResult.strLine);
+
+            if (key_save_len1 != "")
+            {
+                this.save_var(key_save_len1, "double", len1);
+                this.save_var(key_save_len2, "double", len2);
+            }
+
+
+            string str_min_len = this.read_string(this.min_len);
+            
+
+            if (this.key_save_len1 != "")
+            {
+                if (this.filter == true)
+                {
+                    double db_min_len = 0;
+                    try
+                    {
+                        db_min_len = double.Parse(str_min_len);
+                    }
+                    catch (Exception e)
+                    {
+                        Main.WriteLine(this,e.ToString());
+                    }
+                    if (Main.get_double_from_obj(this, this.read_var(key_save_len1, "double")) < db_min_len)
+                    {
+                        Main.WriteLine(this, "点云太小");
+                        S_TTS.speak("点云太小");
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                }
+            }
+
+            if (pResult.strLine=="")
+            {
+                Main.WriteLine(this, "六轴计算超范围！A,B=" + A_new.ToString()+","+B_new.ToString());
+                S_TTS.speak_async("六轴计算超范围！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            {
+                Main.WriteLine(this.Name+" "+ pResult.strLine);
+
+                if (key_save != "")
+                {
+                    this.save_var(key_save, "C_Result", pResult);
+                }
+
+                strSplit = pResult.strLine.Split(",");
+                string line = "";
+                for (int i = 0; i < strSplit.Length; i++)
+                {
+                    if (i == 2)
+                    {
+                        double value = Math.Round(double.Parse(strSplit[i]) - double.Parse(strSplit[i - 1]), 3);
+                        line += value + ",";
+                    }
+                    //else if (i == 5)
+                    //{
+                    //    double angle = Math.Round(double.Parse(strSplit[i]), 3);
+                    //    //if (angle < -90)
+                    //    //{
+                    //    //    angle += 180;
+                    //    //}
+                    //    //if (angle > 90)
+                    //    //{
+                    //    //    angle -= 180;
+                    //    //}
+                    //    line += angle + ",";
+                    //}
+                    else
+                    {
+                        double value = Math.Round(double.Parse(strSplit[i]), 3);
+                        line += value + ",";
+                    }
+                }
+                if (line.EndsWith(","))
+                {
+                    line = line.Substring(0, line.Length - 1);
+                }
+                this.save_var(key_six, "string", line);
+
+                string[] strSplit2 = pResult.strLine.Split(',');
+                if (strSplit2.Length > 5)
+                {
+                    double angle = Math.Round(double.Parse(strSplit2[strSplit2.Length - 1]), 2);
+
+                    this.save_var(key_six + "/last", "string", angle + "");
+                    this.Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    S_TTS.speak_async("六轴计算错误！");
+                    this.Next_Step = Node_Next.False;
+                }
+            }
+
+        }
+
+        private string add_angle(string strLine, string d_angles)
+        {
+            string[] strSplit = strLine.Split(",");
+            string[] strSplit2 = d_angles.Split(",");
+
+            string line = "";
+            for (var i = 0; i < strSplit.Length; i++)
+            {
+                double angle = double.Parse(strSplit[i]);
+
+                double add = 0;
+                if (i < strSplit2.Length)
+                {
+                    add = double.Parse(strSplit2[i]);
+                }
+                angle += add;
+                line = line + angle + ",";
+            }
+            if (line.EndsWith(","))
+            {
+                return line.Substring(0, line.Length - 1);
+            }
+            else
+            {
+                return line;
+            }
+        }
+
+
+
+
+
+    }
+}

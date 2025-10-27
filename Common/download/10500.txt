@@ -1,0 +1,180 @@
+﻿using Common_Robot2;
+using System;
+using System.Drawing;
+
+namespace Test1
+{
+    public class W_Process_Laser : C_Node ,I_Process
+    {
+
+        public byte[]? byte_read;
+        public byte[]? byte_remain;//剩余未处理的字节数
+        
+        public W_Process_Laser(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+
+        public int index_data = 0;
+        //处理收到的信息
+        public void process(byte[] RData)
+        {
+            File.WriteAllBytes("D:\\file"+ index_data + ".data",RData);
+            index_data++;
+
+
+
+            byte[]? byte_now;
+            int index_start = 0;
+            if (byte_remain?.Length > 0)
+            {
+                //如果上次还有数据，先复制老的数据
+                byte_now=new byte[byte_remain.Length+ RData.Length];
+                for (var i=0;i<byte_remain.Length;i++)
+                {
+                    byte_now[i] = byte_remain[i];
+                }
+                index_start= byte_remain.Length;
+            }
+            else
+            {
+                byte_now = new byte[ RData.Length];
+            }
+
+            //复制剩下的数据
+            for (var i = 0; i < RData.Length; i++)
+            {
+                byte_now[index_start+i] = RData[i];
+            }
+
+
+            int index=find_head(byte_now, 0);
+            while (index > -1)
+            {
+                int b1 = byte_now[index + 4];
+                int b2 = byte_now[index + 5];
+                int len = b1 * 256 + b2; //b1,b2代表文本长度
+
+                if (byte_now.Length > len)
+                {
+                    byte_read = new byte[len];
+                    byte_remain = new byte[byte_now.Length - len];
+                    //读取第一段
+                    for(var i=0;i< len; i++)
+                    {
+                        byte_read[i]= byte_now[i];
+                    }
+                    //下一段数据区
+                    for(var i=0;i< byte_remain.Length; i++)
+                    {
+                        byte_remain[i] = byte_now[len+i];
+                    }
+                    process_data(byte_read);
+                    byte_now=byte_remain;
+                    index = find_head(byte_now, 0);
+                }
+                else
+                {
+                    //数据不完整，放到下次处理
+                    byte_remain = new byte[byte_now.Length];
+                    for(var i=0; i < len; i++)
+                    {
+                        byte_remain[i] = byte_now[i];
+                    }
+                    index = -1;
+                }
+            }
+
+            if (index==-1)
+            {
+                //数据不完整，放到下次处理
+                Main.WriteLine(this,"没有找到数据头");
+                byte_remain = new byte[byte_now.Length];
+                for (var i = 0; i < byte_now.Length; i++)
+                {
+                    byte_remain[i] = byte_now[i];
+                }
+            }
+
+            this.Run(pTrain);
+        }
+
+        public int[] distance = new int[811];
+        public int[] reflections = new int[811];
+        //激光雷达的数据
+        public void process_data(byte[] data)
+        {
+            int b1 = data[14];
+            int b2 = data[15];
+
+            int angle_min = b1 * 256 + b2;//角分辨率
+
+            b1 = data[16];
+            b2 = data[17];
+            int count_frame = b1 * 256 + b2;//一帧数据点云个数
+
+            b1 = data[18];
+            b2 = data[19];
+            int index0 = b1 * 256 + b2;//第一个数据的索引
+
+
+            b1 = data[20];
+            b2 = data[21];
+            int count = b1 * 256 + b2;//数据个数
+
+            int count_zero = 0;
+            for(var i = 0;i < count*4; i+=4)
+            {
+                b1 = data[22+i];
+                b2 = data[22+i+1];
+                int len = b1 * 256 + b2;//长度
+
+                int b3 = data[22 + i + 2];
+                int b4 = data[22 + i + 3];
+                int reflection = b3 * 256 + b4;//反射率
+
+                if (len== 0)
+                {
+                    count_zero++;
+                }
+                distance[index0 + i/4]= len;
+                reflections[index0 + i/4] = reflection;
+            }
+
+            Main.WriteLine(this, "read one data index0=" + index0+ " count_zero="+ count_zero+ " count="+ count);
+        }
+
+        public int find_head(byte[] rData, int index_start)
+        {
+            for(var i=index_start; i<rData.Length; i++)
+            {
+                if (i + 3 < rData.Length)
+                {
+                    if (rData[i] == 2 && rData[i + 1] == 2 && rData[i + 2] == 2 && rData[i + 3] == 2)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+        }
+
+    }
+
+
+}

@@ -1,0 +1,972 @@
+﻿using Newtonsoft.Json.Linq;
+using Common_Robot2;
+using ConverxHull;
+using pcammls;
+using OuelletConvexHull;
+using Cloo;
+
+namespace Test1
+{
+    /// <summary>
+    /// 这个是opencl的版本
+    /// </summary>
+    public class C_Cloud_Split_OpenCL2 : C_Node
+    {
+        public string key_cloud = "#cloud1";
+        public string key_cloud_arm = "#cloud1";
+        public string key_save = "#cloud_array";
+        public string key_main = "mains";//List<C_Main>
+        public string key_camera = "&#1";//#camera1_const"; //C_Camera_Const
+        public string key_bottom = "#pPlanet_Bottom1";
+        public string key_jarray = "";
+        public string key_image = "";
+
+
+        public TY_VECT_3F_ARRAY? glb_p3dArray = null;
+        public List<C_Point3D>? edge_points = null;
+        public JArray? JArray_Box = null;
+        public string no_cover = "1";//覆盖的不抓取
+        public string contour = "1";
+        public string key_polygon = "";
+
+        public double draw_scale_tuyang = 1;
+        public string draw_scale = "0.5";
+        public string scale = "2";
+        public string key_3d = "";
+
+        public string check_z = "";
+        public string z = "";
+        public string dz_up = "";
+        public string dz_low = "";
+
+
+
+        public string opencl_code = @"
+//kernel数据类型要严格一样，不能用int传给float，否则会出错
+kernel void Angles(
+    global float* x,
+    global float* y,
+    global float* angle,
+    global float* edgeX,
+    global float* edgeY,
+    const int edge_count)
+{
+    int index = get_global_id(0);//计算当前的index
+    float ox= x[index];
+    float oy= y[index];
+
+    float Ax;
+    float Ay;
+    float Bx;
+    float By;
+    float oAx;
+    float oAy;
+    float oBx;
+    float oBy;
+
+    float dot_product1;
+    float cross_product1;
+    float angle1;
+
+    Ax=edgeX[0];
+    Ay=edgeY[0];
+    float sum_angle=0;
+    for(int i=1;i<edge_count;i++){
+        //Ax=edgeX[i-1];
+        //Ay=edgeY[i-1];
+        Bx=edgeX[i];
+        By=edgeY[i];
+
+        oAx = Ax - ox;
+        oAy = Ay - oy;
+        oBx = Bx - ox;
+        oBy = By - oy;
+        dot_product1 = oAx * oBx + oAy * oBy;// 计算点积
+        cross_product1 = oAx * oBy - oAy * oBx; // 计算叉乘
+        angle1=atan2(cross_product1, dot_product1);
+        sum_angle+=angle1;
+        Ax=Bx;
+        Ay=By;
+    }
+    //Ax=edgeX[edge_count-1];
+    //Ay=edgeY[edge_count-1];
+    Bx=edgeX[0];
+    By=edgeY[0];
+
+    oAx = Ax - ox;
+    oAy = Ay - oy;
+    oBx = Bx - ox;
+    oBy = By - oy;
+    dot_product1 = oAx * oBx + oAy * oBy;// 计算点积
+    cross_product1 = oAx * oBy - oAy * oBx; // 计算叉乘
+    angle1=atan2(cross_product1, dot_product1);
+    sum_angle+=angle1;
+
+    angle[index]=sum_angle;
+}
+";
+        public C_Cloud_Split_OpenCL2(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            this.draw_scale_tuyang = double.Parse(this.draw_scale);
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            Main.WriteLine(this.Name + ",start");
+            this.glb_p3dArray= (TY_VECT_3F_ARRAY?)this.read_var(this.key_3d, "TY_VECT_3F_ARRAY");
+            
+            点云分块(pTrain);
+        }
+
+
+        private List<C_Point3D> check_in_out(int Group_ID,
+            List<C_Point3D> edges, List<C_Point3D> points_all, List<C_Point3D> list_uv)
+        {
+            List<C_Point3D> pList = new List<C_Point3D>();
+            try
+            {
+                ComputePlatform platform = ComputePlatform.Platforms[0];
+                IList<ComputeDevice> devices = new List<ComputeDevice>();
+                ComputeContextPropertyList properties = new ComputeContextPropertyList(platform);
+                devices.Add(platform.Devices[0]);
+
+                ComputeContext context = new ComputeContext(devices, properties, null, IntPtr.Zero);
+
+                int count_sample = list_uv.Count;
+                float[] arrX = new float[count_sample];
+                float[] arrY = new float[count_sample];
+                float[] arrAngle = new float[count_sample];
+
+                for (int i = 0; i < count_sample; i++)
+                {
+                    C_Point3D uv = list_uv[i];   //C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.color_calib, p);
+                    if (uv != null)
+                    {
+                        arrX[i] = uv.x;
+                        arrY[i] = uv.y;
+                    }
+                }
+
+                int count_edge = edges.Count;
+                float[] arr_edgeX = new float[count_edge];
+                float[] arr_edgeY = new float[count_edge];
+
+                for (int i = 0; i < count_edge; i++)
+                {
+                    C_Point3D uv = edges[i];   //C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.color_calib, p);
+
+                    arr_edgeX[i] = uv.x;
+                    arr_edgeY[i] = uv.y;
+                }
+
+                // 创建输入缓存并且用数组数据填充 // Access modifiers should match those in a kernel.
+                // CopyHostPointer 的意思是缓存的数据需要用最后一个参数提供地址填满。 
+                ComputeBuffer<float> x = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arrX);
+                ComputeBuffer<float> y = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arrY);
+                ComputeBuffer<float> edgeX = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arr_edgeX);
+                ComputeBuffer<float> edgeY = new ComputeBuffer<float>(context, ComputeMemoryFlags.ReadOnly | ComputeMemoryFlags.CopyHostPointer, arr_edgeY);
+
+                //输出缓存只需要指定数组大小。
+                ComputeBuffer<float> angle = new ComputeBuffer<float>(context, ComputeMemoryFlags.WriteOnly, arrAngle.Length);
+
+                //创建编译opencl程序
+                ComputeProgram program = new ComputeProgram(context, opencl_code);
+
+                program.Build(null, null, null, IntPtr.Zero);
+
+                //创建内核函数，设置参数。
+                ComputeKernel kernel = program.CreateKernel("Angles");
+                kernel.SetMemoryArgument(0, x);
+                kernel.SetMemoryArgument(1, y);
+                kernel.SetMemoryArgument(2, angle);
+                kernel.SetMemoryArgument(3, edgeX);
+                kernel.SetMemoryArgument(4, edgeY);
+                kernel.SetValueArgument(5, count_edge);
+
+
+                //创建事件列表，这个例子并不需要事件列表，但是它是看到它是如何工作是很重要的。
+                ComputeEventList eventList = new ComputeEventList();
+
+                // 创建命令队列.
+                ComputeCommandQueue commands = new ComputeCommandQueue(context, context.Devices[0], ComputeCommandQueueFlags.None);
+
+                commands.Execute(kernel, null, new long[] { count_sample }, null, eventList);
+                commands.ReadFromBuffer(angle, ref arrAngle, false, eventList);
+                commands.Finish();
+
+
+
+                // 打印结果
+                Console.WriteLine("--------------X-------------");
+                for (int i = 0; i < count_sample; i++)
+                {
+                    float z = list_uv[i].z;
+                    float angle_z = arrAngle[i];
+
+                    if (Math.Abs(angle_z) > 1)
+                    {
+                        points_all[i].Group_ID = Group_ID;
+                        pList.Add(points_all[i]);
+                    }
+                }
+
+
+                // 清除 commands
+                commands.Dispose();
+
+                //清除事件
+                foreach (ComputeEventBase eventBase in eventList)
+                {
+                    eventBase.Dispose();
+                }
+                eventList.Clear();
+                kernel.Dispose();
+                program.Dispose();
+
+                // 清除缓存
+                x.Dispose();
+                y.Dispose();
+                angle.Dispose();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+            return pList;
+        }
+
+        public C_Rect? 计算分割框的矩形(JObject pItem)
+        {
+            JArray? pJArray;
+            if (contour == "1")
+            {
+                pJArray = (JArray?)pItem.SelectToken("contour");
+            }
+            else
+            {
+                pJArray = (JArray?)pItem.SelectToken("vertex");
+            }
+            if (pJArray == null)
+            {
+                return null;
+            }
+
+            int x_min = 10000;
+            int x_max = -10000;
+            int y_min = 10000;
+            int y_max = -10000;
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)pJArray[j][0];
+                int y1 = (int)pJArray[j][1];
+
+                x1 = (int)Math.Round(x1 / this.draw_scale_tuyang + space.vars.draw_offset_x_tuyang);
+                y1 = (int)Math.Round(y1 / this.draw_scale_tuyang + space.vars.draw_offset_y_tuyang);
+
+                if (x1 > x_max) x_max = x1;
+                if (x1 < x_min) x_min = x1;
+                if (y1 > y_max) y_max = y1;
+                if (y1 < y_min) y_min = y1;
+            }
+
+            return new C_Rect(new C_Point3D(x_min, y_min, 0), new C_Point3D(x_max, y_max, 0));
+        }
+
+
+        public C_Rect? 计算原始的分割框的矩形(JObject pItem)
+        {
+            JArray? pJArray;
+            if (contour == "1")
+            {
+                pJArray = (JArray?)pItem.SelectToken("contour");
+            }
+            else
+            {
+                pJArray = (JArray?)pItem.SelectToken("vertex");
+            }
+            if (pJArray == null) return null;
+
+            int x_min = 10000;
+            int x_max = -10000;
+            int y_min = 10000;
+            int y_max = -10000;
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)(int)(pJArray[j][0]);
+                int y1 = (int)(int)(pJArray[j][1]);
+
+                if (x1 > x_max) x_max = x1;
+                if (x1 < x_min) x_min = x1;
+                if (y1 > y_max) y_max = y1;
+                if (y1 < y_min) y_min = y1;
+            }
+
+            return new C_Rect(new C_Point3D(x_min, y_min, 0), new C_Point3D(x_max, y_max, 0));
+        }
+
+
+
+        //这个函数可能有问题
+        public C_Point3D depth_to_3DPoint3(TY_CAMERA_CALIB_INFO src_calib, C_Point3D pPoint)
+        {
+            //相机内参
+            double cam_cx = src_calib.intrinsic.data[2];// 6.52000427e+02;// * 640 / 1280;
+            double cam_cy = src_calib.intrinsic.data[5];//5.06252594e+02;// * 480 / 960;
+            double cam_fx = src_calib.intrinsic.data[0];// 1.09007092e+03;
+            double cam_fy = src_calib.intrinsic.data[4];//1.09046729e+03;
+            double factor = 1;
+
+            double p_z = pPoint.z / factor;
+            double p_x = (pPoint.x - cam_cx) * p_z / cam_fx;
+            double p_y = (pPoint.y - cam_cy) * p_z / cam_fy;
+            return new C_Point3D(p_x, p_y, p_z);
+        }
+
+
+        public void 点云分块(I_Train pTrain)
+        {
+            Main.WriteLine(this.Name+ "点云分块 开始");
+
+            C_Camera_TuYang? camera1 = (C_Camera_TuYang?)this.read_var(this.key_camera, "C_Camera_TuYang");
+
+            if (camera1 == null)
+            {
+                MessageBox.Show(this.Name + ",camera1=null");
+                return;
+            }
+
+
+            this.JArray_Box = (JArray?)this.read_var(this.key_jarray, "JArray");
+            if (this.JArray_Box == null)
+            {
+                MessageBox.Show(this.Name + " JArray ==null key_jarray 可能设置有问题");
+                return;
+            }
+
+            List<C_Point3D>? list_edge = (List<C_Point3D>?)this.read_var(this.key_polygon, "List<C_Point3D>");
+
+            if (list_edge == null)
+            {
+                Main.WriteLine(this.Name + " key_polygon 可能设置有问题");
+                S_TTS.speak_async(this.Name + ",点云 多边形过滤框没有设置好！");
+                return;
+            }
+
+            Bitmap? pBitmap1 = (Bitmap?)this.read_var(this.key_image, "Bitmap");
+
+            List<C_Data> list_c_data = new List<C_Data>();
+            this.save_var(this.key_main, "List<C_Data>", list_c_data);
+
+            for (var i = 0; i < this.JArray_Box.Count; i++)
+            {
+                Main.WriteLine(this.Name+ " 点云分块1 " + i);
+
+                JObject? pItem = (JObject)this.JArray_Box[i];
+
+                string label = pItem==null?"":pItem["label"].ToString();
+
+                Main.WriteLine(i + "=" + label);
+
+
+                C_Data pData = new C_Data(space);
+                pData.Group_ID = i;
+                pData.bCover = true;
+                pData.Label = label;
+
+                if (label.IndexOf("_intact") > -1)
+                {
+                    pData.bCover = false;
+                }
+
+                bool bWork = false;
+                if (this.no_cover == "1")
+                {
+                    if (pData.bCover == false)
+                    {
+                        bWork = true;
+                    }
+                }
+                else
+                {
+                    bWork = true;
+                }
+
+                if (bWork)
+                {
+                    pData.JObject = pItem;
+                    pData.pRect = 计算分割框的矩形(pItem);
+                    pData.pRect_No_Move = 计算原始的分割框的矩形(pItem);//不缩放，不移动
+
+                    double x = (pData.pRect.pPoint1.x + pData.pRect.pPoint2.x) / 2;
+                    double y = (pData.pRect.pPoint1.y + pData.pRect.pPoint2.y) / 2;
+
+					//计算重心是否在多边形内部，这个多边形是用来过滤点云的。
+
+                    if (Main.判断是否在多边形内(list_edge,x,y)) 
+                    {
+                        if (pData.pRect.width() > 20 && pData.pRect.height() > 20)
+                        {
+                            pData.pBmp = new Bitmap(pData.pRect_No_Move.width(), pData.pRect_No_Move.height());
+
+                            Graphics g = Graphics.FromImage(pData.pBmp);
+
+                            if (pBitmap1 != null)
+                            {
+                                lock (pBitmap1)
+                                {
+                                    int width = (int)(pBitmap1.Width * space.vars.draw_scale_tuyang); //先缩小
+                                    int height = (int)(pBitmap1.Height * space.vars.draw_scale_tuyang);
+                                    Bitmap pBitmap_Tmp = new Bitmap(pBitmap1, width, height);
+
+                                    lock (pBitmap_Tmp)  //复制区域图片
+                                    {
+                                        g.DrawImage(pBitmap_Tmp,
+                                        new Rectangle(0, 0, pData.pRect_No_Move.width(), pData.pRect_No_Move.height()),
+                                        new Rectangle((int)pData.pRect_No_Move.pPoint1.x, (int)pData.pRect_No_Move.pPoint1.y,
+                                            pData.pRect_No_Move.width(), pData.pRect_No_Move.height()),
+                                        GraphicsUnit.Pixel);
+                                    }
+                                }
+                            }
+                            list_c_data.Add(pData);
+                        }
+                        else
+                        {
+                            Main.WriteLine(this.Name + ": 矩形太小了！");
+                        }
+                    }
+                    else
+                    {
+                        Main.WriteLine(this.Name + " G=" + pData.Group_ID + " 不在多边形过滤框内！");
+                    }
+
+                }
+            }
+
+            this.save_var(this.key_main + "/count", "double", list_c_data.Count);
+            if (list_c_data.Count == 0)
+            {
+                Main.WriteLine(this.Name + ": arrMain.Count=0");
+                S_TTS.speak_async("点云分块为空！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            C_Data.tasks = new Task[list_c_data.Count];
+
+            List<C_Point3D>? pList = (List<C_Point3D>?)this.read_var(key_cloud, "List<C_Point3D>");
+            List<C_Point3D>? list_arm = (List<C_Point3D>?)this.read_var(key_cloud_arm, "List<C_Point3D>");
+
+            
+
+            if (pList == null)
+            {
+                MessageBox.Show(this.Name + "：" + key_cloud + "== null!");
+                this.Next_Step = Node_Next.False;
+                S_TTS.speak_async("点云分块为空！");
+                return;
+            }
+            bool bDebug = false;// true;
+
+            float db_Scale = float.Parse(this.scale);// 2f;//缩放比
+            List<C_Point3D> list_uv = new List<C_Point3D>();
+            if (bDebug)
+            {
+                List<C_Point3D> pList3 = new List<C_Point3D>();
+
+                for (int i = 0; i < pList.Count; i++)
+                {
+                    C_Point3D p = pList[i];
+                    if (p.z < 2155)
+                    {
+                        C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p);
+                        if (uv == null) continue;
+                        uv.x = uv.x / db_Scale;
+                        uv.y = uv.y / db_Scale;
+                        list_uv.Add(uv);
+                        pList3.Add(p);
+                    }
+                }
+
+
+                Bitmap bmp_new = new Bitmap(pBitmap1.Width, pBitmap1.Height);
+                Graphics g2 = Graphics.FromImage(bmp_new);
+
+                g2.DrawImage(pBitmap1,
+                            new Rectangle(0, 0, pBitmap1.Width, pBitmap1.Height),
+                            new Rectangle(0, 0, pBitmap1.Width, pBitmap1.Height),
+                            GraphicsUnit.Pixel);
+
+                for (int i = 0; i < list_uv.Count; i++)
+                {
+                    C_Point3D uv = list_uv[i];
+                    {
+                        g2.DrawEllipse(Pens.Red, uv.x, uv.y, 5, 5);
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < pList.Count; i++)
+                {
+                    C_Point3D p = pList[i];
+                    {
+                        C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p);
+                        if (uv == null) continue;
+                        uv.x = uv.x / db_Scale;
+                        uv.y = uv.y / db_Scale;
+                        list_uv.Add(uv);
+                    }
+                }
+
+            }
+
+            for (var i = list_c_data.Count - 1; i >= 0; i--)
+            {
+                Main.WriteLine(this.Name+ " 点云分块2 " + i+" start");
+                C_Data pData = list_c_data[i];
+                if (pData.bCover && this.no_cover == "1")
+                {
+                    list_c_data.Remove(pData);
+                    continue;
+                }
+
+                JArray? pJArray = (JArray?)pData.JObject.SelectToken("vertex");
+
+                if (pJArray == null)
+                {
+                    pJArray = (JArray?)pData.JObject.SelectToken("contour");
+                    if (pJArray == null)
+                    {
+                        MessageBox.Show("轮廓线为空！");
+                        return;
+                    }
+                }
+                edge_points = 简化边框读为凸多边形(pJArray);
+                C_Point3D center= Main.计算中心点坐标(edge_points);//center是2D图像的中心点
+
+                int rnd_x = 0;
+                int rnd_y = 0;
+                Random rnd = new Random();
+                int count = 0;
+                C_Point3D pPoint2;
+                bool bFilter = false;
+                while (true)
+                {
+                    pPoint2 = Main.图像转3D点云(this.glb_p3dArray, pBitmap1.Width, (int)center.x+rnd_x, (int)center.y + rnd_y);
+                    if (double.IsNaN(pPoint2.x)==false)
+                    {
+                        Main.WriteLine(this, "rnd_x=" + rnd_x + ",rnd_y=" + rnd_y+",center="+center.ToString());
+                        break;
+                    }
+                    rnd_x = rnd.Next(20) - 10;
+                    rnd_y = rnd.Next(20) - 10;
+                    count++;
+                    if (count > 30)
+                    {
+                        Main.WriteLine(this, ">>>>>>>>>>>>>>>>>>>>>>>>>>中间点云缺失！");
+                        bFilter = true;
+                        break;
+                    }
+                }
+                C_Point3D? center1 = Tools.摄像头坐标转到机械臂坐标(camera1, pPoint2);
+
+                if (bFilter == false)
+                {
+                    (pData.list_3D_Point, pData.list_3D_Point_arm) = 根据深度神经网络识别框2过滤点云(
+                        pData, pList, list_arm, list_uv, pData.Group_ID,pData.JObject);
+
+                    if (pData.list_3D_Point == null || pData.list_3D_Point.Count < 3)
+                    {
+                        list_c_data.Remove(pData);
+                        continue;
+                    }
+                    pData.run_pre();
+                }
+                else
+                {
+                    Main.WriteLine(this.Name + " 点云分块2 " + i + " 被过滤掉");
+                }
+                Main.WriteLine(this.Name + " 点云分块2 " + i + " end");
+
+            }
+            this.save_var(this.key_main + "/count", "double", list_c_data.Count);
+
+
+            Main.WriteLine(this.Name+ "点云分块 3");
+            List<List<C_Point3D>> list = new List<List<C_Point3D>>();
+
+            for (var i = 0; i < list_c_data.Count; i++)
+            {
+                C_Data item = list_c_data[i];
+                if (item.list_3D_Point!=null)
+                {
+                    list.Add(item.list_3D_Point);
+                }
+            }
+            this.save_var(this.key_save, "List<List<C_Point3D>>", list);
+            Main.WriteLine(this.Name+"点云分块 结束");
+
+            this.Next_Step = Node_Next.True;
+        }
+
+
+        public List<C_Point3D> 简化边框读为凸多边形(
+            JArray pJArray,
+            bool bModify = true)
+        {
+            List<C_Point3D> pList_Points = new List<C_Point3D>();
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)pJArray[j][0];
+                int y1 = (int)pJArray[j][1];
+
+                if (bModify)
+                {
+                    x1 = (int)Math.Round(x1 / this.draw_scale_tuyang);// + space.vars.draw_offset_x_tuyang);
+                    y1 = (int)Math.Round(y1 / this.draw_scale_tuyang);// + space.vars.draw_offset_y_tuyang);
+                }
+                C_Point3D pPoint = new C_Point3D(x1, y1, 0);
+                pList_Points.Add(pPoint);
+            }
+
+            return Main.计算外接多边形(pList_Points);
+        }
+
+
+        //先转化为矩形
+        public (List<C_Point3D>? list, List<C_Point3D>? list_arm) 根据深度神经网络识别框2过滤点云(
+            C_Data pData,
+            List<C_Point3D> pList,
+            List<C_Point3D> list_arm,
+            List<C_Point3D> list_uv,
+            int Group_ID,JObject pItem)
+        {
+
+            Main.WriteLine(this,"GID="+pData.Group_ID);
+
+            JArray? pJArray = (JArray?)pItem.SelectToken("vertex");
+
+            if (pJArray == null)
+            {
+                pJArray = (JArray?)pItem.SelectToken("contour");
+                if (pJArray == null)
+                {
+                    return (null,null);
+                }
+            }
+
+            edge_points = 简化边框读为凸多边形(pJArray);
+            pData.edge_points = edge_points;
+
+            return Main.check_in_out(Group_ID, edge_points, pList,list_arm, list_uv);
+        }
+
+        private List<C_Point3D> check_in_out_zzz(int Group_ID, 
+            List<C_Point3D> edges, List<C_Point3D> points_all, List<C_Point3D> list_uv)
+        {
+            List<C_Point3D> pList = new List<C_Point3D>();
+            try
+            {
+
+
+                int count_sample = list_uv.Count;
+                float[] arrX = new float[count_sample];
+                float[] arrY = new float[count_sample];
+                float[] arrAngle = new float[count_sample];
+
+                for (int i = 0; i < count_sample; i++)
+                {
+                    C_Point3D uv = list_uv[i];   //C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.color_calib, p);
+                    if (uv != null)
+                    {
+                        //arrX[i] = uv.x;
+                        //arrY[i] = uv.y;
+                        if (Main.判断是否在多边形内(edges, uv.x, uv.y))
+                        {
+                            pList.Add(points_all[i]);
+                        }
+                    }
+                }
+
+
+
+
+                // 打印结果
+                //Console.WriteLine("--------------X-------------");
+                //for (int i = 0; i < count_sample; i++)
+                //{
+                //    float z = list_uv[i].z;
+                //    float angle_z = arrAngle[i];
+
+                //    if (Math.Abs(angle_z) > 1)
+                //    {
+                //        points_all[i].Group_ID = Group_ID;
+                //        pList.Add(points_all[i]);
+                //    }
+                //}
+
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+            return pList;
+        }
+
+
+        public List<C_Point3D> 简化边框读为矩形(
+            JArray pJArray,
+            bool bModify = true)
+        {
+            List<C_Point3D> pList_Points = new List<C_Point3D>();
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)pJArray[j][0];
+                int y1 = (int)pJArray[j][1];
+
+                if (bModify)
+                {
+                    x1 = (int)Math.Round(x1 / this.draw_scale_tuyang);// + space.vars.draw_offset_x_tuyang);
+                    y1 = (int)Math.Round(y1 / this.draw_scale_tuyang);// + space.vars.draw_offset_y_tuyang);
+                }
+                C_Point3D pPoint = new C_Point3D(x1, y1, 0);
+                pList_Points.Add(pPoint);
+            }
+
+            RotatedRect rect = 计算外接矩形(pList_Points);
+
+            C_Point3D[] ps = rect.Points();
+
+            List<C_Point3D> pList_Points2 = new List<C_Point3D>();
+            for (int i = 0; i < ps.Length; i++)
+            {
+                pList_Points2.Add(ps[i]);
+            }
+
+            return pList_Points2;
+        }
+
+
+        public RotatedRect 计算外接矩形(List<C_Point3D> pList)
+        {
+
+
+            Bitmap bmp = new Bitmap(1200, 900);
+            Graphics e = Graphics.FromImage(bmp);
+            int n = pList.Count;
+            C_Point3D[] points = new C_Point3D[n];
+            for (int j = 0; j < n; j++)
+            {
+
+                C_Point3D p = pList[j];
+
+                C_Point3D p2 = p;//.add(new C_Point3D(500,300,0));//Tools.f_3DPoint_to_depth(camera1.color_calib, p.add(centerAll));
+                points[j] = p2;
+
+                e.DrawEllipse(Pens.Red, p2.x, p2.y, 10, 10);
+            }
+
+            var windowsPoints = points.Select(p => new ConverxHull.Point(p.x, p.y)).ToList();
+
+            var ouelletConvexHull = new ConvexHull(windowsPoints);
+            ouelletConvexHull.CalcConvexHull(ConvexHullThreadUsage.OnlyOne);
+
+            List<C_Point3D> ouelletAsVertices = ouelletConvexHull.GetResultsAsArrayOfPoint()
+                .Select(p => new C_Point3D(p.X, p.Y, 0)).ToList();
+
+            Polygon currentPolygon = new Polygon();
+            for (var i = 0; i < ouelletAsVertices.Count - 1; i++)
+            {
+                var p1 = ouelletAsVertices[i];
+                var p2 = ouelletAsVertices[i + 1];
+                e.DrawLine(new Pen(Color.Yellow), (float)p1.x, (float)p1.y, (float)p2.x, (float)p2.y);
+                currentPolygon.AddPoint(new System.Drawing.Point((int)p1.x, (int)p1.y));
+            }
+            currentPolygon.CompletePolygon = true;
+
+
+            double min_angle = 计算最小外接矩形(ouelletAsVertices);
+
+
+            List<C_Point3D> currentPolygon2 = 旋转点云(min_angle, ouelletAsVertices);
+
+            C_Planet pPlanet = 计算最大最小值(currentPolygon2);
+
+            C_Point3D a = pPlanet.x0y0;
+            C_Point3D b = new C_Point3D(pPlanet.x0y0.x, pPlanet.x1y1.y, 0);
+            C_Point3D c = pPlanet.x1y1;
+            C_Point3D d = new C_Point3D(pPlanet.x1y1.x, pPlanet.x0y0.y, 0);
+
+            List<C_Point3D> result = new List<C_Point3D>();
+            result.Add(a);
+            result.Add(b);
+            result.Add(c);
+            result.Add(d);
+
+            List<C_Point3D> result2 = 旋转点云(-min_angle, result);
+            a = result2[0];
+            b = result2[1];
+            c = result2[2];
+            d = result2[3];
+
+            e.DrawLine(new Pen(Color.Blue, 3), (float)a.x, (float)a.y, (float)b.x, (float)b.y);
+            e.DrawLine(new Pen(Color.Blue, 3), (float)c.x, (float)c.y, (float)b.x, (float)b.y);
+            e.DrawLine(new Pen(Color.Blue, 3), (float)c.x, (float)c.y, (float)d.x, (float)d.y);
+            e.DrawLine(new Pen(Color.Blue, 3), (float)a.x, (float)a.y, (float)d.x, (float)d.y);
+
+            return new RotatedRect(a, b, c, d);
+
+        }
+
+
+
+        public double 计算最小外接矩形(List<C_Point3D> currentPolygon)
+        {
+            C_Point3D a = currentPolygon[0];
+            C_Point3D b = currentPolygon[1];
+            List<C_Point3D> currentPolygon2;
+
+            double min_angle = Math.Atan2(b.y - a.y, b.x - a.x);
+            currentPolygon2 = 旋转点云(min_angle, currentPolygon);
+            double min_area = 计算最小外接正矩形面积(currentPolygon2);
+
+            C_Point3D c, d;
+            double angle2, min_area2;
+            for (int i = 0; i < currentPolygon.Count - 1; i++)
+            {
+                c = currentPolygon[i];
+                d = currentPolygon[i + 1];
+                angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+                currentPolygon2 = 旋转点云(angle2, currentPolygon);
+                min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+                if (min_area2 < min_area)
+                {
+                    min_area = min_area2;
+                    min_angle = angle2;
+                }
+            }
+            c = currentPolygon[currentPolygon.Count - 1];
+            d = currentPolygon[0];
+            angle2 = Math.Atan2(d.y - c.y, d.x - c.x);
+            currentPolygon2 = 旋转点云(angle2, currentPolygon);
+            min_area2 = 计算最小外接正矩形面积(currentPolygon2);
+            if (min_area2 < min_area)
+            {
+                min_area = min_area2;
+                min_angle = angle2;
+            }
+
+            return min_angle;
+        }
+
+
+
+        public double 计算最小外接正矩形面积(List<C_Point3D> currentPolygon)
+        {
+            C_Planet pPlanet = 计算最大最小值(currentPolygon);
+
+            return Math.Abs(pPlanet.x0y0.x - pPlanet.x1y1.x) * Math.Abs(pPlanet.x0y0.y - pPlanet.x1y1.y);
+        }
+
+
+
+        ////计算x，y，z最大，最小值
+        public static C_Planet 计算最大最小值(List<C_Point3D> pList)
+        {
+            double x_min = 100000;
+            double x_max = -100000;
+            double y_min = 100000;
+            double y_max = -100000;
+            double z_min = 100000;
+            double z_max = -100000;
+
+            for (int i = 0; i < pList.Count; i++)
+            {
+                C_Point3D p = (C_Point3D)pList[i];
+                if (p.x < x_min) x_min = p.x;
+                if (p.y < y_min) y_min = p.y;
+                if (p.z < z_min) z_min = p.z;
+
+                if (p.x > x_max) x_max = p.x;
+                if (p.y > y_max) y_max = p.y;
+                if (p.z > z_max) z_max = p.z;
+            }
+
+            C_Planet pPlanet = new C_Planet(-1);
+
+            pPlanet.x0y0 = new C_Point3D(x_min, y_min, z_min);
+            pPlanet.x1y1 = new C_Point3D(x_max, y_max, z_max);
+
+            return pPlanet;
+        }
+
+
+
+        public List<C_Point3D> 旋转点云(double angle, List<C_Point3D> currentPolygon)
+        {
+            List<C_Point3D> polygon2 = new List<C_Point3D>();
+
+            for (int i = 0; i < currentPolygon.Count; i++)
+            {
+                C_Point3D a = currentPolygon[i];
+                double angle2 = Math.Atan2(a.y, a.x);
+
+                double distance = a.distance(new C_Point3D(0, 0, 0));
+                if (distance > 0)
+                {
+                    double x = distance * Math.Cos(angle2 - angle);
+                    double y = distance * Math.Sin(angle2 - angle);
+                    C_Point3D b = new C_Point3D(x, y, 0);
+                    polygon2.Add(b);
+                }
+                else
+                {
+                    polygon2.Add(a);
+                }
+            }
+            return polygon2;
+        }
+
+        public List<C_Point3D> 简化边框读取边框里的点(
+            JArray pJArray,
+            bool bModify = true)
+        {
+            List<C_Point3D> pList_Points = new List<C_Point3D>();
+
+            for (var j = 0; j < pJArray.Count; j++)
+            {
+                int x1 = (int)pJArray[j][0];
+                int y1 = (int)pJArray[j][1];
+
+                if (bModify)
+                {
+                    x1 = (int)Math.Round(x1 / space.vars.draw_scale_tuyang + space.vars.draw_offset_x_tuyang);
+                    y1 = (int)Math.Round(y1 / space.vars.draw_scale_tuyang + space.vars.draw_offset_y_tuyang);
+                }
+                C_Point3D pPoint = new C_Point3D(x1, y1, 0);
+                pList_Points.Add(pPoint);
+            }
+
+
+            return pList_Points;
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

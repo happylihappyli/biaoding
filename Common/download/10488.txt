@@ -1,0 +1,53 @@
+﻿using Common_Robot2;
+using Funny;
+using File = System.IO.File;
+
+namespace Test1
+{
+    public class String_AES_Decrypt : C_Node
+    {
+        public string file_aes = "";
+        public string read = "";
+        public string key_save = "";
+        public string password = "";
+
+        public String_AES_Decrypt(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            string value =this.read_string(read);
+            
+            if (value == "")
+            {
+                if (File.Exists(file_aes))
+                {
+                    value = File.ReadAllText(this.file_aes);
+                }
+            }
+
+            c_string pString = new c_string();
+            if (password == "")
+            {
+                password = pString.default_password;
+            }
+            var str_password = pString.aes_decrypt(value, password);
+
+            this.save_var(this.key_save, "string",str_password);
+        }
+    }
+
+
+}

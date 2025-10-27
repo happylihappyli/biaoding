@@ -1,0 +1,62 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Lucene.Net.Documents;
+using Lucene.Net.Index;
+using Lucene.Net.Search;
+using Lucene.Net.Store;
+using Lucene.Net.Util;
+using System.Collections;
+using Lucene.Net.Analysis;
+using Newtonsoft.Json;
+using B6_Segmentation.com.Funny.Segmentation;
+using B2_Treap.Funny;
+using B2_File.Funny;
+using B2_Data.Funny;
+
+namespace Test1
+{
+    public class S_Index_Add : C_Node
+    {
+
+        public string control_step = "";
+        public string id = ""; 
+        public string content = "";
+
+        public S_Index sIndex ;
+
+        public S_Index_Add(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            sIndex = (S_Index)space.vars_step[control_step];
+
+            string ID =  space.tools.var_read(pTrain, this,id);
+            string Content = space.tools.var_read(pTrain, this,content);
+
+            sIndex.pIndex.Create_Start();
+            sIndex.pIndex.Add_Document(ID, Content);
+            sIndex.pIndex.Create_End();
+        }
+    }
+}

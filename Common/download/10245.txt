@@ -1,0 +1,65 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class String_List_To_Points : C_Node
+    {
+
+        public string key_read = "";//string
+        public string key_save = "";//C_Point3D
+        public string sep = ",";
+        public String_List_To_Points(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<string>? list = (List<string>?)this.read_var(this.key_read, "List<string>");
+
+            List<C_Point3D> list2 = new List<C_Point3D>();
+            for(var i = 0; i < list.Count; i++)
+            {
+                string[] strSplit = list[i].Split(sep);
+
+                if (strSplit.Length > 2)
+                {
+                    float x = float.Parse(strSplit[0]);
+                    float y = float.Parse(strSplit[1]);
+                    float z = float.Parse(strSplit[2]);
+                    C_Point3D pPoint = new C_Point3D(x, y, z);
+                    list2.Add(pPoint);
+                }
+                else
+                {
+                    Console.WriteLine("格式不对！");
+                }
+            }
+            this.save_var(key_save, "List<C_Point3D>", list2);
+
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

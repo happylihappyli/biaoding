@@ -1,0 +1,102 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class Cal_Math_Two : C_Node
+    {
+        public string left = "";
+        public string right = "";
+
+        public double left_value = 0;
+        public double right_value = 0;
+
+        public string key_save = "var1";
+
+        private string? left_key=null;
+        private string? right_key = null;
+
+        public string operate = "+";
+
+        public override void init()
+        {
+            this.init_setting();
+           
+
+            if (this.left.StartsWith("@"))
+            {
+                this.left_key=this.left.Substring(1);
+            }
+            else
+            {
+                try
+                {
+                    this.left_value = double.Parse(this.left);
+                }
+                catch(Exception ex)
+                {
+                    MessageBox.Show(this.Name + " left=" + left+ex.ToString());
+                }
+            }
+
+            if (this.right.StartsWith("@"))
+            {
+                this.right_key = this.right.Substring(1);
+            }
+            else
+            {
+                try
+                {
+                    this.right_value = double.Parse(this.right);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this.Name + "right=" + right+ex.ToString());
+                }
+            }
+        }
+
+        public Cal_Math_Two(string name, C_Space space_parent,C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (left_key != null)
+            {
+                object obj=this.read_var(this.left_key, "double");
+
+                left_value = Main.get_double_from_obj(this,obj);
+            }
+
+            if (right_key != null)
+            {
+                object obj = this.read_var(this.right_key, "double");
+                right_value = Main.get_double_from_obj(this, obj);
+            }
+
+            double value = 0;
+            if (operate == "+")
+            {
+                value = left_value + right_value;
+            }else if (operate == "-")
+            {
+                value = left_value - right_value;
+            }else if (operate == "*")
+            {
+                value = left_value * right_value;
+            }else if (operate == "/")
+            {
+                value = left_value / right_value;
+            }
+
+            this.save_var(key_save,"double",value);
+        }
+         
+    }
+}

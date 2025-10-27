@@ -1,0 +1,45 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// �б�ϲ�
+    /// </summary>
+    public class String_List_Combine : C_Node
+    {
+        public string key_read1 = "";
+        public string key_read2 = "";
+        public string key_save = "";
+        public String_List_Combine(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+        public override void init()
+        {
+
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            List<string>? list1 = (List<string>?)this.read_var(this.key_read1, "List<string>");
+            List<string>? list2 = (List<string>?)this.read_var(this.key_read2, "List<string>");
+            
+
+            List<string>? list = new List<string>();
+            if (list1 != null && list2 != null)
+            {
+                list.AddRange(list1);
+                list.AddRange(list2);
+            }
+
+            this.save_var(key_save, "List<string>", list);
+
+        }
+    }
+}

@@ -1,0 +1,506 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Collections.Generic;
+
+
+namespace Test1
+{
+
+    //   https://www.geogebra.org/3d/ks9gsfrn B
+    public class Cal_Unload_Catch1A : C_Node
+    {
+        public string key_space = "";//C_Space
+        public string key_array_main = "mains";
+
+        public string debug = "1";
+        public string key_angle = "";//读取角度的变量
+        public string key_angle_min = "";//读取最小角度的变量
+        public string calculate_type = "x";
+
+        public string key_grid = "#搜索表格";
+        public string key_grid_row = "#最左边z2";
+
+        public string key_catch_z = "#抓取坐标z";//#抓取坐标z,上次抓取的位置的z（最左边的抓取位置的z分量的变量）
+        public string key_catch_x = "#抓取坐标x";//
+
+        public string? key_planets="";
+        public string key_list_data = "";
+        public string key_x = "#最小x";//测距的x的变量
+        public string key_z = "";//切换到z坐标，如果是测抓，中心点在z下面，就过滤
+
+        public string key_last_x = "#抓取坐标x";//抓取坐标x
+
+        public List<C_Data>? not_move;
+        public C_Train? pTrain_Old = null;
+        public C_Train? pTrain_Finished = null;
+        public string key_last= "";
+
+        public string y_min = "-870";
+        public string y_max= "870";
+        public double car_move_len = 0;
+        public string y_filter= "-300";
+
+        public string key_nobox="#没有盒子";
+        public double angle_start=-10;
+        public string? dz { get;  set; }
+
+        public string? key_read { get;  set; }
+
+        public Cal_Unload_Catch1A(
+            string name,
+            C_Space space_parent,
+            C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string type =this.read_string(this.calculate_type);
+            int count=run_sub_main1(type);
+            this.save_var(this.key_nobox, "string", "0");
+            if (count == 0)
+            {
+                this.save_var(this.key_nobox, "string", "1");
+            }
+        }
+
+
+
+        private int run_sub_main1(string direction)
+        {
+
+            object str_y_min = this.read_string(y_min);
+            double db_y_min = Main.get_double_from_obj(this, str_y_min);
+            object str_y_max = this.read_string(y_max);
+            double db_y_max = Main.get_double_from_obj(this, str_y_max);
+
+
+            object? obj = this.read_var(key_angle, "string");
+            double angle = Main.get_double_from_obj(this, obj == null ? 0 : obj);
+
+            object? obj_x = this.read_var(key_x, "double");
+            double f_x = Main.get_double_from_obj(this, obj_x == null ? 0 : obj_x);
+
+
+            List<C_BoxInfo> list_center3 = (List<C_BoxInfo>)this.read_var(this.key_read, "List<C_BoxInfo>");
+            Main.WriteLine(this, "============= list_center3  =============");
+            string str_ids = "";
+            for (var i = 0; i < list_center3.Count; i++)
+            {
+                C_Data pData = list_center3[i].pData;
+                str_ids += pData.Group_ID + ",";
+            }
+            Main.WriteLine(this, str_ids);
+
+
+            double min_x = 100000000;//找到最小的x
+            for (var i = 0; i < list_center3.Count; i++)
+            {
+                C_BoxInfo center = list_center3[i];
+                if (center.center.x < min_x)
+                {
+                    min_x = center.center.x;
+                }
+            }
+            List<C_BoxInfo> list_center4 = new List<C_BoxInfo>();
+
+
+            for (var i = 0; i < list_center3.Count; i++)
+            {
+                C_BoxInfo center = list_center3[i];
+                {
+                    if (center.center.y > db_y_min-66 && center.center.y < db_y_max+66) //66大概是一排吸嘴的宽度
+                    {
+                        list_center4.Add(center);
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "i=" + i + ",  GID=" + center.Group_ID + "=== center.y <Min Or >Max ===" + center.center.y+ ",y_min="+ db_y_min+ ",y_max=" + db_y_max);
+                    }
+                }
+            }
+
+
+            Main.WriteLine(this, "============= list_center4  =============");
+            str_ids = "";
+            for (var i = 0; i < list_center4.Count; i++)
+            {
+                C_Data pData = list_center4[i].pData;
+                str_ids += pData.Group_ID + ",";
+            }
+            Main.WriteLine(this, str_ids);
+
+
+            list_center4.Sort(delegate (C_BoxInfo p1, C_BoxInfo p2)
+            {
+                //先比较z
+                double d1 = Math.Round(p1.center.z);
+                double d2 = Math.Round(p2.center.z);
+                if (Math.Abs(d1 - d2) < 100)
+                {   //如果z一样，就比较y  //y大的先抓取
+                    d1 = p1.center.y;// + 193;
+                    d2 = p2.center.y;// + 193;
+                    if (angle < 0)
+                    {
+                        return Math.Sign(d1 - d2);//y从小到大
+                    }
+                    else
+                    {
+                        return Math.Sign(d2 - d1);//y从大到小
+                    }
+                }
+                else
+                {
+                    return Math.Sign(d2 - d1);//z从大到小
+                }
+            });
+            Main.WriteLine(this, "==============sort==================");
+            str_ids = "";
+            for (var i = 0; i < list_center4.Count; i++)
+            {
+                C_Data pData = list_center4[i].pData;
+                str_ids += pData.Group_ID + ",";
+            }
+            Main.WriteLine(this, str_ids);
+
+            List<C_Space> spaces = new List<C_Space>();
+
+
+            int iCount = 0;
+            for (var i=0;i< list_center4.Count; i++)
+            {
+                if (iCount >=4) break;
+                C_Data pData = list_center4[i].pData;
+
+                if (i < C_Data.tasks.Length &&
+                    pData.list_3D_Point != null &&
+                    pData.list_3D_Point.Count > 0)
+                {
+                    string tag = i + " " + DateTime.Now.ToString("HHmmssfff");
+                    Main.WriteLine(this, "=============启动线程=============" + tag);
+                    Main.WriteLine(this, "i=" + i + ",分组ID=" + pData.Group_ID);
+                    C_Thread_Data TD = new C_Thread_Data(this, spaces, space, pData, this.key_space, tag);
+                    
+                    TD.space_new.save_vars(TD.space_new.pTrain, this, "main", "C_Data", pData);
+
+                    Thread thread = new Thread(TD.ThreadFun);
+                    thread.Start();
+                    C_Data.threads.Add(thread);
+                    iCount++;
+                }
+                else
+                {
+                    pData.Filter_Conidtion.Append("点云为空");
+                    Main.WriteLine(this, "i=" + i + ",分组ID=" + pData.Group_ID + ",点云为空 count=0");
+                }
+            }
+            S_TTS.speak_async("启动" + iCount+"个");
+
+            int task_count = 0;
+            for (var i = 0; i < C_Data.tasks.Length; i++)
+            {
+                if (C_Data.tasks[i] != null)
+                {
+                    task_count++;
+                }
+            }
+            if (list_center4.Count == 0)
+            {
+                Main.WriteLine(this, "list_center4.Count == 0");
+                this.Next_Step = Node_Next.False;
+                return 0;
+            }
+
+            List<C_Data> list_data2 = new List<C_Data>();//所有的识别结果
+            task_count = 0;
+
+            for (var i = 0; i < list_center4.Count; i++)
+            {
+                if (list_center4[i] != null)
+                {
+                    list_data2.Add(list_center4[i].pData);
+                    task_count++;
+                }
+            }
+
+            Thread.Sleep(1);
+            while (Main.check_finished(spaces) == false)
+            {
+                Thread.Sleep(1);
+            }
+
+
+            double angle_min = 0;
+            try
+            {
+                angle_min = double.Parse(this.read_string("@" + key_angle_min));//  Main.get_double_from_obj(this, obj);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+
+
+
+            List<C_Data> list_data3 = new List<C_Data>();//所有的识别结果
+            Main.WriteLine(this, "======list_data2======");
+            str_ids = "";
+            for (var i = 0; i < list_data2.Count; i++)
+            {
+                C_Data pData = list_data2[i];
+                str_ids += pData.Group_ID + ",";
+            }
+            Main.WriteLine(this, str_ids);
+
+
+            C_Planet_Catch? pLast = (C_Planet_Catch?)this.read_var(this.key_last, "C_Planet_Catch");
+            if (pLast == null)
+            {
+                Main.WriteLine("========上一次没有抓取面");
+            }
+            else
+            {
+                Main.WriteLine("========上次抓取面arm_a=" + pLast.arm_a.ToString());
+            }
+
+
+            for (var i = 0; i < list_data2.Count; i++)
+            {
+                C_Data pData =  list_data2[i];
+                Main.WriteLine(this, "GID=" + pData.Group_ID);
+                if (pData.bFilter == false )
+                {
+                    if (pData.planet == null)
+                    {
+                        Main.WriteLine(this,"【过滤】【planet】==null G=" + pData.Group_ID + " " + pData.Filter_Conidtion.ToString());
+                    }
+                    else
+                    {
+                        if (pLast != null) //如果历史抓取面不是空
+                        {
+                            if (Math.Abs(pData.planet.arm_a.x - pLast.arm_a.x) < Main.x_distance) //先抓同一个面
+                            {
+                                list_data3.Add(pData);
+                            }
+                            else
+                            {
+                                Main.WriteLine(this, "Filter < 80 A G=" + pData.Group_ID);
+                            }
+                        }
+                        else
+                        {
+                            if (Math.Abs(pData.planet.arm_a.x - f_x)< Main.x_distance)
+                            {
+                                list_data3.Add(pData);
+                            }
+                            else
+                            {
+                                Main.WriteLine(this,"距离大于320cm,D="+ Math.Abs(pData.planet.arm_a.x - f_x));
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (pData.planet == null)
+                    {
+                        Main.WriteLine(this,"【过滤】【planet】==null G=" + pData.Group_ID + " " + pData.Filter_Conidtion.ToString());
+                    }
+                    else
+                    {
+                        Main.WriteLine(this,"【过滤】==false G=" + pData.Group_ID+" "+ pData.Filter_Conidtion.ToString());
+                    }
+                }
+            }
+
+
+            bool bContain_Z = false;
+            if (this.contain_var(key_catch_z, "string"))
+            {
+                bContain_Z = true;
+            }
+            double d_z = -1000;
+            if (bContain_Z) d_z = Main.get_double_from_obj(this, this.read_var(key_catch_z, "string"));
+            List<C_Data> list_data4 = new List<C_Data>();
+            //if (bContain_Z)
+            //{
+            //    //抓取位置是开始位置z附近，不能太低。最多下移5cm
+            //    Main.WriteLine(this, "======list_data3======");
+            //    str_ids = "";
+            //    for (var i = 0; i < list_data3.Count; i++)
+            //    {
+            //        C_Data pData = list_data3[i];
+            //        if (pData.planet.arm_a.z - (d_z+int.Parse(this.dz)) > -150)
+            //        {
+            //            list_data4.Add(pData);
+            //        }
+            //        else
+            //        {
+            //            Main.WriteLine(this, "Filter by d_z GID=" + pData.Group_ID+" dz="+ d_z+",a.z="+ pData.planet.arm_a.z);
+            //        }
+            //        str_ids += pData.Group_ID + ",";
+            //    }
+            //    Main.WriteLine(this, str_ids);
+            //}
+            //else
+            {
+                Main.WriteLine(this, "读取为空 key_catch_z=" + key_catch_z);
+                list_data4 = list_data3;
+            }
+
+
+
+            bool bContain_X = false;
+            if (this.contain_var(key_catch_x, "string"))
+            {
+                bContain_X = true;
+            }
+            double d_x = -1000;
+            if (bContain_X) d_x = Main.get_double_from_obj(this, this.read_var(key_catch_x, "string"));
+            List<C_Data> list_data5 = new List<C_Data>();
+            if (bContain_X)
+            {
+                //抓取位置是开始位置x附近，不能相差太远
+                Main.WriteLine(this, "======list_data4======");
+                str_ids = "";
+                for (var i = 0; i < list_data4.Count; i++)
+                {
+                    C_Data pData = list_data4[i];
+                    if (Math.Abs(pData.planet.arm_a.x - d_x)<300)
+                    {
+                        list_data5.Add(pData);
+                    }
+                    else
+                    {
+                        Main.WriteLine(this, "Filter by d_x GID=" + pData.Group_ID + " dx=" + d_x+", x="+ pData.planet.arm_a.x);
+                    }
+                    str_ids += pData.Group_ID + ",";
+                }
+                Main.WriteLine(this, str_ids);
+            }
+            else
+            {
+                Main.WriteLine(this, "读取为空 key_catch_x=" + key_catch_x);
+                list_data5 = list_data4;
+            }
+
+
+
+            Main.WriteLine(this, "======list_data5 ======");
+            str_ids = "";
+            for (var i = 0; i < list_data5.Count; i++)
+            {
+                C_Data pData = list_data5[i];
+                str_ids += pData.Group_ID + ",";
+            }
+            Main.WriteLine(this, str_ids);
+
+
+            int count = 0;
+            {
+                this.save_var(this.key_list_data, "List<C_Data>", list_data5);
+                count = list_data5.Count;
+            }
+
+
+            if (count == 0)
+            {
+                //if (bContain_Z == false)
+                {
+                    this.Next_Step = Node_Next.False;
+                    return 0;
+                }
+            }
+
+            return 1;
+        }
+
+        public void 识别箱子类型(List<C_Data> list_data,float f_x)
+        {
+            List<float> xlens = new List<float>();
+            List<float> ylens = new List<float>();
+            List<float> zlens = new List<float>();
+            for (var i = 0; i < list_data.Count; i++)
+            {
+                C_Data pData = list_data[i];
+                if (pData.pMin_Relative == null)
+                {
+                    continue;
+                }
+                float xmin = pData.pMin_Relative.x;
+                float ymin = pData.pMin_Relative.y;
+                float zmin = pData.pMin_Relative.z;
+                float xmax = pData.pMax_Relative.x;
+                float ymax = pData.pMax_Relative.y;
+                float zmax = pData.pMax_Relative.z;
+
+                const float xthres = 50;
+                const float zthres = 50;
+                if (xmin < f_x + xthres)//过滤掉往里一排的目标
+                {
+                    float xlen = xmax - xmin;
+                    float ylen = ymax - ymin;
+                    float zlen = zmax - zmin;
+
+                    if (zlen > zthres)//侧抓面
+                    {
+                        ylens.Add(ylen);
+                        zlens.Add(zlen);
+                    }
+                    else//正抓面
+                    {
+                        ylens.Add(ylen);
+                        xlens.Add(xlen);
+                    }
+                }
+            }
+
+
+            if (xlens.Count > 0)
+            {
+                xlens.Sort();
+                this.save_var("#箱子的长度", "double", xlens[(int)(xlens.Count / 2)]);
+            }
+            if (ylens.Count > 0)
+            {
+                ylens.Sort();
+                this.save_var("#箱子的宽度", "double", ylens[(int)(ylens.Count / 2)]);
+            }
+            if (zlens.Count > 0)
+            {
+                zlens.Sort();
+                this.save_var("#箱子的高度", "double", zlens[(int)(zlens.Count / 2)]);
+            }
+        }
+
+        public string get_direction(C_Point3D faxiangliang)
+        {
+            if (Math.Abs(faxiangliang.z) > 0.6)
+            {
+                return "z";
+            }else if (Math.Abs(faxiangliang.x) > 0.6)
+            {
+                return "x";
+
+            }
+            else if (Math.Abs(faxiangliang.y) > 0.6)
+            {
+                return "y";
+            }
+            return "";
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

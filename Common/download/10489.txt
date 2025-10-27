@@ -1,0 +1,53 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class File_Dir_Parent : C_Node
+    {
+        public string dir = "";
+        public string key_save = "";
+
+        public File_Dir_Parent(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+        public void run_sub_main()
+        {
+            try
+            {
+                string str_dir = this.read_string(dir);
+
+                string[] strSplit= str_dir.Split("\\");
+
+                string path = "";
+                for(var i=0;i<strSplit.Length-1;i++)
+                {
+                    path += strSplit[i] + "\\";
+                }
+                if (path.EndsWith("\\"))
+                {
+                    path=path.Substring(0,path.Length-1);
+                }
+                this.save_var(key_save,"string", path);
+            }
+            catch (Exception e)
+            {
+                Main.WriteLine(this,"目录读取错误:");
+                Console.WriteLine("目录读取错误:");
+                Console.WriteLine(e.Message);
+            }
+
+        }
+    }
+}

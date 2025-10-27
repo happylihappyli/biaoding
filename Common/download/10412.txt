@@ -1,0 +1,88 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class String_JSON_Read : C_Node
+    {
+        public string key_json = "";
+        public string key_save = "";
+        public string path = "task_status_package/task_status_list@0/status";
+
+        public String_JSON_Read(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+         
+            string? json = (string?)this.read_var(this.key_json, "string");
+            if (json == null)
+            {
+                return;
+            }
+
+            JObject p = JObject.Parse(json);
+            JObject p2 = p;
+
+
+            string[] strSplit = path.Split('/');
+            for (var i = 0; i < strSplit.Length; i++)
+            {
+                string key = strSplit[i];
+
+                if (key.IndexOf("@") > -1)
+                {
+                    string[] strSplit2 = key.Split('@');
+                    if (strSplit2.Length == 2)
+                    {
+                        string key2 = strSplit2[0];
+                        int index = int.Parse(strSplit2[1]);
+                        p2 = (JObject)((JArray)p.GetValue(key2))[index];
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    var item = p.GetValue(key);
+                    switch (item)
+                    {
+                        case JObject obj:
+                            p2 = obj;
+                            break;
+                        case JToken jtoken:
+                            if (i == strSplit.Length - 1)
+                            {
+                                string a = jtoken.ToString();
+                                this.save_var(this.key_save, "string", a);
+                            }
+                            else
+                            {
+                                p2 = (JObject)jtoken;
+                            }
+                            break;
+                    }
+                }
+                p = p2;
+            }
+        }
+
+
+        public override void init()
+        {
+
+        }
+
+    }
+}

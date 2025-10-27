@@ -1,0 +1,125 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class D_Draw_Rects : C_Node
+    {
+
+        public string color = "red";
+        public string pic_read = "camera1";
+        public string pic_save = "";
+
+        public string data_in = "";
+        public string data_out = "";
+
+        private string _key_rects = "";
+        private string _pen_width = "3";
+
+        public string key_rects { get => _key_rects; set => _key_rects = value; }
+        public string pen_width { get => _pen_width; set => _pen_width = value; }
+
+        public D_Draw_Rects(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (pTrain == null) return;
+
+            if (data_in != "")
+            {
+                pic_read = data_in;
+            }
+
+            if (data_out != "")
+            {
+                pic_save = data_out;
+            }
+
+
+            if (space.read_vars(pTrain, this, pic_read, "Bitmap") == null)
+            {
+                MessageBox.Show(this.Name+ "  pic_read=null " + pic_read);
+                return;
+            }
+            Bitmap pBitmapRGB = (Bitmap)space.read_vars(pTrain, this, pic_read, "Bitmap");
+
+            Bitmap pBitmapTmp = Main.CopyBmp(pBitmapRGB);
+
+            int width = pBitmapTmp.Width;
+            int height = pBitmapTmp.Height;
+            Bitmap bmpSave = new Bitmap(width, height);
+            Graphics g = Graphics.FromImage(bmpSave);
+
+            g.DrawImage(pBitmapTmp,
+                new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                        (int)space.vars.draw_offset_y_tuyang,
+                    pBitmapTmp.Width - (int)space.vars.draw_offset_x_tuyang,
+                    pBitmapTmp.Height - (int)space.vars.draw_offset_y_tuyang),
+                new Rectangle(0, 0, pBitmapTmp.Width, pBitmapTmp.Height),
+                GraphicsUnit.Pixel);
+
+
+            C_Point3D p1 = null;
+            C_Point3D p2 = null;
+
+            string[] strSplit = _key_rects.Split(",");
+            string[] strSplit_Color =color.Split(",");
+
+            if (strSplit_Color.Length < strSplit.Length)
+            {
+                MessageBox.Show(this.Name + "颜色数量太少");
+            }
+
+
+
+            for (var i = 0; i < Math.Min(strSplit_Color.Length, strSplit.Length); i++)
+            {
+                string key_rect = strSplit[i];
+                if (space.read_vars(pTrain, this, key_rect, "C_Rect") != null)
+                {
+
+                    C_Rect pRect = (C_Rect)space.read_vars(pTrain, this, key_rect, "C_Rect");
+                    p1 = new C_Point3D(pRect.pPoint1.x, pRect.pPoint1.y, 0);
+                    p2 = new C_Point3D(pRect.pPoint2.x, pRect.pPoint2.y, 0);
+
+
+                    if (pBitmapTmp != null)
+                    {
+                        lock (pBitmapTmp)
+                        {
+                            string color2 = strSplit_Color[i];
+                            if (color2 == "") color2 = "red";
+                            Pen pPen = new Pen(ColorTranslator.FromHtml(color2), int.Parse(_pen_width));
+
+                            float w = (float)(p2.x - p1.x);
+                            float h = (float)(p2.y - p1.y);
+
+                            g.DrawRectangle(pPen, p1.x, p1.y, w, h);
+                        }
+                    }
+                }
+
+            }
+            this.save_var(pic_save, "Bitmap", bmpSave);
+
+
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

@@ -1,0 +1,65 @@
+﻿using Common_Robot2;
+using Microsoft.Win32;
+using System.Diagnostics;
+
+namespace Test1
+{
+    public class S_Open_App : C_Node
+    {
+        public string url = "";
+
+        public S_Open_App(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string url_new = space.tools.var_read(pTrain, this, this.url);
+            //System.Diagnostics.Process.Start(url_new);
+
+            if (url_new.StartsWith("http"))
+            {
+                ////从注册表中读取默认浏览器可执行文件路径
+                //RegistryKey key = Registry.ClassesRoot.OpenSubKey(@"http\shell\open\command\");
+                //string s = key.GetValue("").ToString();
+                ////s就是你的默认浏览器，不过后面带了参数，把它截去，不过需要注意的是：不同的浏览器后面的参数不一样！
+                ////"D:\Program Files (x86)\Google\Chrome\Application\chrome.exe" -- "%1"
+                //Process.Start("Chrome.exe", url_new);
+
+
+                RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe");
+                if (registryKey != null)
+                {
+                    string exePath = (string)registryKey.GetValue("");
+                    if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+                    {
+                        Process.Start(exePath, url_new);
+                    }
+                }
+            }
+            else
+            {
+                Process p = new Process();
+                p.StartInfo.FileName = "explorer.exe";
+                p.StartInfo.Arguments = url_new;// @" C:\Users\RAPOO\Pictures\Camera Roll\wuhan.jpg";
+                p.Start();
+
+            }
+        }
+
+
+    }
+
+
+}

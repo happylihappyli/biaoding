@@ -1,0 +1,154 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System.Text;
+
+namespace Test1
+{
+    //RGB图片分割算法
+    public class Img_Split : C_Node
+    {
+        public string pic_read = "";
+        public string data_in = "";
+
+        public string box_save = "";
+        public string box_save_str = "";
+
+        public string server_url1 = "";
+        public string server_url2 = "";
+        
+        public double draw_scale_tuyang = 1;
+        public string draw_scale = "0.5";
+        public string body = "";
+
+        public Img_Split(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+
+        public async override Task run_sub()
+        {
+            if (data_in != "")
+            {
+                pic_read = data_in;
+            }
+
+            Main.WriteLine(this,"图漾图片发送切割 Start");
+
+            Bitmap? pBitmap1 = (Bitmap?)this.read_var(this.pic_read, "Bitmap");
+            if (pBitmap1 == null) return;
+
+            Bitmap? pBitmap_Send = null;
+            lock (pBitmap1)
+            {
+                Bitmap pBitmap2 = Test1.Main.CopyBmp(pBitmap1);
+                int width = (int)(pBitmap1.Width * this.draw_scale_tuyang);
+                int height = (int)(pBitmap1.Height * this.draw_scale_tuyang);
+                pBitmap_Send = new Bitmap(pBitmap2, width, height);
+            }
+            //await Send_To_NN(pTrain, pBitmap_Send);
+
+            string strURL = this.read_string(this.server_url1);
+            await http_post_test(pTrain, pBitmap_Send, strURL);
+
+            Main.WriteLine(this,"图漾图片发送切割 End");
+        }
+
+
+
+        public static string FileToBase64Str(Bitmap bmp)// string path)
+        {
+
+            byte[] bt;
+            lock (bmp)
+            {
+                bt = Tools.ImageToByte(bmp);
+            }
+            string base64Str = Convert.ToBase64String(bt);
+
+            return base64Str;
+        }
+
+
+        public async Task http_post_test(
+            I_Train pTrain,
+            Bitmap pBitmap_Send,
+                string url)
+        {
+            try
+            {
+                Main.WriteLine(this,"POST Start ");
+
+                string strData = FileToBase64Str(pBitmap_Send);
+                string content = this.code;//post 模板
+
+                if (content == "")
+                {
+                    content = "{\"img_info\":{\"img_data\":\"@{data}\"}}";
+                }
+                content = content.Replace("@{data}", strData);
+
+                var content2 = new StringContent(content, Encoding.UTF8, "application/json");
+                string responseString = "";
+                try
+                {
+                    HttpClient client = new HttpClient();
+                    var response = await client.PostAsync(url, content2);
+                    responseString = await response.Content.ReadAsStringAsync();
+                }
+                catch (Exception ex)
+                {
+                    S_TTS.speak_async("分割服务器有问题");
+                    Main.WriteLine(this,ex.ToString());
+                }
+                 
+                    Main.WriteLine(this,"POST End ");
+
+                JObject? root = null;
+                JArray? JArray_Box=null;
+                try
+                {
+                    root=JObject.Parse(responseString);
+                    JArray_Box = (JArray?)root.SelectToken("pack_list");
+                }
+                catch(Exception ex)
+                {
+                    S_TTS.speak_async("分割服务器有问题");
+                    Main.WriteLine(this,ex.ToString());
+                }
+
+
+                if (JArray_Box != null)
+                {
+                    if (JArray_Box.Count == 0)
+                    {
+                        S_TTS.speak_async("图片切割为空！");
+                        Main.WriteLine(this, "切割为空!");
+                    }
+                    this.save_var(box_save, "JArray", JArray_Box);
+                    if (box_save_str != "")
+                    {
+                        this.save_var(box_save_str, "string", JArray_Box.ToString());
+                    }
+                }
+                else
+                {
+                    S_TTS.speak_async("没有要抓取的包裹");
+                    MessageBox.Show("没有要抓取的包裹  no_package.png");
+                    Main.WriteLine(this,responseString);
+                    return;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(this,ex.ToString());
+            }
+        }
+
+        public override void init()
+        {
+            draw_scale_tuyang = double.Parse(this.draw_scale);
+        }
+    }
+}

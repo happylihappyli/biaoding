@@ -1,0 +1,61 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Test1
+{
+    public class S_Array_Read : C_Node
+    {
+        public string index = "";
+        //public string type_read = "";
+        public string type_save = "";
+        public string key_read = "";
+        public string key_save = "";
+
+        public S_Array_Read(string name, C_Space space_parent, C_Space space) : 
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string index_new = this.read_string(index);
+
+            IList pList = (IList)this.read_var(key_read, "");
+            if (pList == null) return;
+
+            object line = null;
+            if (index_new == "count")
+            {
+                line = pList.Count + "";
+            }
+            else
+            {
+                int iIndex = int.Parse(index_new);
+                if (iIndex < pList.Count && iIndex >= 0)
+                {
+                    line = pList[iIndex];
+                }
+            }
+
+            this.save_var(key_save, type_save, line);
+        }
+    }
+
+}

@@ -1,0 +1,49 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Read_Rect : C_Node
+    {
+        public string key_read1 = "";
+        public string key_read2 = "";
+        public string key_save = "1";
+
+
+        public S_Read_Rect(string name, C_Space space_parent, C_Space space) : base(name,space_parent,space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        private void run_sub_main()
+        {
+            string _x1 = (string)space.read_vars(pTrain, this, this.key_read1 + "/x", "string");
+            string _y1 = (string)space.read_vars(pTrain, this, this.key_read1 + "/y", "string");
+            string _x2 = (string)space.read_vars(pTrain, this, this.key_read2 + "/x", "string");
+            string _y2 = (string)space.read_vars(pTrain, this, this.key_read2 + "/y", "string");
+
+            if (_x1 == "") return;
+            int x1 = int.Parse(_x1);
+            int y1 = int.Parse(_y1);
+            int x2 = int.Parse(_x2);
+            int y2 = int.Parse(_y2);
+
+            {
+                C_Rect pRect1 = new C_Rect(new C_Point3D(x1, y1, 0),
+                    new C_Point3D(x2, y2, 0));
+
+                space.save_vars(pTrain, this, key_save, "C_Rect", pRect1);
+            }
+        }
+    }
+}

@@ -1,0 +1,42 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class File_Is_Utf8: C_Node
+    {
+        public string? file;
+
+        public File_Is_Utf8(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_file = this.read_string(this.file);
+
+            if (Main_File.isUtf8(str_file))
+            {
+                this.Next_Step = Node_Next.True;
+            }
+            else
+            {
+                this.Next_Step = Node_Next.False;
+            }
+        }
+
+        public override void init()
+        {
+        }
+    }
+
+}

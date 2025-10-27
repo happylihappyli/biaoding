@@ -1,0 +1,83 @@
+﻿
+using Common_Robot2;
+using M;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //播放MIDI文件","inPorts": ["in"],"outPorts": ["out"],"image_url": "","image": "","content":"说明信息"}
+    public class File_Play_Midi: C_Node
+    {
+        //要播放的midi文件","var_type":"string","required":"1","var":"1","type_group":"","help": ""}
+        public string file = "";
+        public string speed = "1";
+
+
+        private MidiStream? stm = null;
+
+
+        public override void init()
+        {
+
+        }
+
+        public File_Play_Midi(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            stm = MidiDevice.Streams[0];
+            {
+                // open it
+                stm.Open();
+                // read a MIDI file
+                var midiFile = MidiFile
+                .ReadFrom(this.file);
+                //Console.WriteLine(Path.GetFileName(midiFile.FilePath) + " @ " + midiFile.TimeBase + " PQN");
+                var tsig = midiFile.TimeSignature;
+                //Console.WriteLine("Tempo: " + midiFile.Tempo + " BPM @ " + tsig.Numerator + "/" + tsig.Denominator + " time");
+                //Console.WriteLine("Tracks:");
+                for (var i = 0; i < midiFile.Tracks.Count; ++i)
+                {
+                    var track = midiFile.Tracks[i];
+                    //Console.Write("\t");
+                    var name = track.Name;
+                    if (string.IsNullOrEmpty(name))
+                        name = "Track " + i;
+                    //Console.WriteLine(name + " \tEvents: " + track.Events.Count);
+                }
+                //Console.WriteLine();
+                // merge the tracks for playback
+                var seq = MidiSequence.Merge(midiFile.Tracks);
+                // set the stream timebase
+                string strSpeed = this.read_string(speed);
+                stm.TimeBase = (short)(midiFile.TimeBase*float.Parse(strSpeed));
+                // start the playback
+                stm.Start();
+
+
+                // 循环播放
+                stm.SendComplete += delegate (object s, EventArgs e)
+                {
+                    // loop
+                    //stm.Send(seq.Events);
+                    stm.Close();
+                };
+                stm.Send(seq.Events);
+
+            }
+
+        }
+
+    }
+}

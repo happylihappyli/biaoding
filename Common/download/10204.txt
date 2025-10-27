@@ -1,0 +1,80 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Test1
+{
+    /// <summary>
+    /// 新建抓取面，用3个坐标
+    /// </summary>
+    public class S_New_Planet_Catch : C_Node
+    {
+        public string key_a = "";
+        public string key_b = "";
+        public string key_save = "";
+        public string _key_cloud = "";
+
+
+        public string key_cloud { get => _key_cloud; set => _key_cloud = value; }
+
+
+        public S_New_Planet_Catch(string name, C_Space space_parent, C_Space space)
+            : base(name, space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            C_Point3D a = (C_Point3D)space.read_vars(pTrain, this, this.key_a, "C_Point3D");
+            C_Point3D b = (C_Point3D)space.read_vars(pTrain, this, this.key_b, "C_Point3D");
+
+            if (a == null)
+            {
+                MessageBox.Show(this.Name + " a==null");
+                return;
+            }
+            if (b == null)
+            {
+                MessageBox.Show(this.Name + " b==null");
+                return;
+            }
+
+
+            C_Data pData = new C_Data(space);
+            C_Planet_Catch pCatch = new C_Planet_Catch(space,0,pData);
+            pCatch.arm_a = a;
+            pCatch.arm_b = b;
+
+            Main.WriteLine(this, "a=" + a.ToString());
+            Main.WriteLine(this, "b=" + b.ToString());
+
+            if (this.key_cloud != "")
+            {
+                List<C_Point3D> list = (List<C_Point3D>)this.read_var(this.key_cloud, "List<C_Point3D>");
+                pData.list_3D_Point = list;
+                pData.list_3D_Point_filter = list;
+            }
+
+
+            space.save_vars(pTrain, this, this.key_save, "C_Planet_Catch", pCatch);
+
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

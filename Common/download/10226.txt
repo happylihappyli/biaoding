@@ -1,0 +1,66 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using ConverxHull;
+
+namespace Test1
+{
+    public class String_To_Polygon : C_Node
+    {
+        public string str = "";
+        public string key_save = "";
+
+        public String_To_Polygon(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string[] strSplit=this.key_save.Split(',');
+            string strLine = space.tools.var_read(pTrain, this, this.str);
+
+            JArray arr = JArray.Parse(strLine);
+            if (arr.Count!= strSplit.Length)
+            {
+                MessageBox.Show(this.Name+ "变量和多边形个数不一致！");
+            }
+            for (var i = 0; i < arr.Count; i++)
+            {
+                JArray line = (JArray)arr[i];
+                if (line.Count > 3)
+                {
+                    List<C_Point3D> list = new List<C_Point3D>();
+                    for (var j=0; j<line.Count; j++)
+                    {
+                        JArray item = (JArray)line[j];
+                        string? strX = (string?)item[0];
+                        string? strY = (string?)item[1];
+                        if (strX==null || strY == null)
+                        {
+                            continue;
+                        }
+                        float x = float.Parse(strX);
+                        float y = float.Parse(strY);// (string)item[1]);
+                        C_Point3D pPoint = new C_Point3D(x, y, 0);
+                        list.Add(pPoint);
+                    }
+
+                    this.save_var(strSplit[i], "List<C_Point3D>", list);
+                }
+            }
+
+        }
+    }
+}

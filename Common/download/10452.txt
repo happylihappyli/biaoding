@@ -1,0 +1,75 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class S_Button : S_UI
+    {
+        public Button button;
+        public Panel panel;
+        public string url = "";
+        public string read_key = "";
+        public string text = "button1";
+
+        public S_Button(string name, C_Space space_parent, C_Space space) : base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+
+            button = new Button();
+            button.BackColor = Color.Transparent;
+            button.Location = new System.Drawing.Point(x, y);
+            button.Size = new Size(width, height);
+            button.Text = Tools.process_title(text);
+
+
+            var font_name = this.font_name;
+            if (font_name == "")
+            {
+                font_name = "宋体";
+            }
+            var font_size = this.font_size;
+            if (this.font_size == "")
+            {
+                font_size = "12";
+            }
+            button.Font = new Font(font_name, float.Parse(font_size),
+                FontStyle.Regular, GraphicsUnit.Point, ((byte)(134)));
+
+            if (this.color_bg != "")
+            {
+                button.BackColor = ColorTranslator.FromHtml(this.color_bg);
+            }
+            if (this.color_font != "")
+            {
+                button.ForeColor = ColorTranslator.FromHtml(this.color_font);
+            }
+
+            if (pFrm != null)
+            {
+
+                Action act = delegate ()
+                {
+                    if (pFrm != null)
+                    {
+                        Main.Add_Panel(this.pFrm,dock,this.group, space, button);
+                    }
+                };
+                if (pFrm != null)
+                    pFrm.BeginInvoke(act, null);
+
+
+            }
+        }
+    }
+}

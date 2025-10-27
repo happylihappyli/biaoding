@@ -1,0 +1,52 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //模型缩放
+    public class S_Model_Scale: C_Node
+    {
+        //读取模型变量
+        public string key_read = "";
+        //保存的模型变量
+        public string key_save = "";
+        //缩放比例
+        public string scale = "1";
+
+        public S_Model_Scale(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            double db_scale = double.Parse(this.scale);
+            List<C_Point3D> model1 = (List<C_Point3D>)this.read_var(key_read, "Bitmap");
+
+            List<C_Point3D> model2 = new List<C_Point3D>();
+            for(var i=0; i<model1.Count; i++)
+            {
+                C_Point3D p = model1[i];
+                model2.Add(p.scale(db_scale));
+            }
+
+            this.save_var(key_save, "List<C_Point3D>", model2);
+        }
+
+        public void init()
+        {
+
+        }
+    }
+}

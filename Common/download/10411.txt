@@ -1,0 +1,61 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using pcammls;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Xml.Linq;
+
+namespace Test1
+{
+    public class S_Convert_Pic_Point_To_3D : C_Node
+    {
+        public string key_read = "pic_key";
+        public string key_save = "3d_key";
+        public string camera_w = "1280";
+        public string key_3d = "";
+
+        public S_Convert_Pic_Point_To_3D(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+            //this.Name = Name;
+            //space.vars_step.Add(Name, this);
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            TY_VECT_3F_ARRAY glb_p3dArray = (TY_VECT_3F_ARRAY)this.read_var(this.key_3d, "TY_VECT_3F_ARRAY");
+
+            if (glb_p3dArray == null)
+            {
+                MessageBox.Show(this.Name + " key_3d 设置错误");
+                return;
+            }
+
+            C_Point3D? pPoint1= (C_Point3D?)this.read_var(key_read, "C_Point3D");
+            int x = (int)Math.Round(pPoint1.x);// int.Parse((string)space.vars.read_vars(pTrain, this, key_read + "/x", "string"));
+            int y = (int)Math.Round(pPoint1.y);// int.Parse((string)space.vars.read_vars(pTrain, this, key_read + "/y", "string"));
+            C_Point3D pPoint2 = Main.图像转3D点云(glb_p3dArray, int.Parse(camera_w), x, y);
+
+
+            space.save_vars(pTrain, this, key_save, "C_Point3D", pPoint2);
+
+        }
+
+    }
+}

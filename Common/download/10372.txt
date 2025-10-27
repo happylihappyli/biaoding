@@ -1,0 +1,130 @@
+﻿
+using Common_Robot2;
+
+
+namespace Test1
+{
+    public class U_Image_Show : C_Node
+    {
+        public PictureBox? picture_box;
+
+        private string _url = "";
+        private string _key_ui = "";
+        private string _data_in = "";
+
+        private string _key_pic = "";
+
+        public string key_ui { get => _key_ui; set => _key_ui = value; }
+        public string url { get => _url; set => _url = value; }
+        public string data_in { get => _data_in; set => _data_in = value; }
+        public string key_image { get => _key_pic; set => _key_pic = value; }
+
+        public U_Image_Show(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show(this.Name+ " S_Image_Show key_ui==null!");
+                return;
+            }
+
+
+            S_Image? pItem;
+            if (space.vars_ui.ContainsKey(key_ui))
+            {
+                pItem = (S_Image)space.vars_ui[key_ui];
+            }
+            else
+            {
+                pItem = (S_Image)space_parent.vars_ui[key_ui];
+            }
+            picture_box = pItem.picture_box;
+
+
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            Action? act = delegate ()
+            {
+                if (picture_box != null)
+                {
+                    if (data_in != "")
+                    {
+                        key_image = data_in;
+                    }
+                    if (key_image != "")
+                    {
+                        if (space.contains(pTrain, this, key_image, "Bitmap"))
+                        {
+                            Bitmap? bmp = (Bitmap?)this.read_var(key_image, "Bitmap");
+                            if (bmp != null)
+                                lock(bmp)
+                                {
+                                    try
+                                    {
+                                        Bitmap? bmp2 = Main.CopyBmp(bmp);
+                                        lock (bmp2)
+                                        {
+                                            picture_box.Image = bmp2;
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Main.WriteLine(this,ex.ToString());
+                                    }
+                                }
+                        }
+                    }
+                    else
+                    {
+                        if (_url.StartsWith("@"))
+                        {
+                            var key = _url.Substring(1);
+                            if (space.contains(pTrain, this, key, "Bitmap"))
+                            {
+                                Bitmap? bmp = (Bitmap?)this.read_var(key, "Bitmap");
+                                try
+                                {
+                                    if (bmp != null)
+                                    {
+                                        Bitmap? bmp2 = Main.CopyBmp(bmp);
+                                        lock (bmp2)
+                                        {
+                                            picture_box.Image = bmp2;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Main.WriteLine(this,ex.ToString());
+                                }
+                            }
+                        }
+                        else
+                        {
+                            picture_box.ImageLocation = _url;
+                            picture_box.Refresh();
+                            picture_box.SizeMode = PictureBoxSizeMode.StretchImage;
+                            picture_box.Parent.Refresh();
+                        }
+                    }
+                }
+            };
+            if (picture_box != null)
+                picture_box.BeginInvoke(act, null);
+        }
+
+    }
+}

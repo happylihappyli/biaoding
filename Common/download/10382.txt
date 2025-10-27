@@ -1,0 +1,39 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class U_Show_Debug : C_Node
+    {
+        public U_Show_Debug(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            Action act = delegate ()
+            {
+
+                Frm_Debug pDebug = new Frm_Debug();
+                pDebug.space = this.space;// space3;
+                pDebug.Show();
+            };
+
+            if (m1.form!=null)
+            {
+                m1.form.BeginInvoke(act, null);
+            }
+
+
+        }
+    }
+}

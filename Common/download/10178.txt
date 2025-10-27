@@ -1,0 +1,451 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using pcammls;
+
+namespace Test1
+{
+    public class S_Calculate2 : C_Node
+    {
+        public C_Point3D postion_start = new C_Point3D(1200, 0, 1200);//机械臂初始位置
+
+
+        public string key_3d = "#3F_ARRAY";//TY_VECT_3F_ARRAY 
+        public string key_save = "pPlanet_Top";
+        public string key_main = "mains";//List<C_Main>
+        public string key_matrix = "";
+        public string key_bottom = "";//C_Planet
+
+        public string right_bottom = "";
+        public string box_height = "225";
+        public string key_box_type = "";
+        public string key_stat;
+        public string sort_type = "yxz";
+
+
+        private string _key_robot = "";
+        public string key_robot { get => _key_robot; set => _key_robot = value; }
+
+        private string _key_camera = "#camera1_const";
+        public string key_camera { get => _key_camera; set => _key_camera = value; }
+
+        private string _y_max = "0";
+        public string key_save_cloud="";
+
+        public string y_max { get => _y_max; set => _y_max = value; }
+
+        public S_Calculate2(string name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void init()
+        {
+
+        }
+
+
+        public void run_sub_main()
+        {
+
+            space.remove_var(pTrain, this, this.key_save, "C_Planet_Catch");
+
+            if (C_Data.tasks == null)
+            {
+                Main.WriteLine(this.Name + " C_Main.tasks == null");
+                return;
+            }
+            init();
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(this.key_camera, "C_Camera_TuYang");// "#camera1_const");
+            TY_VECT_3F_ARRAY p3dArray = (TY_VECT_3F_ARRAY)this.read_var(this.key_3d, "TY_VECT_3F_ARRAY");//.vars["glb_p3dArray"];
+            
+            C_Robot pRobot = (C_Robot)space.read_vars(pTrain, this, this.key_robot, "C_Robot");
+            if (pRobot == null)
+            {
+                MessageBox.Show(this.Name + "pRobot == null!!");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            C_Planet bottom = (C_Planet)space.read_vars(pTrain, this, this.key_bottom, "C_Planet");
+            if (bottom == null)
+            {
+                MessageBox.Show(this.Name+ "bottom == null!!");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+
+            int space_count = 0;
+            List<C_Space> spaces = new List<C_Space>();
+            {
+                S_Calculate2 that = this;
+                List<C_Data> arrMain = (List<C_Data>)space.read_vars(pTrain, this, this.key_main, "List<C_Data>");
+
+                List<C_Box_Type> list_box_type = new List<C_Box_Type>();
+
+                for (var i = 0; i < arrMain.Count; i++)
+                {
+                    C_Data pData = arrMain[i];
+
+                    if (i < C_Data.tasks.Length &&
+                        pData.list_3D_Point != null &&
+                        pData.list_3D_Point.Count > 0)
+                    {
+                        space_count += 1;
+                        {
+                            C_Space space_new = new C_Space();
+                            spaces.Add(space_new);
+                            S_Main2 pMain2 = new S_Main2("main2", space, space_new);
+                            pMain2.pData = pData;
+                            if (p3dArray == null)
+                            {
+                                MessageBox.Show("key_3d error");
+                                return;
+                            }
+                            if (camera1 == null)
+                            {
+                                MessageBox.Show("key_camera error");
+                                return;
+                            }
+                            C_Box_Type pType = new C_Box_Type(pData.Group_ID, 0, 0, 0, 0, 0);
+                            list_box_type.Add(pType);
+                            pMain2.BoxType = pType;
+                            pMain2.pTrain = pTrain;
+                            pMain2.camera1 = camera1.camera1;
+                            pMain2.key_matrix = key_matrix;
+                            pMain2.robot = pRobot;
+                            pMain2.p3dArray = p3dArray;
+                            pMain2.bottom = bottom;
+                            pMain2.Run(pTrain);
+                        }
+                    }
+                    else
+                    {
+                        pData.Filter_Conidtion.Append("点云为空");
+                        Console.WriteLine(this.Name+ "点云为空 count=0");
+                    }
+                }
+
+
+                int task_count = 0;
+                for (var i = 0; i < C_Data.tasks.Length; i++)
+                {
+                    if (C_Data.tasks[i] != null)
+                    {
+                        task_count++;
+                    }
+                }
+
+                List<C_Data> list_data2 = new List<C_Data>();//所有的识别结果
+                task_count = 0;
+                for (var i = 0; i < arrMain.Count; i++)
+                {
+                    list_data2.Add(arrMain[i]);
+                    task_count++;
+                }
+
+
+                Thread.Sleep(1);
+                while (check_finished(spaces) == false)
+                {
+                    Thread.Sleep(1);
+                }
+
+
+                List<C_Box_Type> list_box_type2 = new List<C_Box_Type>();
+                for (var i = 0; i < list_box_type.Count; i++)
+                {
+                    if (list_box_type[i] != null)
+                    {
+                        list_box_type2.Add(list_box_type[i]);
+                    }
+                }
+
+
+                //MODIFIED 读取箱规
+                string box_size_str = (string)space.read_vars(pTrain, this, "#箱子类型远", "string");
+                string[] string_values = box_size_str.Split(",");
+                double[] box_size = new double[string_values.Length];
+                for(int ii = 0; ii < box_size.Count(); ii++) {
+                    box_size[ii] = double.Parse(string_values[ii]);
+                }
+
+                //if (mode == "1")
+                {
+                    //抓取模式
+                    List<C_Planet_Catch> list_catch = new List<C_Planet_Catch>();//所有的识别结果 pPlanet_Top
+
+                    for (var i = 0; i < list_data2.Count; i++)
+                    {
+                        C_Data pData = list_data2[i];
+
+                        //MODIFIED 估计面积，按照面积大小过滤
+                        double area = pData.planet.len1 * pData.planet.len2;
+                        double min_area = box_size[0] * box_size[1];
+                        //判断短边
+                        double min_len = Math.Min(pData.planet.len1, pData.planet.len2);
+                        //判断短边是y还是z
+                        double dist_y = Math.Abs(min_len - box_size[1]);
+                        double dist_z= Math.Abs(min_len - box_size[2]);
+
+                        if (pData.planet != null && area > 0.7 * min_area && dist_y <= dist_z) //过滤null，面积小，倒下的箱子
+                        {
+                            list_catch.Add(pData.planet);
+                        }
+                    }
+                    if (list_catch.Count == 0)
+                    {
+                        space.save_vars(pTrain, this, this.key_save, "C_Planet_Catch", null);
+                        Console.WriteLine(this.Name+"没有合适的抓取面！");
+                        S_TTS.speak_async(this.Name + "没有合适的抓取面");
+                        MessageBox.Show(this.Name + "没有合适的抓取面");
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+
+                    C_Point3D postion_zero = new C_Point3D(120, 0, 3200);
+
+                    if (sort_type == "yxz")
+                    {
+
+                        list_catch.Sort((x, y) =>
+                        {
+                            C_Point3D a1 = x.arm_a;
+                            C_Point3D b1 = y.arm_a;
+
+                            if (Math.Abs(a1.y - b1.y) < 100)
+                            {
+                                if (Math.Abs(a1.x - b1.x) < 100)
+                                {
+                                    return Math.Sign(a1.z - b1.z);
+                                }
+                                else
+                                {
+                                    return Math.Sign(a1.x - b1.x);
+                                }
+                            }
+                            else
+                            {
+                                return Math.Sign(a1.y - b1.y);
+                            }
+                        });
+                    }else if (sort_type == "-z-yx")
+                    {
+
+                        list_catch.Sort((x, y) =>
+                        {
+                            C_Point3D a1 = x.arm_a;
+                            C_Point3D b1 = y.arm_a;
+
+
+                            if (Math.Abs(a1.z - b1.z) < 100)
+                            {
+                                if (Math.Abs(a1.y - b1.y) < 100)
+                                {
+                                    return Math.Sign(a1.x - b1.x);
+                                }
+                                else
+                                {
+                                    return Math.Sign(b1.y - a1.y);
+                                }
+                            }
+                            else
+                            {
+                                return Math.Sign(b1.z - a1.z);
+                            }
+                        });
+                    }
+                    else if (sort_type == "-z-y-x")
+                    {
+
+                        list_catch.Sort((x, y) =>
+                        {
+                            C_Point3D a1 = x.arm_a;
+                            C_Point3D b1 = y.arm_a;
+
+
+                            if (Math.Abs(a1.z - b1.z) < 100)
+                            {
+                                if (Math.Abs(a1.y - b1.y) < 100)
+                                {
+                                    return Math.Sign(b1.x - a1.x);
+                                }
+                                else
+                                {
+                                    return Math.Sign(b1.y - a1.y);
+                                }
+                            }
+                            else
+                            {
+                                return Math.Sign(b1.z - a1.z);
+                            }
+                        });
+                    }
+                    else
+                    {
+
+                        list_catch.Sort((x, y) =>
+                        {
+                            C_Point3D a1 = x.arm_a;
+                            C_Point3D b1 = y.arm_a;
+
+
+                            if (Math.Abs(a1.z - b1.z) < 100)
+                            {
+                                if (Math.Abs(a1.y - b1.y) < 100)
+                                {
+                                    return Math.Sign(b1.x - a1.x);
+                                }
+                                else
+                                {
+                                    if (this.y_max == "1")
+                                    {
+                                        return Math.Sign(b1.y - a1.y);
+                                    }
+                                    else
+                                    {
+                                        return Math.Sign(a1.y - b1.y);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                return Math.Sign(b1.z - a1.z);
+                            }
+                        });
+                    }
+
+
+                    C_Planet_Catch pCatch_Selected = list_catch[0];
+                    if (pCatch_Selected == null)
+                    {
+                        space.save_vars(pTrain, this, this.key_save, "C_Planet_Catch", null);
+                        this.Next_Step = Node_Next.False;
+                        return;
+                    }
+                    else
+                    {
+                        for (var i = 0; i < list_catch.Count; i++)
+                        {
+                            C_Data pMain = list_catch[i].pMain;
+                            //Main.save_cloud("D:\\cloud\\c2_g_" + pMain.Group_ID + ".txt", pMain.list_3D_Point_arm);
+                        }
+                        Main.WriteLine(this.Name+">>>抓取平面的GroupID=" + pCatch_Selected.Group_ID);//, Level_Enum.Info, this.log_index, this.Name);
+
+                        space.save_vars(pTrain, this, this.key_save, "C_Planet_Catch", pCatch_Selected);
+                        space.save_vars(pTrain, this, this.key_save_cloud, "List<C_Point3D>", pCatch_Selected.pMain.list_3D_Point_arm);
+
+                    }
+                    this.Next_Step = Node_Next.True;
+                }
+
+
+                if (this.key_box_type != "")
+                {
+                    抓取的箱子判断是否匹配预先设置的箱子类型(list_box_type2);
+                    List<C_Box_Type> stat = 箱子类型数量统计(list_box_type2);
+                    space.save_vars(pTrain, this, this.key_stat, "List<C_Box_Type>", stat);
+                }
+
+            }
+        }
+
+
+        public bool check_finished(List<C_Space> spaces)
+        {
+            for (var i = 0; i < spaces.Count; i++)
+            {
+                var space2 = spaces[i];
+                if (space2 != null && space2.finished == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public List<C_Box_Type> 箱子类型数量统计(List<C_Box_Type> list_box_type)
+        {
+            List<C_Box_Type> list_box_static = new List<C_Box_Type>();
+
+            for (var i = 0; i < list_box_type.Count; i++)
+            {
+                C_Box_Type item = list_box_type[i];
+
+                C_Box_Type pitem_static = null;
+                for (var j = 0; j < list_box_static.Count; j++)
+                {
+                    if (item.ID == list_box_static[j].ID)
+                    {
+                        pitem_static = list_box_static[j];
+                        break;
+                    }
+                }
+                if (pitem_static == null)
+                {
+                    pitem_static = new C_Box_Type(-1, 0, item.x_len, item.y_len, item.z_len, 0);
+                    pitem_static.ID = item.ID;
+                    pitem_static.max = item.max;
+                    pitem_static.file = item.file;
+                    pitem_static.count = 1;
+                    list_box_static.Add(pitem_static);
+                }
+                pitem_static.count += 1;
+            }
+            return list_box_static;
+        }
+
+        public void 抓取的箱子判断是否匹配预先设置的箱子类型(List<C_Box_Type> list_box_type)
+        {
+            List<C_Box_Type> box_type = (List<C_Box_Type>)space.read_vars(pTrain, this, this.key_box_type, "List<C_Box_Type>");
+
+            for (var i = 0; i < list_box_type.Count; i++)
+            {
+                C_Box_Type type = list_box_type[i];
+                C_Box_Type x = match_box_type(box_type, type);
+                if (x == null)
+                {
+                    MessageBox.Show(this.Name+ " 没有找到这个箱子的类型！");
+                }
+            }
+        }
+
+        private C_Box_Type match_box_type(List<C_Box_Type> box_type, C_Box_Type type)
+        {
+            double min = double.MaxValue;
+            int min_index = -1;
+            for (var i = 0; i < box_type.Count; i++)
+            {
+                C_Box_Type item = box_type[i];
+                double value = Math.Abs(item.x_len - (type.x_len + 15)) + Math.Abs(item.y_len - (type.y_len + 15));
+                if (value < min)
+                {
+                    min = value;
+                    min_index = i;
+                }
+            }
+            if (min_index == -1) return null;
+
+            type.x_len = box_type[min_index].x_len;
+            type.y_len = box_type[min_index].y_len;
+            type.z_len = box_type[min_index].z_len;
+            type.max = box_type[min_index].max;
+            type.ID = box_type[min_index].ID;
+            type.file = box_type[min_index].file;
+            return type;
+        }
+
+
+
+    }
+}

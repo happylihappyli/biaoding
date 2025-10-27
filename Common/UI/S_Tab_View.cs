@@ -1,0 +1,100 @@
+﻿
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using Test1.Common_Robot;
+
+namespace Test1
+{
+    public class S_Tab_View : S_UI
+    {
+        public FlatTabControl ui_item;
+        
+        public string color1 = "white";
+        public string color2 = "white";
+
+        public S_Tab_View(string Name, C_Space space_parent, C_Space space):
+            base(Name, space_parent, space)
+        {
+            this.Name = Name; 
+        }
+
+        public override void init()
+        {
+            space.vars_ui.TryAdd(this.key, this);
+
+
+            ui_item = new FlatTabControl();
+            ui_item.Location = new Point(x, y);
+
+
+            this.ui_item.Dock = DockStyle.Fill;
+            this.ui_item.Location = new Point(0, 0);
+            this.ui_item.Size = new Size(1348, 525);
+            this.ui_item.TabIndex = 0;
+            this.ui_item.ItemSize = new Size(120, 120);
+
+
+            if (this.code != "")
+            {
+                JObject obj = JObject.Parse(this.code);
+
+                string align = "";
+                //{"align":"right"}
+                if (obj.ContainsKey("align"))
+                {
+                    align = obj["align"].ToString();
+                    switch (align)
+                    {
+                        case "right":
+                            ui_item.Alignment = TabAlignment.Right;
+                            break;
+                        case "top":
+                            ui_item.Alignment = TabAlignment.Top;
+                            break;
+                        case "bottom":
+                            ui_item.Alignment = TabAlignment.Bottom;
+                            break;
+                        case "left":
+                            ui_item.Alignment = TabAlignment.Left;
+                            break;
+                    }
+                }
+            }
+
+            var font_name = this.font_name;
+            if (font_name == "")
+            {
+                font_name = "宋体";
+            }
+            var font_size = this.font_size;
+            if (this.font_size == "")
+            {
+                font_size = "12";
+            }
+            ui_item.Font = new Font(font_name, float.Parse(font_size),
+                FontStyle.Regular, GraphicsUnit.Point, ((byte)(134)));
+
+            Action act = delegate ()
+            {
+                if (pFrm != null)
+                {
+                    Main.Add_Panel(this.pFrm, dock, this.group, space, ui_item);
+                }
+            };
+            if (pFrm != null)
+                pFrm.BeginInvoke(act, null);
+        }
+
+        //ScriptCallbackObject external ;
+        private void Button_Click(object sender, EventArgs e)
+        {
+            this.Run(pTrain);
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+}

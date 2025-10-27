@@ -1,0 +1,820 @@
+﻿
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using Test1;
+
+namespace Common_Robot2
+{
+    public class C_Space
+    {
+        public static int ID_Count = 0;
+        public int ID = 0;
+
+        public ConcurrentDictionary<string, C_Node?> vars_step = new ConcurrentDictionary<string, C_Node?>();
+        public ConcurrentDictionary<string, S_UI> vars_ui = new ConcurrentDictionary<string, S_UI>();
+        public ConcurrentDictionary<string, C_Menu_Item> vars_menu = new ConcurrentDictionary<string, C_Menu_Item>(); 
+                
+        // 全局变量
+        public ConcurrentDictionary<string, C_Var> vars_new = new ConcurrentDictionary<string, C_Var>();
+        public ConcurrentDictionary<string, S_UI> pUI_Update = new ConcurrentDictionary<string, S_UI>();
+
+        public I_Train? pTrain;
+        public List<C_Node_and_Train> actives_Nodes = new List<C_Node_and_Train>();
+
+
+        public C_Node? pState_Time_Out = null;
+        public C_Space? parent_space;
+        public C_Space? parent = null;//当前空间的父空间
+        public C_Vars vars;
+        public C_Data main;
+        public C_Console console;
+        public Tools tools;
+
+
+        public string Name = "";
+        public string? mode = null; //运行模式，有些模块只能特定模式才能运行
+
+        public bool step_stop = false;
+        public bool finished_exit = false;
+        public bool finished = false;
+        public bool bExit_Loop = false;
+
+        public float time_out = 10;
+
+        public int sleep_time = 5;
+        public int step_count = 0;
+        public int step_max = 5;
+        public int save_count = 0;
+
+        public C_Space()
+        {
+            C_Space.ID_Count++;
+            this.ID = C_Space.ID_Count;
+
+            vars = new C_Vars(this);
+            main = new C_Data(this);
+            console = new C_Console(this);
+            tools = new Tools(this);
+        }
+
+        /// <summary>
+        /// 单步运行模式，跳到下一步
+        /// </summary>
+        public void step_next()
+        {
+            step_stop = false;
+        }
+
+
+
+        private ConcurrentQueue<string> _logMessages_debug = new ConcurrentQueue<string>();
+        private Thread? backgroundThread_debug;
+
+        private readonly object _lock_debug = new object();
+        public string file_log = "";
+
+        public void Log_Debug(string message)
+        {
+            // Add the log message to the queue
+            _logMessages_debug.Enqueue(message);
+        }
+
+
+        public void Log_Debug_Thread_Start()
+        {
+            if (backgroundThread_debug != null)
+            {
+                return;
+            }
+
+            string time_id = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss__FFF");
+
+            this.file_log= this.Name + "_" + time_id + ".txt";
+            string path = C_Vars.log_path + "\\" + this.file_log;
+            if (this.Name != "main")
+            {
+                string path_dir = C_Vars.log_path + "\\call";
+                if (Directory.Exists(path_dir)==false)
+                {
+                    Directory.CreateDirectory(path_dir);
+                }
+                path = C_Vars.log_path + "\\call\\" + this.file_log;
+            }
+
+            Action<string> writeLog = (message) =>
+            {
+                lock (_lock_debug)
+                {
+                    using (StreamWriter writer = File.AppendText(path))// "log.txt"))
+                    {
+                        writer.WriteLine(message);
+                    }
+                }
+            };
+
+            // Create a background thread to write the log messages to disk
+            backgroundThread_debug = new Thread(() =>
+            {
+                while (true)
+                {
+                    // Check if there are any log messages to write
+                    if (_logMessages_debug.Count > 0)
+                    {
+                        // Get the next log message
+                        string logMessage;
+                        _logMessages_debug.TryDequeue(out logMessage);
+                        writeLog(logMessage);  // Write the log message to disk
+                    }
+                    else
+                    {
+                        // Sleep for 100 milliseconds to avoid busy-waiting
+                        Thread.Sleep(100);
+                    }
+                }
+            });
+
+            backgroundThread_debug.Start();
+        }
+
+
+
+        public void save_vars(I_Train? pTrain, C_Node pNode, string? key, string str_type, Object? value)
+        {
+
+
+            if (key == "" || key == null)
+            {
+                Main.WriteLine(pNode,"key==null");//);
+                return;
+            }
+            try
+            {
+                if (key.StartsWith("&"))
+                {
+                    string key2 = key.Substring(1);
+                    C_Container? container = null;
+
+                    if (key2.StartsWith("#"))
+                    {
+                        if (this.vars_new.ContainsKey(key2))
+                        {
+                            if (this.vars_new[key2].type == "C_Container")
+                            {
+                                container = (C_Container?)this.vars_new[key2].pObj;
+                            }
+                            else
+                            {
+                                MessageBox.Show(key2 + "这个变量不是容器");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            container = new C_Container();
+                            container.Name = key2;
+                            lock (this.vars_new)
+                            {
+                                this.vars_new[key2] = new C_Var(key2, "", "C_Container", container);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (pTrain!=null && pTrain.get_Vars().ContainsKey(key2))
+                        {
+                            if (pTrain.get_Vars()[key2].type == "C_Container")
+                            {
+                                container = (C_Container?)pTrain.get_Vars()[key2].pObj;
+                            }
+                            else
+                            {
+                                MessageBox.Show(key2 + "这个变量不是容器");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            container = new C_Container();
+                            container.Name = key2;
+                            if (pTrain!=null)
+                                pTrain.get_Vars()[key2] = new C_Var(key2, "", "C_Container", container);
+                        }
+                    }
+                    container?.save_var(str_type, new C_Var(key, "", str_type, value));
+
+                }
+                else if (key.StartsWith("#"))
+                {
+                    lock (this.vars_new)
+                    {
+                        bool bSucess = this.vars_new.TryAdd(key, new C_Var(key, "", str_type, value));
+                        if (bSucess == false)
+                        {
+                            this.vars_new.TryRemove(key, out C_Var? tmp);
+                            this.vars_new.TryAdd(key, new C_Var(key, "", str_type, value));
+                        }
+                    }
+                    if (pUI_Update.ContainsKey(key))
+                    {
+                        S_UI pUI = pUI_Update[key];
+                        pUI.update(value);
+                    }
+                }
+                else if (key.StartsWith("*"))
+                {
+                    C_Data? pData = (C_Data?)pTrain?.get_Vars()["main"].pObj;
+
+                    if (pData != null)
+                    {
+                        lock (pData.vars)
+                        {
+                            bool bSucess = pData.vars.TryAdd(key, new C_Var(key, "", str_type, value));
+                            if (bSucess == false)
+                            {
+                                pData.vars.TryRemove(key,out C_Var? tmp);
+                                pData.vars.TryAdd(key, new C_Var(key, "", str_type, value));
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (pTrain != null)
+                    {
+                        var vars=pTrain.get_Vars();
+                        lock (vars)
+                        {
+                            bool bSucess = vars.TryAdd(key, new C_Var(key, "", str_type, value));
+                            if (bSucess == false)
+                            {
+                                vars.TryRemove(key,out C_Var? tmp);
+                                vars.TryAdd(key, new C_Var(key, "", str_type, value));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Main.WriteLine(ex.ToString());
+            }
+        }
+
+
+        public bool contains(I_Train? pTrain, C_Node pNode, string key, string str_type)
+        {
+            if (key == "" || key == null)
+            {
+                CommonMain.WriteLine("error read_vars " + key);
+                return false;
+            }
+
+            if (key.StartsWith("&"))
+            {
+                string key2 = key.Substring(1);
+                C_Container? container;
+
+                if (key2.StartsWith("#"))
+                {
+                    if (this.vars_new.ContainsKey(key2))
+                    {
+                        if (this.vars_new[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)this.vars_new[key2].pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        this.vars_new[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+                else
+                {
+                    if (pTrain == null)
+                    {
+                        MessageBox.Show(key2 + " pTrain==null");
+                        return false;
+                    }
+                    if (pTrain.get_Vars().ContainsKey(key2))
+                    {
+                        if (pTrain.get_Vars()[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)pTrain.get_Vars()[key2].pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        pTrain.get_Vars()[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+                if (container == null)
+                {
+                    return false;
+                }
+                else
+                {
+                    return container.contains(str_type);
+                }
+
+            }
+            else if (key.StartsWith("#"))
+            {
+                return this.vars_new.ContainsKey(key);
+            }
+            else if (key.StartsWith("*"))
+            {
+                C_Data? pData = (C_Data?)pTrain?.get_Vars()["main"].pObj;
+
+                if (pData != null)
+                {
+                    if (pData.vars.ContainsKey(key) == false)
+                    {
+                        return false;
+                    }
+                    return pData.vars.ContainsKey(key);
+                }
+                return false;
+            }
+            else
+            {
+                if (pTrain != null && pTrain.get_Vars().ContainsKey(key))
+                {
+                    return pTrain.get_Vars().ContainsKey(key);
+                }
+            }
+            return false;
+        }
+
+
+        public void remove_var(I_Train? pTrain, C_Node pNode, string key, string str_type)
+        {
+            if (key == "" || key == null)
+            {
+                CommonMain.WriteLine("error read_vars " + key);
+                return;
+            }
+
+            if (key.StartsWith("&"))
+            {
+                string key2 = key.Substring(1);
+                C_Container? container;
+
+                if (key2.StartsWith("#"))
+                {
+                    if (this.vars_new.ContainsKey(key2))
+                    {
+                        if (this.vars_new[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)this.vars_new[key2].pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        this.vars_new[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+                else
+                {
+                    if (pTrain == null)
+                    {
+                        MessageBox.Show(key2 + " pTrain==null");
+                        return;
+                    }
+                    if (pTrain.get_Vars().ContainsKey(key2))
+                    {
+                        if (pTrain.get_Vars()[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)pTrain.get_Vars()[key2].pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        pTrain.get_Vars()[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+
+                if (container != null)
+                {
+                    container.remove_var(str_type);
+                }
+
+            }
+            else if (key.StartsWith("#"))
+            {
+                this.vars_new.TryRemove(key,out C_Var tmp);
+            }
+            else
+            {
+                if (pTrain != null && pTrain.get_Vars().ContainsKey(key))
+                {
+                    pTrain.get_Vars().TryRemove(key, out C_Var tmp);
+                }
+            }
+        }
+
+
+
+
+        /// <summary>
+        /// 读取变量
+        /// </summary>
+        /// <param name="pTrain"></param>
+        /// <param name="key"></param>
+        /// <param name="str_type"></param>
+        /// <returns></returns>
+        public object? read_vars(I_Train? pTrain, C_Node? pNode, string key, string str_type)
+        {
+            if (key == "" || key == null)
+            {
+                CommonMain.WriteLine("error read_vars " + key);
+                return null;
+            }
+            C_Var? result = null;
+
+            if (key.StartsWith("&"))
+            {
+                string key2 = key.Substring(1);
+                C_Container? container;
+
+                if (key2.StartsWith("#"))
+                {
+                    if (this.vars_new.ContainsKey(key2))
+                    {
+                        if (this.vars_new[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)this.vars_new[key2].pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        this.vars_new[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+                else
+                {
+                    if (pTrain == null)
+                    {
+                        MessageBox.Show(key2 + " pTrain==null");
+                        return null;
+                    }
+                    if (pTrain.get_Vars().ContainsKey(key2))
+                    {
+                        if (pTrain.get_Vars()[key2].type == "C_Container")
+                        {
+                            container = (C_Container?)pTrain?.get_Vars()?[key2]?.pObj;
+                        }
+                        else
+                        {
+                            MessageBox.Show(key2 + "这个变量不是容器");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        container = new C_Container();
+                        container.Name = key2;
+                        pTrain.get_Vars()[key2] = new C_Var(key2, "", "C_Container", container);
+                    }
+                }
+                result = container?.read_var(str_type);
+            }
+            else if (key.StartsWith("#"))
+            {
+                if (this.vars_new.ContainsKey(key) == false)
+                {
+                    return null;
+                }
+                lock (this.vars_new)
+                {
+                    bool bSucess = this.vars_new.TryGetValue(key, out result);
+                    if (bSucess == false)
+                    {
+                        Main.WriteLine(pNode, "vars_new 读取错误！key=" + key);
+                        Debugger.Break();
+                    }
+                }
+            }
+            else if (key.StartsWith("*"))
+            {
+                C_Data? pData = (C_Data?)pTrain?.get_Vars()["main"].pObj;
+
+                if (pData != null)
+                {
+                    if (pData.vars.ContainsKey(key) == false)
+                    {
+                        return null;
+                    }
+                    var vars = pData.vars;
+                    lock (vars)
+                    {
+                        bool bSucess = vars.TryGetValue(key, out result);
+                        if (bSucess == false)
+                        {
+                            Main.WriteLine(pNode, "pTrain.vars 读取错误！key=" + key);
+                            Debugger.Break();
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (pTrain == null)
+                {
+                    return null;
+                }
+
+                var vars = pTrain.get_Vars();
+                if (vars.ContainsKey(key))
+                {
+                    lock (vars)
+                    {
+                        bool bSucess = vars.TryGetValue(key,out result);
+                        if (bSucess == false)
+                        {
+                            Main.WriteLine(pNode, "pTrain.vars 读取错误！key=" + key);
+                            Debugger.Break();
+                        }
+                    }
+                }
+            }
+
+            if (result == null)
+            {
+                return null;
+            }
+            return result.pObj;
+        }
+
+
+        private static ConcurrentQueue<string> _log_Var_History= new ConcurrentQueue<string>();
+        private static Thread? backgroundThread_var_history;
+        private static readonly object _lock_var_history = new object();
+        public static void Save_Var_History(string message)
+        {
+            _log_Var_History.Enqueue(message);
+        }
+
+        public static void Log_Var_History_Thread_Start(Thread? pThread)
+        {
+            if (pThread != null)
+            {
+                return;
+            }
+
+            string time2 = DateTime.Now.ToString("yyyy_MM_dd__HH");
+            string File_Log = "D:\\data\\vars\\vars_" + time2 + ".txt";
+            Action<string> writeLog = (message) =>
+            {
+                lock (_lock_var_history)
+                {
+                    string path_dir = "D:\\data\\vars\\";
+                    if (Directory.Exists(path_dir) == false)
+                    {
+                        Directory.CreateDirectory(path_dir);
+                    }
+                    using (StreamWriter writer = File.AppendText(File_Log))
+                    {
+                        string time2 = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                        writer.WriteLine(time2+"\t"+message);
+                    }
+                }
+            };
+
+            pThread = new Thread(() =>
+            {
+                while (true)
+                {
+                    if (_log_Var_History.Count > 0)
+                    {
+                        string logMessage;
+                        _log_Var_History.TryDequeue(out logMessage); // Get the next log message
+                        writeLog(logMessage);  // Write the log message to disk
+                    }
+                    else
+                    {
+                        Thread.Sleep(100);
+                    }
+                }
+            });
+
+            pThread.Start();
+        }
+
+        private ConcurrentQueue<string> _logMessages = new ConcurrentQueue<string>();
+        private Thread? backgroundThread;
+        private readonly object _lock_logs = new object();
+
+        public void Log(string message)
+        {
+            _logMessages.Enqueue(message);
+        }
+
+
+        public void Log_Thread_Start(Thread? pThread)
+        {
+            if (pThread != null)
+            {
+                return;
+            }
+
+
+            string time2 = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss");
+            string path = Application.StartupPath + "\\logs\\";
+            if (Directory.Exists(path)==false)
+            {
+                Directory.CreateDirectory(path);
+            }
+            string File_Log = Application.StartupPath+"\\logs\\space"+this.Name+"_" + time2 + ".txt";
+            Action<string> writeLog = (message) =>
+            {
+                lock (_lock_logs)
+                {
+
+                    using (StreamWriter writer = File.AppendText(File_Log))
+                    {
+                        writer.WriteLine(message);
+                    }
+                }
+            };
+
+            //C_Space that = this;
+            pThread = new Thread(() =>
+            {
+                while (true)
+                {
+                    // Check if there are any log messages to write
+                    if (_logMessages.Count > 0)
+                    {
+                        string logMessage;
+                        _logMessages.TryDequeue(out logMessage);// Get the next log message
+                        writeLog(logMessage);  // Write the log message to disk
+                    }
+                    else
+                    {
+                        Thread.Sleep(100);
+                    }
+                }
+            });
+
+            pThread.Start();
+        }
+
+        public void Run_Node(C_Node pNode,I_Train? pTrain)
+        {
+            Thread thread = new Thread(() =>
+            {
+                if (pNode.new_debug)
+                {
+                    pNode.run_sub_pre();
+                }
+                pNode.Run(pTrain);
+            });
+            thread.Start();
+        }
+
+
+        public void 检查步骤状态()
+        {
+            C_Space.Log_Var_History_Thread_Start(C_Space.backgroundThread_var_history);
+
+            this.Log_Thread_Start(this.backgroundThread);
+            this.Log_Debug_Thread_Start();
+
+            save_count++;
+            if (save_count % 300 == 2 && save_count< 30)
+            {
+                string? value2 = (string?)this.read_vars(pTrain, null, "#serial", "string");
+                if (Tools.check_serial(value2) == false)
+                {
+                    MessageBox.Show("序列号不对！" + value2);
+                    Application.Exit();
+                    return;
+                }
+            }
+
+
+            bExit_Loop = false;
+            C_Node? pNode;
+
+            DateTime DateTime1 = DateTime.Now;
+            int index = 0;
+            while (this.vars.bClosingWindows == false)
+            {
+                if (this.vars.bAutoMode == false) continue;
+
+                lock (this.actives_Nodes)
+                {
+                    List<C_Node_and_Train> list2 = new List<C_Node_and_Train>();
+                    for(var i = 0; i < this.actives_Nodes.Count; i++)
+                    {
+                        C_Node_and_Train tmp = this.actives_Nodes[i];
+                        pNode = tmp.pNode;
+                        if (pNode == null) continue;
+                        if (pNode.mode != null && pNode.mode != "")
+                        {
+                            if (pNode.mode == this.mode)
+                            {
+                                list2.Add(tmp);
+                            }
+                        }
+                        else
+                        {
+                            list2.Add(tmp);
+                        }
+                    }
+
+                    if (list2.Count > 0)
+                    {
+                        C_Node_and_Train? tmp = list2[0];
+                        if (tmp == null)
+                        {
+                            Main.WriteLine("pNode[0] == null !");
+                            continue;
+                        }
+                        pNode = tmp.pNode;
+                        this.actives_Nodes.Remove(tmp);
+                        try
+                        {
+                            if (pNode != null)
+                            {
+                                DateTime1 = DateTime.Now;
+                                Run_Node(pNode, tmp?.pTrain);
+                            }
+                            else
+                            {
+                                Main.WriteLine("pNode == null !");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Main.WriteLine(ex.ToString());
+                            MessageBox.Show(pNode?.Name + "\r\n" + ex.Message + "\r\n" + ex.Source);
+                        }
+                    }
+                }
+
+
+                index++;
+
+
+                if (this.vars.debug_mode)
+                {
+                    step_count++;
+                    if (step_count >= step_max)
+                    {
+                        step_stop = true;
+                    }
+                    while (step_stop)
+                    {
+                        Thread.Sleep(1000);
+                    }
+                }
+                Thread.Sleep(sleep_time);
+
+                if (this.finished_exit)
+                {
+                    if (this.finished)
+                    {
+                        break;
+                    }
+                }
+            }
+            bExit_Loop = true;
+        }
+    }
+}

@@ -1,0 +1,54 @@
+﻿using Common_Robot2;
+using System.Text;
+using System.Web;
+
+namespace Test1
+{
+    public class String_Convert : C_Node
+    {
+        public string type = "";
+        public string key_read = "";
+        public string key_save = "";
+        public String_Convert(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            this.Name = name;
+            //space.vars_step.Add(name, this);
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string output = "";
+            string? encodedString = (string?)this.read_var(this.key_read, "string");
+            if (encodedString != null)
+            {
+                if (type == "decode.base64")
+                {
+                    byte[] data = Convert.FromBase64String(encodedString);
+                    output = Encoding.UTF8.GetString(data);
+                }
+                else if (type == "decode.url")
+                {
+                    output = HttpUtility.UrlDecode(encodedString);
+                }
+                ///encode
+                else if (type == "encode.url")
+                {
+                    output = HttpUtility.UrlEncode(encodedString);
+                }
+
+            }
+            this.save_var(key_save, "string", output);
+        }
+    }
+}

@@ -1,0 +1,24 @@
+﻿
+using ConverxHull;
+
+namespace Common_Robot2
+{
+    public class C_Result
+    {
+        public string strLine = "";
+        public string error_msg = "";
+        public C_Point3D? A = null;
+        public C_Point3D? B = null;
+
+
+        public C_Result(string v, 
+            C_Point3D a, C_Point3D b,
+            string error_msg="")
+        {
+            this.strLine = v;
+            this.A = a;
+            this.B = b;
+            this.error_msg = error_msg;
+        }
+    }
+}

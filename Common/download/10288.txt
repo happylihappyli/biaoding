@@ -1,0 +1,106 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Three.Net.Lights;
+
+namespace Test1
+{
+    public class D_Cut_Circle_From_List : C_Node
+    {
+
+        public string key_array = "";
+        public string key_read = "bitmap";
+        public string color = "red";
+        public string pen_width = "3";
+        public string r = "";
+        public string file = "";
+
+        private int index = 0;
+
+        public D_Cut_Circle_From_List(string Name, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            List<string> list = (List<string>)this.read_var(key_array, "C_Point3D");
+            List<Bitmap> list2 = new List<Bitmap>();
+
+            if (pTrain == null) return;
+            if (space.read_vars(pTrain, this, key_read, "Bitmap") == null)
+            {
+                MessageBox.Show("pic_read=null" + Name);
+                return;
+            }
+            Bitmap pBitmapRGB = (Bitmap)space.read_vars(pTrain, this, key_read, "Bitmap");
+
+            string file_save = file;
+            if (pBitmapRGB != null)
+            {
+                lock (pBitmapRGB)
+                {
+                    int width = pBitmapRGB.Width;
+                    int height = pBitmapRGB.Height;
+
+                    for (var i=0;i< list.Count;i++)
+                    {
+                        string line = list[i];
+                        string[] strSplit = line.Split(",");
+                        if (strSplit.Length < 2) continue;
+
+                        int x0 = int.Parse(strSplit[0]);
+                        int y0 = int.Parse(strSplit[1]);
+
+                        int f_r = int.Parse(r);
+
+                        int x1 = x0 - f_r;
+                        int y1 = y0 - f_r;
+                        int x2 = x0 + f_r;
+                        int y2 = y0 + f_r;
+
+                        Bitmap a = new Bitmap(f_r * 2, f_r * 2);
+                        Graphics g = Graphics.FromImage(a);
+                        g.DrawImage(pBitmapRGB,
+                                new Rectangle(0,0, (f_r * 2), (f_r * 2)),
+                                new Rectangle(x1,y1,(f_r * 2), (f_r * 2)),
+                                GraphicsUnit.Pixel);
+
+
+
+                        
+                        if (this.file.StartsWith("&"))
+                        {
+                            list2.Add(a);
+                        }
+                        else
+                        {
+                            file_save = Main.file_replace(pTrain, file_save);
+
+                            a.Save(file_save);
+                        }
+                    }
+                }
+                this.save_var(this.file.Substring(1), "List<Bitmap>", list2);
+            }
+
+        }
+    }
+}

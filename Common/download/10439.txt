@@ -1,0 +1,136 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Windows.Forms;
+
+
+namespace Test1
+{
+ 
+    /// <summary>
+    /// 图片框支持实时绘制多边形
+    /// </summary>
+    public class U_PictureBox_Draw_Ploygon : C_Node
+    {
+        public PictureBox? picture_box;
+        public Panel? panel;
+
+        private string _url = "";
+        private string _key_ui = "";
+        private string _data_in = "";
+
+        private string _key_pic = "";
+
+        public string key_ui { get => _key_ui; set => _key_ui = value; }
+        public string url { get => _url; set => _url = value; }
+        public string data_in { get => _data_in; set => _data_in = value; }
+        public string key_pic { get => _key_pic; set => _key_pic = value; }
+
+        private bool isDragging;
+        private int selectedPointIndex = -1;
+        private C_Point3D? offset;
+
+        public U_PictureBox_Draw_Ploygon(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        private void PictureBox_Paint(object sender, PaintEventArgs e)
+        {
+            if (pControl!=null && pControl.polygonPoints.Count > 1)
+            {
+                Pen blue = new Pen(Color.FromArgb(0, 255, 255), 3);
+                Pen yellow = new Pen(Color.FromArgb(255, 255,0), 3);
+
+                for (var i = 0; i < pControl.polygonPoints.Count-1; i++)
+                {
+                    C_Point3D point1 = pControl.polygonPoints[i];
+                    C_Point3D point2 = pControl.polygonPoints[i+1];
+                    e.Graphics.DrawLine(blue, point1.x, point1.y, point2.x, point2.y);
+                }
+                {
+                    C_Point3D point1 = pControl.polygonPoints[pControl.polygonPoints.Count - 1];
+                    C_Point3D point2 = pControl.polygonPoints[0];
+                    e.Graphics.DrawLine(blue, point1.x, point1.y, point2.x, point2.y);
+                }
+
+                foreach (C_Point3D point in pControl.polygonPoints)
+                {
+                    e.Graphics.DrawEllipse(yellow, point.x - 10, point.y - 10, 20, 20);
+                }
+            }
+        }
+
+        private void PictureBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (pControl != null)
+            {
+                for (int i = 0; i < pControl.polygonPoints.Count; i++)
+                {
+                    if (Math.Abs(e.Location.X - pControl.polygonPoints[i].x) <= 10 && Math.Abs(e.Location.Y - pControl.polygonPoints[i].y) <= 10)
+                    {
+                        isDragging = true;
+                        selectedPointIndex = i;
+                        offset = new C_Point3D(e.Location.X - pControl.polygonPoints[i].x, e.Location.Y - pControl.polygonPoints[i].y,0);
+                        return;
+                    }
+                }
+                pControl.polygonPoints.Add(new C_Point3D(e.Location.X, e.Location.Y, 0));
+            }
+            picture_box?.Invalidate();
+        }
+
+        private void PictureBox_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (isDragging && selectedPointIndex != -1 && pControl!=null && offset!=null)
+            {
+                pControl.polygonPoints[selectedPointIndex] = new C_Point3D(e.Location.X - offset.x, e.Location.Y - offset.y,0);
+                picture_box?.Invalidate();
+            }
+        }
+
+        private void PictureBox_MouseUp(object sender, MouseEventArgs e)
+        {
+            isDragging = false;
+            selectedPointIndex = -1;
+        }
+
+        S_PictureBox? pControl;
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+        }
+
+        public override void init()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show("S_PictureBox_Show key_ui==null!");
+                return;
+            }
+
+            if (space.vars_ui.ContainsKey(key_ui))
+            {
+                pControl = (S_PictureBox)space.vars_ui[key_ui];
+            }
+            else
+            {
+                pControl = (S_PictureBox)space_parent.vars_ui[key_ui];
+            }
+            picture_box = pControl.picture_box;
+            panel = pControl.panel;
+
+
+
+            picture_box.MouseDown += PictureBox_MouseDown;
+            picture_box.MouseMove += PictureBox_MouseMove;
+            picture_box.MouseUp += PictureBox_MouseUp;
+            picture_box.Paint += PictureBox_Paint;
+        }
+    }
+}

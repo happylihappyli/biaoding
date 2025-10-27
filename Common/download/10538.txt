@@ -1,0 +1,50 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class Data_Get_Cloud : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_save = "min";
+
+        public Data_Get_Cloud(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? list=null;
+
+            if (this.key_read == "%main.3d")
+            {
+                C_Data? pData = (C_Data?)this.read_var("main", "C_Data");
+                list = pData?.list_3D_Point;
+            }
+            else if (this.key_read == "%main.3d.arm")
+            {
+                C_Data? pData = (C_Data?)this.read_var("main", "C_Data");
+                list = pData?.list_3D_Point_arm;
+            }
+            else
+            {
+                list = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+            }
+
+            this.save_var(this.key_save, "List<C_Point3D>", list);
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

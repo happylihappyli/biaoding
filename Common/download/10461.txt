@@ -1,0 +1,122 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+
+
+    public class U_List_View_Refresh_File_ID : C_Node
+    {
+        public string dir = "";//要同步带目录
+        public string path = "";//相对同步目录的目录
+
+        public string key_ui = "";
+        public string col_id_of_file = "";//文件名字段数组下标
+        public string col_id_of_file_id = "";//文件ID字段数组下标
+        public string site = "www.sndvision.cn";
+        public ListView ui_item = null;
+
+        public U_List_View_Refresh_File_ID(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public override void init()
+        {
+        }
+
+        private void run_sub_main()
+        {
+            S_List_View pItem = (S_List_View)space.vars_ui[key_ui];
+            ui_item = pItem.ui_item;
+
+            string str_dir = this.read_string(this.dir);
+            string str_site = this.read_string(this.site);
+
+            str_site = str_site.Replace("https://", "");
+            str_site = str_site.Replace("http://", "");
+            str_site = str_site.Replace("/", "");
+
+            string file = str_dir + "\\"+ str_site + ".sync.id.json";
+
+            if (File.Exists(file)==false )
+            {
+                return;
+            }
+            string json=File.ReadAllText(file);
+            JObject obj=JObject.Parse(json);
+
+            JArray? arr = (JArray?)obj["files"];
+
+            if (arr == null)
+            {
+                return;
+            }
+            Dictionary<int,C_File> dic = new Dictionary<int, C_File>();
+            Dictionary<string, C_File> dic_path = new Dictionary<string, C_File>();
+            for (var i=0;i< arr.Count; i++)
+            {
+                JObject item = (JObject)arr[i];
+                int id = item.read_int("id");
+                string? path2 = item.read("path");
+                string? encode2 = item.read("encode");
+                C_File pFile = new C_File(id, path2, path2, encode2);
+                if (dic.ContainsKey(id) == false)
+                {
+                    if (id>0) dic.Add(id, pFile);
+                }
+                else
+                {
+                    MessageBox.Show(this.Name + "id重复 id="+id);
+                }
+
+                if (dic_path.ContainsKey(path2) == false)
+                {
+                    dic_path.Add(path2, pFile);
+                }
+                else
+                {
+                    MessageBox.Show(this.Name + "path重复 path="+path2);
+                }
+            }
+
+            Action act = delegate ()
+            {
+                if (ui_item != null)
+                {
+                    string str_path = this.read_string(this.path);
+                    int index = int.Parse(this.read_string(col_id_of_file));
+                    int index2 = int.Parse(this.read_string(col_id_of_file_id));
+                    for (var i=0;i< ui_item.Items.Count; i++)
+                    {
+                        ListViewItem item = ui_item.Items[i];
+                        string file = item.SubItems[index].Text;
+
+                        string file2 = str_path +"\\"+ file;//.Substring(str_dir.Length);
+
+                        dic_path.TryGetValue(file2, out C_File? pFile);
+                        if (pFile != null)
+                        {
+                            while (index2>=item.SubItems.Count)
+                            {
+                                item.SubItems.Add("");
+                            }
+                            item.SubItems[index2].Text = pFile?.id + "";
+                        }
+                    }
+
+
+                }
+            };
+            if (ui_item != null)
+                ui_item.BeginInvoke(act, null);
+        }
+    }
+}

@@ -1,0 +1,103 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //过滤机械臂点云的时候，对应的摄像头点也会过滤掉，保持一一映射","inPorts": ["in"],"outPorts": ["out"],"image_url": "","image": "","content":"说明信息"}
+    public class C_Cloud_Filter2 : C_Node
+    {
+
+        //"key_read","type":"one_line","tips":"机械臂读取点云","var_type":"List<C_Poinit3D>","required":"1","var":"1","type_group":"","help": ""}
+        public string key_read = "cloud1";
+
+        //"key_read2","type":"one_line","tips":"摄像头读取点云","var_type":"List<C_Poinit3D>","required":"1","var":"1","type_group":"","help": ""}
+        public string key_read2 = "cloud2";
+
+        //"key_save","type":"one_line","tips":"机械臂保存点云","var_type":"List<C_Poinit3D>","required":"1","var":"1","type_group":"","help": ""}
+        public string key_save = "cloud1_arm";
+        //"key_save2","type":"one_line","tips":"摄像头保存点云","var_type":"List<C_Poinit3D>","required":"1","var":"1","type_group":"","help": ""}
+        public string key_save2 = "cloud2_arm";
+
+
+        //"xyz","type":"one_line","tips":"xyz，分量","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string xyz = "0";//1,2
+        //"min","type":"one_line","tips":"最小","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string min = "";
+        //"max","type":"one_line","tips":"最大","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string max = "";
+
+
+        public override void init()
+        {
+
+        }
+
+        public C_Cloud_Filter2(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? read1 = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+            List<C_Point3D>? read2 = (List<C_Point3D>?)this.read_var(this.key_read2, "List<C_Point3D>");
+            if (read1 == null)
+            {
+                S_TTS.speak("读取点云为空！");
+                MessageBox.Show("读取点云为空");
+                return;
+            }
+
+            string str_min = this.read_string(this.min);
+            string str_max = this.read_string(this.max);
+
+
+            float f_min = 0;
+            float f_max = 0;
+            try
+            {
+                f_min = float.Parse(str_min);
+                f_max = float.Parse(str_max);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this.Name + ex.Message);
+                return;
+            }
+            (List<C_Point3D> save1, List<C_Point3D> save2 )= Main.cloud_filter2(read1,read2, xyz, f_min, f_max);
+
+            if (save1.Count == 0)
+            {
+                Main.WriteLine(this, "点云为空!");
+                S_TTS.speak_async("点云为空!");
+            }
+
+            if (save1 == null || save1.Count == 0)
+            {
+                Main.WriteLine(this, "error");
+            }
+            else
+            {
+                
+                this.save_var(this.key_save, "List<C_Point3D>", save1);
+                this.save_var(this.key_save2, "List<C_Point3D>", save2);
+
+
+
+            }
+
+        }
+
+    }
+}

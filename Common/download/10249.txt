@@ -1,0 +1,174 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Gen_Simple_Box : C_Node
+    {
+        //public string file = "";
+        public string container = "#container";
+        public string key_data = "";
+        public string b2d = "1";
+        public string thickness = "2";
+
+        public S_Gen_Simple_Box(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            string line_space = space.tools.var_read(pTrain, this, this.container);
+
+            C_Block_Space container = new C_Block_Space(line_space);
+
+            object obj = space.read_vars(pTrain, this, this.thickness,"");
+
+            double thickness = Main.get_double_from_obj(this, obj);// int.Parse(space.tools.var_read(pTrain, this.thickness));
+
+            calculate_simple_block(container, (this.b2d == "1"), (int)thickness);
+
+            Console.WriteLine("生成简单模块");
+        }
+
+        private void calculate_simple_block(C_Block_Space container, bool b2D, int thickness)
+        {
+            C_Block_Data pBlockData = (C_Block_Data)space.read_vars(pTrain, this, this.key_data, "C_Block_Data");
+
+            pBlockData.block_list.Clear();
+
+            for (var i = 0; i < pBlockData.pArrayBoxs_Type.Count; i++)
+            {
+                C_Box_Type pBox_Type = pBlockData.pArrayBoxs_Type[i];
+
+                int n = 100;// pBlockData.pArrayBoxs_Type[i].count;
+
+                for (int nx = 1; nx <= n; nx++)
+                {
+                    for (int ny = 1; ny <= n / nx; ny++)
+                    {
+                        if (b2D)
+                        {
+                            //2D模式
+                            container.z_len = (pBox_Type.z_len + thickness);
+                            int nz = 1;
+                            //不同的朝向当做不同的盒子
+                            int lx, ly, lz;
+                            lx = (pBox_Type.x_len + thickness) * nx;
+                            ly = (pBox_Type.y_len + thickness) * ny;
+                            lz = (pBox_Type.z_len + thickness) * nz;
+                            C_Block_Simple p1 = null;
+                            C_Block_Simple p2 = null;
+
+                            if (lx <= container.x_len &&
+                                ly <= container.y_len &&
+                                lz <= container.z_len)
+                            {
+                                p1 = new C_Block_Simple(pBox_Type, lx, ly, lz, nx, ny, nz);
+                                p1.count = nx * ny * nz;
+                                pBlockData.block_list.Add(p1);
+                            }
+
+                            if (ly <= container.x_len &&
+                                lx <= container.y_len &&
+                                lz <= container.z_len)
+                            {
+                                p2 = new C_Block_Simple(pBox_Type, ly, lx, lz, ny, nx, nz);
+                                p2.count = nx * ny * nz;
+                                pBlockData.block_list.Add(p2);
+                            }
+                            if (p1 != null && p2 != null)
+                            {
+                                p1.Roate90 = p2;
+                                p2.Roate90 = p1;
+                            }
+
+                        }
+                        else
+                        {
+                            //3D模式
+                            for (int nz = 1; nz <= n / nx / ny; nz++)
+                            {
+                                //不同的朝向当做不同的盒子
+                                int lx, ly, lz;
+                                lx = (pBox_Type.x_len + thickness) * nx;
+                                ly = (pBox_Type.y_len + thickness) * ny;
+                                lz = (pBox_Type.z_len + thickness) * nz;
+
+
+                                if (lx <= container.x_len &&
+                                    ly <= container.y_len &&
+                                    lz <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, lx, ly, lz, nx, ny, nz);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+                                if (ly <= container.x_len &&
+                                    lx <= container.y_len &&
+                                    lz <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, ly, lx, lz, ny, nx, nz);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+
+
+                                if (lx <= container.x_len &&
+                                    lz <= container.y_len &&
+                                    ly <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, lx, lz, ly, nx, nz, ny);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+                                if (lz <= container.x_len &&
+                                    lx <= container.y_len &&
+                                    ly <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, lz, lx, ly, nz, nx, ny);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+
+                                if (ly <= container.x_len &&
+                                    lz <= container.y_len &&
+                                    lx <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, ly, lz, lx, ny, nz, nx);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+                                if (lz <= container.x_len &&
+                                    ly <= container.y_len &&
+                                    lx <= container.z_len)
+                                {
+                                    C_Block_Simple p = new C_Block_Simple(pBox_Type, lz, ly, lx, nz, ny, nx);
+                                    p.count = nx * ny * nz;
+                                    pBlockData.block_list.Add(p);
+                                }
+
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+}

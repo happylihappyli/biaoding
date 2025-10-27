@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup />
+  <ItemGroup>
+    <Compile Update="Common\Class\Notification\Notification.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Common\Class\Notification\NotificationLauncher.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Common_Robot\cmd\ConsoleControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Common_Robot\FlatTabControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Dialog\FrmDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Dialog\FrmValue.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Dialog\Frm_Debug.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="FrmMain.cs">
+      <SubType>Form</SubType>
+    </Compile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,92 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Diagnostics;
+
+namespace Test1
+{
+    public class C_Cloud_Filter : C_Node
+    {
+        public string key_read = "cloud1";
+        public string key_save = "cloud2";
+        public string xyz = "0";//1,2
+        public string min = "";
+        public string max = "";
+
+        public C_Cloud_Filter(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        { 
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D>? pList = (List<C_Point3D>?)this.read_var(this.key_read, "List<C_Point3D>");
+            if (pList == null)
+            {
+                S_TTS.speak("读取点云为空！");
+                MessageBox.Show("读取点云为空");
+                return;
+            }
+
+            this.save_var("C_Cloud_Filter/count", "string", pList.Count + "");
+
+
+            
+
+            string str_min = this.read_string(this.min);
+            string str_max = this.read_string(this.max);
+
+
+            float f_min =0;
+            float f_max =0;
+            try
+            {
+                f_min = float.Parse(str_min);
+                f_max = float.Parse(str_max);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this.Name + ex.Message);
+                return;
+            }
+            List<C_Point3D> pList2 = Main.cloud_filter(pList, xyz, f_min, f_max);
+
+            if (pList2.Count == 0)
+            {
+                Main.WriteLine(this,"点云为空!");
+                S_TTS.speak_async("点云为空!");
+            }
+
+            if (pList2==null || pList2.Count == 0)
+            {
+                Main.WriteLine(this, "error");
+            }
+            else
+            {
+                Main.WriteLine(this, "no_this_key 1=" + this.key_save);
+
+                this.save_var(this.key_save, "List<C_Point3D>", pList2);
+                if (this.read_var(this.key_save, "List<C_Point3D>") == null)
+                {
+                    Main.WriteLine(this, "no_this_key=" + this.key_save);
+                    Debugger.Break();
+                }
+
+                Main.WriteLine(this, "no_this_key 2=" + this.key_save);
+
+                this.save_var("C_Cloud_Filter/count", "string", pList2.Count + "");
+
+
+            }
+
+        }
+    }
+}

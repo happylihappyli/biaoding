@@ -1,0 +1,416 @@
+﻿using Common_Robot;
+using MathNet.Spatial.Euclidean;
+
+using Common_Robot2;
+using ConverxHull;
+using System.Text;
+
+namespace Test1
+{
+    public class W_Send_ARM_Estun : C_Node
+    {
+        public string camera_const = "#camera1_const";
+        public string str_type = "1";
+        public int type = 1;
+
+        public string name_arm = "xxx_step";
+        public I_TCP Arm_Server = null;
+
+        public string key_planet = "";
+
+        public string add = "30";
+        public string key_robot = "#robot1";
+        public string angle_dif = "0";
+
+
+        public W_Send_ARM_Estun(string v, C_Space space_parent, C_Space space) : base(space_parent, space)
+        {
+            Name = v;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            type = int.Parse(str_type);
+
+            C_Robot pRobot = (C_Robot)space.read_vars(pTrain, this, key_robot, "C_Robot");
+
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)space.read_vars(pTrain, this, camera_const, "C_Camera_TuYang");// "#camera1_const");
+
+            Arm_Server = (I_TCP)space.vars_step[name_arm];
+            if (Arm_Server == null)
+            {
+                space.console.WriteLine("服务器名称没有设置正确", Level_Enum.Info, log_index, Name);
+                return;
+            }
+
+
+            C_Planet_Catch pCatch =
+                (C_Planet_Catch)space.read_vars(pTrain, this, key_planet, "C_Planet_Catch");// pTrain.vars[this.key_planet];// "pPlanet_Top"];
+            if (pCatch != null)
+            {
+                //happyli zzz 新吸盘比原先高60mm
+                C_Point3D pPoint_new = pCatch.center;
+                //space.console.WriteLine(pPoint_new.ToString2());
+                C_Point3D pPoint_new2 = pPoint_new;
+
+                if (type == 1)
+                {
+                    C_Point3D old_uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, pPoint_new);
+                    space.save_vars(pTrain, this, "#pDraw_Center", "C_Point3D", pPoint_new);//记录上一次位置
+
+                    space.save_vars(pTrain, this, "#old_uv", "C_Point3D", old_uv);
+
+                    //pPoint_new2 = pPoint_new.add(new C_Point3D(0, 0, int.Parse(get_add)));
+                    space.console.WriteLine("<><><> 抓取位置：" + pPoint_new2.ToString(), Level_Enum.Info, log_index, Name);
+                    //S_TTS.speak_async(" 抓取位置 " + pPlanet_Top.center.ToString());
+
+                    Console.WriteLine("抓取位置 A=" + pPoint_new2.ToString());
+                }
+                else if (type == 2)
+                {
+                    //pPoint_new2 = pPoint_new.add(new C_Point3D(0, 0, float.Parse(put_add)));
+                    //pPlanet_Top.center.z += float.Parse(this.put_add);// (float)space.vars.put_add;// 60+30;
+                    //space.console.WriteLine(pPoint_new.ToString2());
+
+                    object obj1 = space.read_vars(pTrain, this, "#put_angle", "");
+                    double angle = Main.get_double_from_obj(this, obj1);
+
+                    object obj2 = space.read_vars(pTrain, this, "#put_angle2", "");
+                    double angle2 = Main.get_double_from_obj(this, obj2);
+
+
+                    pCatch.dbAngle = angle + angle2 + 90;
+                    space.console.WriteLine("<><><> 放置位置：" + pPoint_new, Level_Enum.Info, log_index, Name);// pPlanet_Top.center.ToString());
+
+                }
+
+
+                发送给estun机械臂(camera1,pRobot, type, pPoint_new2, pCatch.dbAngle);// pPlanet_Top);
+
+                pCatch.pMain.bCatch = true;//代表这个区域被抓取过了
+
+                Thread.Sleep(500);
+
+            }
+            else
+            {
+                if (type == 1 || type == 2)
+                {
+
+                    S_TTS.speak_async("没有合适的抓取位置");
+                    space.console.WriteLine("!!没有合适的抓取位置", Level_Enum.Info, log_index, Name);
+                }
+                else
+                {
+                    发送给ESTUN机械臂(type, "0,0,0,0");
+                }
+            }
+        }
+
+        public void 发送给estun机械臂(
+            C_Camera_TuYang camera1,
+            C_Robot pRobot, int type, C_Point3D pPoint_New2, double dbAngle) // C_Planet_Catch pPlanet_Top)
+        {
+            space.console.WriteLine("根据坐标计算3轴角度", Level_Enum.Info, log_index, Name);
+
+            if (double.IsNaN(pPoint_New2.x)) // pPlanet_Top.center.x))
+            {
+                space.console.WriteLine("NaN", Level_Enum.Info, log_index, Name);
+                return;
+            }
+            C_Point3D A = Tools.摄像头坐标转到机械臂坐标(camera1, pPoint_New2);// pPlanet_Top.center);
+
+            space.console.WriteLine("机械臂=" + A.ToString(), Level_Enum.Info, log_index, Name);
+
+            C_Point3D A2 = A.add(new C_Point3D(0,0,double.Parse(this.add)));
+            // new C_Point3D(1196.65, 928.81, 745.89);//   A;//.subtract(new C_Point3D(0, 0, (float)height_minus));
+
+            C_Point3D B = 计算B_v2(A2);
+
+            C_Point3D D = 计算D坐标(pRobot, B);
+
+            C_Result pResult = 根据坐标计算4轴角度(pRobot, B, D, dbAngle);// pPlanet_Top.dbAngle);
+
+            if (pResult.strLine == "")
+            {
+                MessageBox.Show("计算4轴角度有错误！");
+                space.console.WriteLine("//有错误 ", Level_Enum.Info, log_index, Name);
+                return;
+            }
+
+
+            space.console.WriteLine("//发送给机械臂轴信息 ", Level_Enum.Info, log_index, Name);
+
+            {
+                //S_TTS.speak_async("发送消息给机械臂");
+                发送给ESTUN机械臂(type, pResult.strLine);
+                space.console.WriteLine(type + ":" + pResult.strLine, Level_Enum.Info, log_index, Name);
+            }
+        }
+
+
+
+        /// <summary>
+        /// 根据B算D
+        /// </summary>
+        /// <returns></returns>
+        public static C_Point3D 计算D坐标(C_Robot pRobot, C_Point3D B)
+        {
+            var a = Math.Atan2(B.y, B.x);
+            var x = pRobot.arm_oz * Math.Cos(a);
+            var y = pRobot.arm_oz * Math.Sin(a);
+            var z = pRobot.arm_dz;
+
+            return new C_Point3D(x, y, z);
+        }
+
+
+        //通过A计算B
+        public static C_Point3D A_To_B(C_Point3D a)
+        {
+
+            double len = Math.Sqrt(a.x * a.x + a.y * a.y);
+            double len_new = len - 225;
+
+            double x_new = a.x * len_new / len;
+            double y_new = a.y * len_new / len;
+
+            return new C_Point3D(x_new, y_new, a.z);
+        }
+
+
+        public static C_Point3D 计算B_v2(C_Point3D A)
+        {
+            C_Point3D A2 = Tools.FromA_To_Real_A(A);
+            C_Point3D B = A_To_B(A2);
+            return B;
+        }
+
+        public C_Result 根据坐标计算4轴角度(
+            C_Robot pRobot,
+            C_Point3D B, C_Point3D D, double angle_last)
+        {
+            //if (const_arm.bDebug_Mode) space.console.WriteLine("A="+A.ToString());
+            if (space.vars.bDebug_Mode) space.console.WriteLine("B=" + B.ToString(), Level_Enum.Info, log_index, Name);
+            if (space.vars.bDebug_Mode) space.console.WriteLine("D=" + D.ToString(), Level_Enum.Info, log_index, Name);
+            space.console.WriteLine("计算BD以及是否超范围", Level_Enum.Info, log_index, Name);
+            C_Point3D[] arr = space.main.计算D和C2_C以及是否超范围_v2(this, pRobot, B);
+
+            if (arr == null)
+            {
+                space.console.WriteLine("前面超范围没有过滤！", Level_Enum.Info, log_index, Name);
+
+                return new C_Result("", B, B, "前面超范围没有过滤！");
+            }
+
+            C_Point3D C2 = arr[0];
+
+            space.console.WriteLine("计算旋转轴角度", Level_Enum.Info, log_index, Name);
+            double[] angle = new double[6];
+            double a1 = -1 * Math.Atan2(D.y, D.x);//第一个轴
+            a1 = angle_process(a1);
+            if (space.vars.bDebug_Mode)
+                space.console.WriteLine("1=" + a1 + ",=" + Tools.to_degree(a1), Level_Enum.Info, log_index, Name);
+
+            C_Point3D vector_dc2 = C2.subtract(D);
+            C_Point3D vector_od_in_z0 = D.subtract(new C_Point3D(0, 0, D.z)).subtract(new C_Point3D(0, 0, 0));//od 在z=0平面的投影
+            double len_vector_dc2_in_z0 = vector_dc2.dotProduct(vector_od_in_z0.normalize());
+
+            double new_y = len_vector_dc2_in_z0;// Math.Sqrt(vector_dc2.x * vector_dc2.x + vector_dc2.y * vector_dc2.y);
+            double new_x = vector_dc2.z;
+            double a2 = Math.Atan2(new_y, new_x); //Math.PI / 2 - Math.Atan2(new_y, new_x);
+            a2 = angle_process(a2);
+            if (space.vars.bDebug_Mode)
+                space.console.WriteLine("2=" + a2 + ",=" + Tools.to_degree(a2), Level_Enum.Info, log_index, Name);
+
+
+            C_Point3D vector_c2b = B.subtract(C2);
+
+            Vector3D v_dc2 = new Vector3D(vector_dc2.x, vector_dc2.y, vector_dc2.z);
+            Vector3D v_c2b = new Vector3D(vector_c2b.x, vector_c2b.y, vector_c2b.z);
+
+            C_Point3D Z = new C_Point3D(D.x, D.y, 0);
+
+            C_Point3D vector_oz = Z;
+            Vector3D v_oz = new Vector3D(vector_oz.x, vector_oz.y, vector_oz.z);
+            Vector3D v_c2r = v_dc2.CrossProduct(v_oz); //v_dc2.CrossProduct(v_z2);
+
+            if (v_dc2.DotProduct(new Vector3D(0, 0, 1)) < 0)
+            {
+                v_c2r = -v_c2r;
+            }
+
+            UnitVector3D J = v_dc2.CrossProduct(v_c2r).Normalize();
+
+            new_x = v_c2b.DotProduct(v_dc2.Normalize());
+            new_y = v_c2b.DotProduct(J);
+
+            double a3 = Math.Atan2(new_y, new_x);
+            a3 = -1 * (angle_process(a3) + Math.PI / 2);
+            if (space.vars.bDebug_Mode)
+                space.console.WriteLine("3=" + a3 + ",=" + Tools.to_degree(a3), Level_Enum.Info, log_index, Name);
+
+            angle[0] = a1;
+            angle[1] = a2;
+            angle[2] = a3;
+
+
+            if (验算ABC_v2(angle, B, C2, D) == false)
+            {
+                if (space.vars.bDebug_Mode)
+                    space.console.WriteLine("6=" + angle[5] + ",=" + Tools.to_degree(angle[5]), Level_Enum.Info, log_index, Name);
+
+                angle[0] = angle[0] * 180 / Math.PI;
+                angle[1] = angle[1] * 180 / Math.PI;
+                angle[2] = angle[2] * 180 / Math.PI;
+
+                string strLine = "";
+                for (var i = 0; i < 3; i++)
+                {
+                    strLine += Math.Round(angle[i] * 100) / 100 + ",";
+                }
+
+
+                //object tmp = space.vars.read_vars(pTrain, this, "#angle_dif", "");
+                double angle_dif = double.Parse(this.angle_dif);// Main.get_double_from_obj(this, tmp);
+                double angle4 = -angle[0] - angle_last + angle_dif + 90;
+                if (angle4 < 0) angle4 += 180;
+                strLine += Math.Round(angle4, 2);
+
+                return new C_Result(strLine, B, B);
+            }
+            space.console.WriteLine("@ 验算有问题！", Level_Enum.Info, log_index, Name);//+ 验算ABC(angle, A, B, C2, C, D)
+
+            space.console.WriteLine("angle=", Level_Enum.Info, log_index, Name);
+            for (var i = 0; i <= 5; i++)
+            {
+                space.console.WriteLine(i + "=" + angle[i], Level_Enum.Info, log_index, Name);
+            }
+
+
+            space.console.WriteLine("B=" + B.ToString2(), Level_Enum.Info, log_index, Name);
+            space.console.WriteLine("C2=" + C2.ToString2(), Level_Enum.Info, log_index, Name);
+            space.console.WriteLine("D=" + D.ToString2(), Level_Enum.Info, log_index, Name);
+
+            //验算ABC(angle,  B, C2,  D);
+
+            return new C_Result("", B, B, "验算有问题！");
+        }
+
+        // C_Point3D A, C_Point3D C,
+        public bool 验算ABC_v2(double[] angle, C_Point3D B, C_Point3D C2, C_Point3D D)
+        {
+            C_Robot pRobot = new C_Robot();
+            pRobot.ini_estun();// ini_anchuang();
+            for (var i = 0; i < 6; i++)
+            {
+                double a = angle[i] * 180 / Math.PI;
+                Console.WriteLine(a);
+                pRobot.Rotate(i, angle[i]);
+            }
+
+            bool bError = true;
+            if (check_equal(100, pRobot.bottom_L[2], C2))
+            {
+                if (check_equal(100, pRobot.bottom_L[4], B))
+                {
+                    bError = false;
+                }
+                else
+                {
+                    space.console.WriteLine("B " + pRobot.bottom_L[4].ToString() + " " + B.ToString(), Level_Enum.Info, log_index, Name);
+                }
+            }
+            else
+            {
+                space.console.WriteLine("C2 " + pRobot.bottom_L[2].ToString() + " " + C2.ToString(), Level_Enum.Info, log_index, Name);
+            }
+
+            //根据D算C2，
+            return bError;
+        }
+
+
+
+        public bool check_equal(double dbScale, Three.Net.Math.Vector3 v, C_Point3D p)
+        {
+            if (Math.Round(v.x * dbScale - p.x, 1) != 0)
+            {
+                return false;
+            }
+            if (Math.Round(v.y * dbScale - p.y, 1) != 0)
+            {
+                return false;
+            }
+            if (Math.Round(v.z * dbScale - p.z, 1) != 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+
+        public double angle_process(double angle)
+        {
+            if (angle > Math.PI) angle = angle - Math.PI * 2;
+            if (angle < -Math.PI) angle = angle + Math.PI * 2;
+            angle = Math.Round(angle, 5);
+            return angle;
+        }
+
+        public void 发送给ESTUN机械臂(int iType, string strLine1)
+        {
+            // Tools.bRobot_Catch = false;//代表没有抓取成功
+
+            switch (iType)
+            {
+                case 1:
+                    space.console.WriteLine("吸取位置iType=" + iType, Level_Enum.Info, log_index, Name);
+                    break;
+                case 2:
+                    space.console.WriteLine("放置位置iType=" + iType, Level_Enum.Info, log_index, Name);
+                    break;
+            }
+
+            Main.WriteLine(Name+ string.Format("包裹位置:\r\n {0}", strLine1));
+            //发送数据
+            {
+                string strResult = string.Format("[{0},{1},0,0,0]", strLine1, iType);
+                space.console.WriteLine("发送数据=" + strResult, Level_Enum.Info, log_index, Name);
+                byte[] gbk = Encoding.GetEncoding("GBK").GetBytes(strResult);
+                //发送
+                发送给机械臂Byte(gbk);
+            }
+        }
+
+
+        /// <summary>
+        /// 给机械臂发送包裹抓取指令
+        /// </summary>
+        /// <param name="data"></param>
+        public void 发送给机械臂Byte(byte[] data)
+        {
+            string message = "";
+            space.console.WriteLine("数据发送中...", Level_Enum.Info, log_index, Name);
+            //异常信息
+            if (!Arm_Server.Send(data))
+            {
+                space.console.WriteLine("发送指令异常：" + message, Level_Enum.Info, log_index, Name);
+            }
+            else
+            {
+                space.console.WriteLine("发送指令成功!", Level_Enum.Info, log_index, Name);
+            }
+        }
+
+    }
+}

@@ -1,0 +1,131 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 生成点云
+    /// </summary>
+    public class C_Cloud_Make : C_Node
+    {
+        public string key_read = "center"; //C_Point3D
+        public string key_save = "cloud2"; //List<C_Point3D>
+        public string fix = "x";//=x 代表坐标的x轴不变，生成点云
+        public int r = 100;
+        public int count = 100;
+
+        public C_Cloud_Make(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent,space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            C_Point3D center = (C_Point3D)this.read_var(this.key_read, "C_Point3D");
+            if (center == null)
+            {
+                MessageBox.Show(this.Name + " 中心点为空！" + key_read);
+                this.Next_Step = Node_Next.None;
+                return;
+            }
+
+            List<C_Point3D> pList2 = new List<C_Point3D>();
+
+
+            for (var i = 0; i < count; i++)
+            {
+                C_Point3D point;
+                if (fix == "x")
+                {
+                    Random random = new Random();
+                    double y = center.y + r * Math.Cos(random.NextDouble());
+                    double z = center.z + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(center.x, y, z);
+                    pList2.Add(point);
+                }
+                else if (fix == "y")
+                {
+                    Random random = new Random();
+                    double x = center.x + r * Math.Cos(random.NextDouble());
+                    double z = center.z + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(x, center.y, z);
+                    pList2.Add(point);
+                }
+                else if (fix == "z")
+                {
+                    Random random = new Random();
+                    double y = center.y + r * Math.Cos(random.NextDouble());
+                    double x = center.x + r * Math.Sin(random.NextDouble());
+                    point = new C_Point3D(x, y, center.z);
+                    pList2.Add(point);
+                }
+            }
+
+
+            if (fix == "x")
+            {
+                C_Point3D point = new C_Point3D(center.x, center.y - 2 * r, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y + 2 * r, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y - 2 * r, center.z + r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x, center.y + 2 * r, center.z + r);
+                pList2.Add(point);
+            }
+            else if (fix == "y")
+            {
+                C_Point3D point = new C_Point3D(center.x - 2 * r, center.y, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y, center.z - r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - 2 * r, center.y, center.z + r);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y, center.z + r);
+                pList2.Add(point);
+            }
+            else if (fix == "zx")
+            {
+                C_Point3D point = new C_Point3D(center.x - 2 * r, center.y - r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y - r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - 2 * r, center.y + r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + 2 * r, center.y + r, center.z);
+                pList2.Add(point);
+            }
+            else if (fix == "z")
+            {
+                C_Point3D point = new C_Point3D(center.x - r, center.y - 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + r, center.y - 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x - r, center.y + 2 * r, center.z);
+                pList2.Add(point);
+                point = new C_Point3D(center.x + r, center.y + 2 * r, center.z);
+                pList2.Add(point);
+            }
+            this.save_var(this.key_save, "List<C_Point3D>", pList2);
+
+        }
+    }
+}

@@ -1,0 +1,394 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Windows.Forms;
+
+
+namespace Test1
+{
+
+    /// <summary>
+    /// 计算卸货的时候抓取的箱子的信息
+    /// </summary>
+    public class Cal_Catch_Box_Info : C_Node
+    {
+        public string key_array_main = "mains";
+        public string key_last = "";//上次抓取的面
+
+        public string debug = "1";
+        public string key_angle = "";//读取角度的变量
+        public string calculate_type = "x";
+        
+
+        public string key_z = "";//切换到z坐标，如果是测抓，中心点在z下面，就过滤
+
+        public double car_move_len = 0;
+        public string y_filter= "-300";
+        public string x_max = "1600";
+
+        public string len_robot = "2100";
+        public string? key_sum_move_len="";
+        public string? dz = "0";
+
+        public string? key_save { get;  set; }
+        public string? key_boxs { get; set; }
+
+
+
+        public string? key_camera { get; set; }
+        public string? scale { get;  set; }
+        public string width { get;  set; }
+        public string height { get;  set; }
+        public string value { get;  set; }
+
+
+
+        //zzz
+        public string? key_catch_x_higher = "";//zzz   #高于切换线
+        //public string? key_catch_z = "";
+
+        public string? min_angle = "-40";
+        public string? max_angle = "40";
+
+        public Cal_Catch_Box_Info(string name,C_Space space_parent,C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            string direction = this.read_string(this.calculate_type);
+            
+            C_Planet_Catch? pLast=(C_Planet_Catch?)this.read_var(this.key_last, "C_Planet_Catch");
+            if (pLast == null)
+            {
+                Main.WriteLine("========上一次没有抓取面");
+            }
+            else
+            {
+                Main.WriteLine("========上次抓取面arm_a="+pLast.arm_a.ToString());
+            }
+
+
+            List<C_Data>? list_data = (List<C_Data>?)this.read_var(this.key_array_main, "List<C_Data>");
+            if (list_data == null)
+            {
+                Main.WriteLine(this.Name + this.Name + ", list_data 为空  key_array_main 设置不对！");
+                this.Next_Step = Node_Next.False;
+                return ;
+            }
+
+            object? obj = this.read_var(key_angle, "string");
+            double angle = Main.get_double_from_obj(this, obj==null?0:obj);
+
+            if (pLast == null)//自动识别箱规
+            {
+                //识别箱子类型(list_data,f_x);
+            }
+
+
+
+            for (var i = 0; i < list_data.Count; i++)
+            {
+                C_Data pData2 = list_data[i];
+            }
+
+
+            List<C_BoxInfo> list_boxInfo = new List<C_BoxInfo>();
+            for (var i = 0; i < list_data.Count; i++)
+            {
+                C_Data pData2 = list_data[i];
+
+                if (pData2.list_3D_Point_arm != null  && pData2.list_3D_Point_arm.Count>50)
+                {
+
+                    (C_Point3D center,C_Point3D min,C_Point3D max) = Main.计算中位数中心点坐标(pData2.list_3D_Point_arm);
+
+                    List<C_Point3D> pListPoint = Main.中心点附近70mm范围的点(pData2.list_3D_Point_arm, center);
+                    C_Point3D faxiangliang = Main.平面拟合计算法向量等(pListPoint);
+
+                    C_BoxInfo c_BoxInfo = new C_BoxInfo(center, pData2, faxiangliang,get_direction(faxiangliang));
+                    c_BoxInfo.x_min = min.x;
+                    c_BoxInfo.x_max = max.x;
+                    c_BoxInfo.y_min = min.y;
+                    c_BoxInfo.y_max = max.y;
+                    c_BoxInfo.z_min = min.z;
+                    c_BoxInfo.z_max = max.z;
+                    list_boxInfo.Add(c_BoxInfo);
+                }
+                else
+                {
+                    Main.WriteLine(this, "i=" + i + ", 点云太少 GID=" + pData2.Group_ID+" c="+ pData2.list_3D_Point?.Count);
+                }
+            }
+
+            //把一个箱子的两个面互相串联起来，x_min,x_max 等也要重新计算
+            for(var i=0;i< list_boxInfo.Count; i++)
+            {
+                C_BoxInfo box1 = list_boxInfo[i];
+                for (var j = 0; j < list_boxInfo.Count; j++)
+                {
+                    if (i != j)
+                    {
+                        C_BoxInfo box2 = list_boxInfo[j];
+                        if (box1.z_max - box1.z_min < 30 && box2.x_max - box2.x_min < 30)
+                        {
+                            //如果box1是法向量为z的平面
+                            double dy_min = Math.Abs(box1.y_min - box2.y_min);
+                            double dy_max = Math.Abs(box1.y_max - box2.y_max);
+
+                            if (dy_min < 30 && dy_max < 30)
+                            {
+                                double dz = Math.Abs(box2.z_max - box1.z_min);
+                                if (dz < 30)
+                                {
+                                    double dx = Math.Abs(box1.x_min - box2.x_min);
+                                    if (dx < 30)
+                                    {
+                                        if (box1.extend == null)
+                                        {
+                                            box1.extend = box2;
+                                            box2.extend = box1;
+
+                                            box1.x_min = Math.Min(box1.x_min, box2.x_min);
+                                            box1.x_max = Math.Max(box1.x_max, box2.x_max);
+                                            box1.y_min = Math.Min(box1.y_min, box2.y_min);
+                                            box1.y_max = Math.Max(box1.y_max, box2.y_max);
+                                            box1.z_min = Math.Min(box1.z_min, box2.z_min);
+                                            box1.z_max = Math.Max(box1.z_max, box2.z_max);
+
+                                            box2.x_min = box1.x_min;
+                                            box2.x_max = box1.x_max;
+                                            box2.y_min = box1.y_min;
+                                            box2.y_max = box1.y_max;
+                                            box2.z_min = box1.z_min;
+                                            box2.z_max = box1.z_max;
+                                        }
+                                        else
+                                        {
+                                            MessageBox.Show(this.Name + " Error");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+
+
+
+            string? str_sum_db_move = (string?)this.read_var(this.key_sum_move_len, "string");
+            if (str_sum_db_move == null || str_sum_db_move == "")
+            {
+                str_sum_db_move = "0";
+            }
+            double sum_db_move = double.Parse(str_sum_db_move);
+
+            string str_max = this.read_string(this.x_max);
+            if (str_max == "")
+            {
+                str_max = "0";
+            }
+            double db_x_max_read = double.Parse(str_max);
+            double db_x_max = db_x_max_read - sum_db_move;
+
+            Main.WriteLine(this, "  db_x_max =" + db_x_max + ", sum_db_move=" + sum_db_move);
+
+
+
+            List<C_BoxInfo> list_box7 = new List<C_BoxInfo>();
+            for (var i = 0; i < list_boxInfo.Count; i++)
+            {
+                C_BoxInfo center = list_boxInfo[i];
+
+                C_Data pData2 = center.pData;
+                C_Point3D faxiangliang = center.faxiangliang;
+
+                if (center.center.x < db_x_max)
+                {
+                    list_box7.Add(center);
+                }
+                else
+                {
+                    //S_TTS.speak_async("x距离太远");
+                    Main.WriteLine(this, "i=" + i + ",  GID=" + pData2.Group_ID + "=== x距离太远 ===" + center.center.x + ", db_x_max=" + db_x_max);
+                }
+            }
+
+
+
+            string? str_z = this.read_string("@" + this.key_z);
+            double db_z_filter = double.Parse(str_z == null ? "0" : str_z);
+            List<C_BoxInfo> list_box8 = new List<C_BoxInfo>();
+
+            Main.WriteLine(this, "============= list_box7  =============");
+            string str_ids = "";
+
+            {
+                //this.save_var(this.key_catch_x_higher, "string", "0");
+                for (var i = 0; i < list_box7.Count; i++)
+                {
+                    C_BoxInfo center = list_box7[i];
+
+                    str_ids += center.Group_ID + ",";
+
+                    if (direction == "z")
+                    {
+                        if (center.center.z < db_z_filter)
+                        {
+                            list_box8.Add(center);
+                        }
+                        else
+                        {
+                            Main.WriteLine(this, "GID:" + center.Group_ID + ",center.center.z < db_z_filter " + center.center.z + "," + db_z_filter+"//传一个变量出来，告诉系统，有高于切换线的盒子需要侧面抓取");
+                            //this.save_var(this.key_catch_x_higher, "string", "1");
+                            //break;
+                        }
+                    }
+                    else if (direction == "x" || direction == "-x")
+                    {
+                        if (center.center.z > db_z_filter)
+                        {
+                            list_box8.Add(center);
+                        }
+                        else
+                        {
+                            Main.WriteLine(this, "GID:"+center.Group_ID+",center.center.z < db_z_filter " + center.center.z + "," + db_z_filter);
+
+                        }
+                    }
+                }
+                Main.WriteLine(this, str_ids);
+            }
+
+            double db_width = double.Parse(this.width);
+            double db_height = double.Parse(this.height);
+            double db_value = double.Parse(this.value);
+
+            List<C_BoxInfo> list_box9 = new List<C_BoxInfo>();
+            C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(key_camera, "C_Camera_TuYang");
+            float db_Scale = float.Parse(this.scale);// 2f;//缩放比
+            for (var i = 0; i < list_box8.Count; i++)
+            {
+                C_BoxInfo box = list_box8[i];
+
+                C_Point3D p2 = Tools.机械臂坐标到摄像头坐标(camera1, box.center);
+                C_Point3D uv = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, p2);
+                if (uv == null) continue;
+
+                uv.x = uv.x / db_Scale;
+                uv.y = uv.y / db_Scale;
+
+                //周围一圈宽度为dbvalue的过滤掉
+                if (uv.x>= db_value && uv.x <= db_width - db_value)
+                {
+                    if (uv.y >= db_value && uv.y <= db_height - db_value)
+                    {
+                        list_box9.Add(box);
+                    }
+                }
+            }
+
+            str_ids = "";
+            for(var i=0;i < list_box9.Count; i++)
+            {
+                str_ids += list_box9[i].Group_ID + ",";
+            }
+            Main.WriteLine(this, "list_box9:" + str_ids);
+
+            this.save_var(this.key_save, "List<C_BoxInfo>", list_box9);
+            this.save_var(this.key_boxs, "List<C_BoxInfo>", list_boxInfo);
+            this.Next_Step = Node_Next.True;
+        }
+
+
+
+        public void 识别箱子类型(List<C_Data> list_data,float f_x)
+        {
+            List<float> xlens = new List<float>();
+            List<float> ylens = new List<float>();
+            List<float> zlens = new List<float>();
+            for (var i = 0; i < list_data.Count; i++)
+            {
+                C_Data pData = list_data[i];
+                if (pData.pMin_Relative == null)
+                {
+                    continue;
+                }
+                float xmin = pData.pMin_Relative.x;
+                float ymin = pData.pMin_Relative.y;
+                float zmin = pData.pMin_Relative.z;
+                float xmax = pData.pMax_Relative.x;
+                float ymax = pData.pMax_Relative.y;
+                float zmax = pData.pMax_Relative.z;
+
+                const float xthres = 50;
+                const float zthres = 50;
+                if (xmin < f_x + xthres)//过滤掉往里一排的目标
+                {
+                    float xlen = xmax - xmin;
+                    float ylen = ymax - ymin;
+                    float zlen = zmax - zmin;
+
+                    if (zlen > zthres)//侧抓面
+                    {
+                        ylens.Add(ylen);
+                        zlens.Add(zlen);
+                    }
+                    else//正抓面
+                    {
+                        ylens.Add(ylen);
+                        xlens.Add(xlen);
+                    }
+                }
+            }
+
+
+            if (xlens.Count > 0)
+            {
+                xlens.Sort();
+                this.save_var("#箱子的长度", "double", xlens[(int)(xlens.Count / 2)]);
+            }
+            if (ylens.Count > 0)
+            {
+                ylens.Sort();
+                this.save_var("#箱子的宽度", "double", ylens[(int)(ylens.Count / 2)]);
+            }
+            if (zlens.Count > 0)
+            {
+                zlens.Sort();
+                this.save_var("#箱子的高度", "double", zlens[(int)(zlens.Count / 2)]);
+            }
+        }
+
+        public string get_direction(C_Point3D faxiangliang)
+        {
+            if (Math.Abs(faxiangliang.z) > 0.6)
+            {
+                return "z";
+            }else if (Math.Abs(faxiangliang.x) > 0.6)
+            {
+                return "x";
+
+            }
+            else if (Math.Abs(faxiangliang.y) > 0.6)
+            {
+                return "y";
+            }
+            return "";
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

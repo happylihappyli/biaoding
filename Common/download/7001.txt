@@ -1,0 +1,511 @@
+﻿
+using B2_Data.Funny;
+using Common_Robot2;
+using ConverxHull;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+
+    public class C_Pair
+    {
+        public C_Point3D Point1;
+        public C_Point3D Point2;
+
+        public C_Pair(C_Point3D c_Point3D1, C_Point3D c_Point3D2)
+        {
+            this.Point1 = c_Point3D1;
+            this.Point2 = c_Point3D2;
+        }
+
+        override
+        public string ToString()
+        {
+            return Point1.ToString() + ";" + Point2.ToString();
+        }
+    }
+
+
+    //无人机变形模块
+    public class S_Drone_Convert: C_Node
+    {
+        //模型变量1
+        public string key_model1 = "";
+        //模型变量2
+        public string key_model2 = "";
+        //最小距离(米)
+        public string min_distance = "";
+        //输出文件
+        public string file = "D:\\data\\file_@.txt";
+
+        public string sum_time = "120";
+
+        public S_Drone_Convert(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<C_Point3D> list1 = (List<C_Point3D>)this.read_var(this.key_model1, "");
+            List<C_Point3D> list2 = (List<C_Point3D>)this.read_var(this.key_model2, "");
+
+            double min_distance = double.Parse(this.min_distance);
+
+            double distance1 = S_Drone_Convert.最小距离(list1);
+            double distance2 = S_Drone_Convert.最小距离(list2);
+
+            Console.WriteLine("distance1=" + distance1);
+            Console.WriteLine("distance2=" + distance2);
+
+            if (distance1 < min_distance)
+            {
+                MessageBox.Show("变形开始 间距小于最小距离！"+ distance1+ ", min_distance="+ min_distance);
+                return;
+            }
+            if (distance2 < min_distance)
+            {
+                MessageBox.Show("变形结束 间距小于最小距离！"+ distance2 + ", min_distance=" + min_distance);
+                return;
+            }
+
+            int n = 100;
+            List<C_Pair> list_pair = S_Drone_Convert.匹配数据(list1, list2);
+
+            List<C_Point3D>[] time_points = S_Drone_Convert.变形数据(list_pair, n, min_distance);
+
+            double db_sum_time = double.Parse(this.sum_time);
+            S_Drone_Convert.输出到文件(db_sum_time, file,list_pair, time_points);
+
+
+            //List<C_Point3D> list3 = S_Drone_Convert.抽取数据(time_points, list_pair.Count, 417);
+            //S_Drone_Convert.放大数据(list3, 4);
+
+            //Console.WriteLine("=================== 打印最小距离");
+            //S_Drone_Convert.打印最小距离(time_points, n, list_pair.Count);
+
+            //List<C_Pair> list_pair2 = S_Drone_Convert.匹配数据(list1, list3);
+            //List<C_Point3D>[] time_points2 = S_Drone_Convert.变形数据(list_pair2, n, min_distance);
+
+            //Console.WriteLine("=================== 打印最小距离");
+            //S_Drone_Convert.打印最小距离(time_points2, n, list_pair2.Count);
+
+            //S_Drone_Convert.输出到文件(list_pair2, time_points2);
+        }
+
+        public static double 计算最小距离(List<C_Point3D>[] time_points, int n, int i, int j)
+        {
+            double min_d = 1000000; ;
+            for (var k = 0; k < n; k++)
+            {
+
+                if (i != j)
+                {
+                    var list1 = time_points[i];
+                    var list2 = time_points[j];
+                    C_Point3D p1 = list1[k];
+                    C_Point3D p2 = list2[k];
+
+                    double d = p1.distance(p2);
+                    if (d < min_d)
+                    {
+                        min_d = p1.distance(p2);
+                    }
+                }
+            }
+            return min_d;
+        }
+
+        public static List<C_Point3D> 计算中间值(
+            C_Pair pPair, int n, int i, int start)
+        {
+            List<C_Point3D> list_new = new List<C_Point3D>();
+
+            for (var j = 0; j < n; j++)
+            {
+                if (j < start)
+                {
+                    double x = pPair.Point1.x;// * weight + pPair.Point1.x * (1 - weight);
+                    double y = pPair.Point1.y;// * weight + pPair.Point1.y * (1 - weight);
+                    double z = pPair.Point1.z;// * weight + pPair.Point1.z * (1 - weight);
+
+                    C_Point3D tmp = new C_Point3D(i + "," + x + "," + y + "," + z, ",");
+                    list_new.Add(tmp);
+                }
+                else
+                {
+                    double weight = (j - start + 1.0) / (n - start);
+                    double x = pPair.Point2.x * weight + pPair.Point1.x * (1 - weight);
+                    double y = pPair.Point2.y * weight + pPair.Point1.y * (1 - weight);
+                    double z = pPair.Point2.z * weight + pPair.Point1.z * (1 - weight);
+
+                    C_Point3D tmp = new C_Point3D(i + "," + x + "," + y + "," + z, ",");
+                    list_new.Add(tmp);
+                }
+
+            }
+            return list_new;
+        }
+
+
+
+        public static double 最小距离(List<C_Point3D> list1)
+        {
+            double min_d = 1000000; ;
+            for (var i = 0; i < list1.Count; i++)
+            {
+                for (var j = 0; j < list1.Count; j++)
+                {
+                    if (i != j)
+                    {
+                        C_Point3D p1 = list1[i];
+                        C_Point3D p2 = list1[j];
+
+                        double d = p1.distance(p2);
+                        if (d < min_d)
+                        {
+                            min_d = p1.distance(p2);
+                        }
+                    }
+                }
+            }
+            return min_d;
+        }
+
+
+
+        public static List<C_Pair> 匹配数据(List<C_Point3D> list1_in, List<C_Point3D> list2_in)
+        {
+            List<C_Point3D> list1 = List_Copy(list1_in);
+            List<C_Point3D> list2 = List_Copy(list2_in);
+
+            List<C_Pair> list_pair = new List<C_Pair>();
+
+            bool bFind = true;
+            while (bFind)
+            {
+                double f_min = 10000;
+                bFind = false;
+                int index1 = 0;
+                int index2 = 0;
+                for (var i = 0; i < list1.Count; i++)
+                {
+                    for (var j = 0; j < list2.Count; j++)
+                    {
+                        double distance = list1[i].distance(list2[j]);
+                        if (distance < f_min)
+                        {
+                            f_min = distance;
+                            index1 = i;
+                            index2 = j;
+                            bFind = true;
+                        }
+                    }
+                }
+
+                if (bFind)
+                {
+                    C_Pair pPair = new C_Pair(list1[index1], list2[index2]);
+                    Console.WriteLine(f_min + "=" + pPair.ToString());
+                    list_pair.Add(pPair);
+                    list1.RemoveAt(index1);
+                    list2.RemoveAt(index2);
+                    if (list1.Count == 0) break;
+                    if (list2.Count == 0) break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return list_pair;
+        }
+
+
+
+        public static void 输出到文件(
+            double sum_time,
+            string file,
+            List<C_Pair> list_pair, List<C_Point3D>[] time_points)
+        {
+            for (var i = 0; i < list_pair.Count; i++)
+            {
+                C_Pair pPair = list_pair[i];
+                string fileLoc = file.Replace("@", i + "");//
+                using (StreamWriter sw = new StreamWriter(fileLoc))
+                {
+                    var list = time_points[i];
+                    sw.WriteLine("//" + pPair.Point1.ToString() + ";" + pPair.Point2.ToString());
+                    sw.Write("//id,time,x,y,z,vx,vy,vz,ax,ay,az,red,green,blue,light_type,brightness");
+                    sw.Write("//float brightness;   //亮度，浮点数，0-1之间，1最亮。 int light_type;     //显示类型，1常量，2闪烁，3呼吸。");
+
+                    List<C_Point3D> list_speed = new List<C_Point3D>();
+                    for (var j = 0; j < list.Count; j++)
+                    {
+                        double time = sum_time*j / list.Count;
+                        double time_span = sum_time * 2 / list.Count;
+
+                        C_Point3D pre;
+                        C_Point3D next;
+                        if (j == 0)
+                        {
+                            pre = list[j];
+                        }
+                        else
+                        {
+                            pre = list[j - 1];
+                        }
+                        if (j == list.Count - 1)
+                        {
+                            next = list[j];
+                        }
+                        else
+                        {
+                            next = list[j+1];
+                        }
+
+                        double vx = get_speed(pre.x, next.x, time_span);
+                        double vy = get_speed(pre.y, next.y, time_span);
+                        double vz = get_speed(pre.z, next.z, time_span);
+
+                        list_speed.Add(new C_Point3D(vx, vy, vz));
+                    }
+
+                    for (var j = 0; j < list.Count; j++)
+                    {
+                        double time = sum_time * j / list.Count;
+                        double time_span = sum_time * 2 / list.Count;
+
+                        C_Point3D speed= list_speed[ j ];
+
+
+                        C_Point3D pre;
+                        C_Point3D next;
+                        if (j == 0)
+                        {
+                            pre = list_speed[j];
+                        }
+                        else
+                        {
+                            pre = list_speed[j - 1];
+                        }
+                        if (j == list_speed.Count - 1)
+                        {
+                            next = list_speed[j];
+                        }
+                        else
+                        {
+                            next = list_speed[j + 1];
+                        }
+
+
+                        double ax = get_speed(pre.x, next.x, time_span);
+                        double ay = get_speed(pre.y, next.y, time_span);
+                        double az = get_speed(pre.z, next.z, time_span);
+
+
+                        sw.WriteLine(j + "," + time+","+ list[j].ToString() + "," + list_speed[j].ToString() + "," + ax + "," + ay + "," + az+",255,255,255,1,1");
+                    }
+                }
+            }
+        }
+
+        public static double get_speed(double x1, double x2,double time_span)
+        {
+            return (x2-x1)/time_span;
+        }
+
+        public static void 打印最小距离(List<C_Point3D>[] time_points, int n, int size)
+        {
+            double[] min_d = new double[n];
+            for (var k = 0; k < n; k++)
+            {
+                min_d[k] = 1000000;
+
+                for (var i = 0; i < size; i++)
+                {
+                    for (var j = 0; j < size; j++)
+                    {
+                        if (i != j)
+                        {
+                            var list1 = time_points[i];
+                            var list2 = time_points[j];
+                            C_Point3D p1 = list1[k];
+                            C_Point3D p2 = list2[k];
+
+                            double d = p1.distance(p2);
+                            if (d < min_d[k])
+                            {
+                                min_d[k] = p1.distance(p2);
+                            }
+                        }
+                    }
+                }
+                Console.WriteLine(k + "," + min_d[k]);
+            }
+        }
+
+        public static List<C_Point3D> 抽取数据(List<C_Point3D>[] time_points, int n, int k)
+        {
+            List<C_Point3D> list_new = new List<C_Point3D>();
+            for (var i = 0; i < n; i++)
+            {
+                List<C_Point3D> list = time_points[i];
+                C_Point3D p1 = list[k];
+                list_new.Add(p1);
+            }
+            return list_new;
+        }
+
+        public static void 放大数据(
+            List<C_Point3D> list, double db_scale)
+        {
+            double sum_x = 0;
+            double sum_y = 0;
+            double sum_z = 0;
+
+            int n = list.Count;
+            for (var j = 0; j < n; j++)
+            {
+                C_Point3D p1 = list[j];
+                sum_x += p1.x;
+                sum_y += p1.y;
+                sum_z += p1.z;
+            }
+            C_Point3D center = new C_Point3D(sum_x / n, sum_y / n, sum_z / n);
+
+
+            for (var j = 0; j < n; j++)
+            {
+                C_Point3D p1 = list[j];
+                C_Point3D p2 = p1.add(center.scale(-1)).scale(db_scale);//4*0.9>3
+                list[j] = p2;
+            }
+
+        }
+
+        public static List<C_Point3D>[] 变形数据(
+            List<C_Pair> list_pair,
+            int n, double min_distance)
+        {
+
+            List<C_Point3D>[] time_points = new List<C_Point3D>[list_pair.Count];
+
+            list_pair.Sort((a, b) =>
+            {
+                return Math.Sign(b.Point2.z - a.Point2.z);
+            });
+
+            int start = 0;
+            for (var i = 0; i < 2; i++)
+            {
+                C_Pair pPair = list_pair[i];
+                time_points[i] = 计算中间值(pPair, n, i, start);
+            }
+
+            int index1 = 0;
+            int index2 = 1;
+
+            while (index2 < list_pair.Count)
+            {
+                double distance = 计算多个最小距离(time_points, n, index2);
+
+                C_Pair pPair = list_pair[index2];
+
+                while (distance < min_distance)
+                {
+                    start += 1;
+                    if (start > n / 2)
+                    {
+                        MessageBox.Show("有错误！");
+                        break;
+                    }
+                    else
+                    {
+                        time_points[index2] = 计算中间值(pPair, n, index2, start);
+                    }
+                    distance = 计算多个最小距离(time_points, n, index2);
+                    //Console.WriteLine("start="+ start+" d="+distance);
+                }
+                Console.WriteLine("计算最小距离 start=" + start + " index=" + index2 + " d=" + distance);
+                index1 = index2;
+                index2 = index2 + 1;
+
+                if (index2 < list_pair.Count)
+                {
+                    start = 0;
+                    pPair = list_pair[index2];
+                    time_points[index2] = 计算中间值(pPair, n, index2, start);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+
+            Console.WriteLine("d");
+
+            ////////////////////////////
+            //for (var i = 0; i < list_pair.Count; i++)
+            //{
+            //    C_Pair pPair = list_pair[i];
+
+            //    List<C_Point3D> list_new = new List<C_Point3D>();
+            //    for (var j = 0; j < n; j++)
+            //    {
+            //        double weight = (j + 0.0) / n;
+            //        double x = pPair.Point2.x * weight + pPair.Point1.x * (1 - weight);
+            //        double y = pPair.Point2.y * weight + pPair.Point1.y * (1 - weight);
+            //        double z = pPair.Point2.z * weight + pPair.Point1.z * (1 - weight);
+
+            //        C_Point3D tmp = new C_Point3D(i + "," + x + "," + y + "," + z, ",");
+            //        list_new.Add(tmp);
+            //    }
+            //    time_points[i] = list_new;
+            //}
+            return time_points;
+        }
+
+        public static double 计算多个最小距离(List<C_Point3D>[] time_points, int n, int index2)
+        {
+            double distance = 100000;
+
+            for (var i = 0; i < index2; i++)
+            {
+                double distance_tmp = 计算最小距离(time_points, n, i, index2);
+                if (distance_tmp < distance)
+                {
+                    distance = distance_tmp;
+                }
+            }
+            return distance;
+        }
+
+        public static List<C_Point3D> List_Copy(List<C_Point3D> list1_in)
+        {
+            List<C_Point3D> list1 = new List<C_Point3D>();
+            for (var i = 0; i < list1_in.Count; i++)
+            {
+                list1.Add(list1_in[i]);
+            }
+            return list1;
+        }
+
+        public void init()
+        {
+        }
+    }
+
+
+
+}

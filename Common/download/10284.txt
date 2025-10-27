@@ -1,0 +1,75 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Math_Multiply : C_Node
+    {
+
+        public string left = "";
+        public string right = "";
+
+        public double left_value = 0;
+        public double right_value = 0;
+
+        public string key_save = "var1";
+
+        private string left_key=null;
+        private string right_key = null;
+
+        public override void init()
+        {
+            this.init_setting();
+
+            if (this.left.StartsWith("@"))
+            {
+                this.left_key=this.left.Substring(1);
+            }
+            else
+            {
+                this.left_value = double.Parse(this.left);
+            }
+
+            if (this.right.StartsWith("@"))
+            {
+                this.right_key = this.right.Substring(1);
+            }
+            else
+            {
+                this.right_value = double.Parse(this.right);
+            }
+        }
+
+        public S_Math_Multiply(string name, C_Space space_parent,C_Space space) : 
+            base(name, space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (left_key != null)
+            {
+                object obj=this.read_var(this.left_key, "double");
+
+                left_value = Main.get_double_from_obj(this,obj);
+            }
+
+            if (right_key != null)
+            {
+                object obj = this.read_var(this.right_key, "double");
+                right_value = Main.get_double_from_obj(this, obj);
+            }
+
+            double value = left_value * right_value;
+
+            this.save_var(key_save,"double",value);
+        }
+         
+    }
+}

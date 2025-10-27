@@ -1,0 +1,147 @@
+﻿
+using pcammls;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    /// <summary>
+    /// 拍照步骤，按模块化思路来做
+    /// </summary>
+    public class S_Camera_Virtual : C_Node
+    {
+        public S_Camera Camera_Control = null;
+        public static bool bInit = false;
+
+        public IntPtr dev_handle;
+
+        public string control_2d = "";
+        public string control_3d = "";
+        public string key_save = "2d_pic";
+
+
+        private string _control_camera = "";//C_Camera_Const
+        public string control_camera { get => _control_camera; set => _control_camera = value; }
+
+
+        private string _key_camera = "";//C_Camera_Const
+        public string key_camera { get => _key_camera; set => _key_camera = value; }
+
+        public string key_rgb = "";
+
+        public C_DrawBox box1 = new C_DrawBox();//摄像头的机械臂抓取区域
+
+        public int camera_w = 1280;
+        public int camera_h = 960;
+
+        public C_Camera_TuYang camera_const = null;
+        public Bitmap pBitmap_Depth;
+        public List<C_Point3D> pList_Point3D_Color = new List<C_Point3D>();
+
+        public bool bCatching;
+
+        public string camera_format = "";
+
+        public string wait = "0";
+
+        public int img_index = 0;
+        public IntPtr handle;
+        public TY_FRAME_DATA frame = null;
+        public IntPtr color_isp_handle;
+
+        public C_Point3D old_uv = null;//上一次位置
+
+        public TY_VECT_3F_ARRAY glb_p3dArray = null;
+        public TY_VECT_3F_ARRAY p3dArray;
+
+        public bool Camera_Receive_Read = false;
+
+        public bool recvFlag = false;
+        public C_Cloud_Get pGet_3D;
+        public Img_Get pGet_2D;
+
+        public int color_width;
+        public int color_height;
+
+        public Data_RGB pLast = null;
+
+
+        public string key_3d = "#3F_ARRAY";
+        public string key_camera_time = "";
+        public string save_color_cloud = "0";
+        public string key_compare = "";
+        public string depth_camera = "0";
+
+        public string time_min = "2000";
+        public string key_ids="";
+
+
+        public S_Camera_Virtual(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            pBitmap_Depth = new Bitmap(camera_w, camera_h);
+        }
+
+
+
+        public void set_2d(Img_Get pGet)
+        {
+            this.pGet_2D = pGet;
+        }
+
+        public void set_3d(C_Cloud_Get pGet)
+        {
+            this.pGet_3D = pGet;
+        }
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main(); 
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+
+            Main.WriteLine(this, "虚拟相机开始拍照 ");
+
+
+            //设置真正的摄像头
+            Camera_Control.set_2d(this.pGet_2D);
+            Camera_Control.set_3d(this.pGet_3D);
+
+            //必须要吧train传递过去，否则会错乱
+            Camera_Control.pTrain = this.pTrain;
+
+            try
+            {
+                Camera_Control.run_sub_main();
+            }catch(Exception e)
+            {
+                Main.WriteLine(this,e.ToString());
+            }
+
+        }
+
+        public override void init()
+        {
+            Img_Get? m2d = (Img_Get?)space.vars_step[this.control_2d];
+            C_Cloud_Get? m3d = (C_Cloud_Get?)space.vars_step[this.control_3d];
+            this.set_2d(m2d);
+            this.set_3d(m3d);
+
+            if (space.parent.vars_step.ContainsKey(this.control_camera))
+            {
+                Camera_Control = (S_Camera)space.parent.vars_step[this.control_camera];
+            }
+            else if(space.parent.parent!=null &&  space.parent.parent.vars_step.ContainsKey(this.control_camera))
+            {
+                Camera_Control = (S_Camera)space.parent.parent.vars_step[this.control_camera];
+            }else
+            {
+                Camera_Control = (S_Camera)space.vars_step[this.control_camera];
+            }
+        }
+    }
+}

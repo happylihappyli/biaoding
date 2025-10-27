@@ -1,0 +1,84 @@
+﻿
+using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Camera_Position_Switch : C_Node
+    {
+        public string key_table = ""; //表格数据
+        public string angle1 = "0";
+        public string angle2 = "0";
+        public string camera_postion_index = "1";//相机位置参数 1=上画面，2=中画面，3=中下画面，4=下画面
+        public string key_save = "#相机位置索引";
+        public string key_count = "#行抓取个数";
+        public S_Camera_Position_Switch(string name, C_Space space_parent, C_Space space) : 
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+            
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string str_angle1 = this.read_string(this.angle1);
+            double db_angle1 = double.Parse(str_angle1);
+            string str_angle2 = this.read_string(this.angle2);
+            double db_angle2 = double.Parse(str_angle2);
+
+            Dictionary<string, List<C_BoxInfo>>? dic =
+                (Dictionary<string, List<C_BoxInfo>>?)this.read_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>");
+
+            if (dic == null)
+            {
+                dic = new Dictionary<string, List<C_BoxInfo>>();
+                this.save_var(this.key_table, "Dictionary<string, List<C_BoxInfo>>", dic);
+            }
+
+            string str_camera_postion_index = this.read_string(camera_postion_index);
+            int index = int.Parse(str_camera_postion_index);
+
+            int count = 0;
+            {
+                string key1 = db_angle1 + "," + index;
+                if (dic.ContainsKey(key1))
+                {
+                    List<C_BoxInfo> pList = dic[key1];
+
+                    if (pList.Count > 0)
+                    {
+                        count += 1;
+                    }
+                }
+                string key2 = db_angle2 + "," + index;
+                if (dic.ContainsKey(key2))
+                {
+                    List<C_BoxInfo> pList = dic[key2];
+                    if (pList.Count > 0)
+                    {
+                        count += 1;
+                    }
+                }
+            }
+
+            if (count == 0)
+            {
+                index += 1;
+            }
+
+            this.save_var(this.key_save, "string", index + "");
+        }
+
+    }
+
+
+
+}

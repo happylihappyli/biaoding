@@ -1,0 +1,95 @@
+﻿using Common_Robot;
+using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class D_Draw_Planet : C_Node
+    {
+        public string pic_read = "camera1";
+        public string pic_save = "";
+
+        public string key_planet = "";
+        public string key_camera = "";
+        public string scale="2";
+
+        public D_Draw_Planet(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            if (pTrain == null) return;
+
+            if (space.contains(pTrain, this, pic_read, "Bitmap") == false)
+            {
+                Console.Write(pic_read + " 读取图片为空！");
+                S_TTS.speak_async(pic_read + " 读取图片为空！");
+                return;
+            }
+            Bitmap pBitmapRGB = (Bitmap)this.read_var(pic_read, "Bitmap");//.pObj;
+
+            float f_scale = float.Parse(this.scale);
+
+            if (pBitmapRGB != null)
+            {
+                lock (pBitmapRGB)
+                {
+                    int width = pBitmapRGB.Width;
+                    int height = pBitmapRGB.Height;
+                    Bitmap a = new Bitmap(width, height);
+                    Graphics g = Graphics.FromImage(a);
+
+                    g.DrawImage(pBitmapRGB,
+                        new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                                (int)space.vars.draw_offset_y_tuyang,
+                        pBitmapRGB.Width - (int)space.vars.draw_offset_x_tuyang, pBitmapRGB.Height - (int)space.vars.draw_offset_y_tuyang),
+                        new Rectangle(0, 0, pBitmapRGB.Width, pBitmapRGB.Height),
+                        GraphicsUnit.Pixel);
+
+                    C_Planet_Catch pPlanet = (C_Planet_Catch)this.read_var(key_planet, "C_Planet_Catch");
+
+
+                    if (pPlanet == null)
+                    {
+                        Main.WriteLine(this,"平面为空：" + key_planet);
+                    }
+                    else
+                    {
+                        C_Camera_TuYang camera1 = (C_Camera_TuYang)this.read_var(key_camera, "C_Camera_TuYang");
+
+                        C_Point3D center=Tools.机械臂坐标到摄像头坐标(camera1, pPlanet.arm_a);
+                        C_Point3D center2 = Tools.f_3DPoint_to_depth(camera1.camera1.color_calib, center);
+                        center2.x = center2.x / f_scale;
+                        center2.y = center2.y / f_scale;
+                        g.FillEllipse(Brushes.Red, center2.x - 30, center2.y - 30, 60, 60);
+
+                    }
+
+                    this.save_var(pic_save, "Bitmap", a);
+                }
+            }
+
+        }
+    }
+}

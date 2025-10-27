@@ -1,0 +1,75 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class E_CheckBox_Event : C_Node
+    {
+        public CheckBox control;
+        public Panel panel;
+        //public string text = "button1";
+        public string key_save="";
+
+        private string _key_ui = "";
+
+        public string key_ui { get => _key_ui; set => _key_ui = value; }
+
+        public E_CheckBox_Event(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+            //this.Name = name;
+            ////space.vars_step.Add(name, this);
+        }
+
+
+        private void Button_Click(object sender, EventArgs e)
+        {
+            Main.WriteLine(Name + " 事件激活 " + this.GetType().Name);
+
+            if (control.Checked)
+            {
+                this.save_var(this.key_save, "string", "1");
+            }
+            else
+            {
+                this.save_var(this.key_save, "string", "0");
+            }
+
+            string id = "CheckBox_" + DateTime.Now.ToString("HHmmssfff");
+            pTrain = new C_Train(id);
+            Run(pTrain);
+        }
+
+        public override Task run_sub()
+        {
+            return Task.CompletedTask;
+        }
+
+        public override void init()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show("key_ui ==null ! " + Name);
+                return;
+            }
+            if (space.vars_ui.ContainsKey(key_ui) == false)
+            {
+                MessageBox.Show("没有这个按钮 key_ui=" + key_ui);
+                return;
+            }
+            S_CheckBox pItem = (S_CheckBox)space.vars_ui[key_ui];
+
+            control = pItem.pControl;
+            if (control != null)
+            {
+                control.Click += Button_Click;
+            }
+        }
+    }
+}

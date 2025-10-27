@@ -1,0 +1,42 @@
+﻿using Common_Robot2;
+using System.Text;
+using System.Web;
+
+namespace Test1
+{
+    public class String_Join_List_String : C_Node
+    {
+        public string type = "";
+        public string key_read = "";
+        public string key_save = "";
+        public String_Join_List_String(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            List<string>? list1 = (List<string>?)this.read_var(this.key_read, "List<string>");
+
+            if (list1 == null)
+            {
+                return;
+            }
+            string output = string.Join(type, list1.ToArray());
+
+            this.save_var(key_save, "string", output);
+        }
+
+
+        public override void init()
+        {
+            
+        }
+    }
+}

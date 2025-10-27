@@ -1,0 +1,75 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Text;
+
+namespace Test1
+{
+    public class Data_Laser_To_Cloud : C_Node
+    {
+
+        public string key_process = "";//激光雷达处理模块
+        public string key_save = "";
+
+
+        public Data_Laser_To_Cloud(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+
+        }
+
+
+        public override Task run_sub()
+        {
+            space.vars_step.TryGetValue(key_process, out C_Node pNode2);
+            if (pNode2 != null)
+            {
+                W_Process_Laser pProcess=(W_Process_Laser)pNode2;
+
+                List<C_Point3D> list= new List<C_Point3D>();    
+                
+
+                StringBuilder sb=new StringBuilder();
+
+                int count_zero = 0;
+                for (var i = 0; i < 811; i++)
+                {
+                    double d=pProcess.distance[i];
+                    
+                    sb.AppendLine(d + "," + i + ",0");
+
+                    double angle =(0.3333 * i-45)/180*Math.PI;
+                    double x = Math.Cos(angle) * d;
+                    double y = Math.Sin(angle) * d;
+                    C_Point3D p = new C_Point3D(x, y, 0);
+                    if (d > 0)
+                    {
+                        list.Add(p);
+                    }
+                    else
+                    {
+                        count_zero++;
+                    }
+                }
+
+                Main.WriteLine("count_zero_lenth="+count_zero);
+                File.WriteAllText("D:\\123.distance.txt", sb.ToString());
+                this.save_var(this.key_save, "List<C_Point3D>", list);
+            }
+
+
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+        }
+
+    }
+
+
+}

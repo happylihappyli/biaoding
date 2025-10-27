@@ -1,0 +1,145 @@
+﻿
+using Common_Robot2;
+using Newtonsoft.Json.Linq;
+using System.Drawing.Imaging;
+using System.IO.Ports;
+using Three.Net.Extras.Helpers;
+
+
+namespace Test1
+{
+    public class W_Light_Control: C_Node
+    {
+        public string key_com = "";
+        public string key_baudrate = "";
+        public string key_message = "";
+        public string key_model = "";
+
+        private SerialPort LightRS232Device = new SerialPort();
+
+        public W_Light_Control(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+            this.Name = name;
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (Init())
+            {
+                Thread.Sleep(50);
+                string? brightnessStr = (string?)this.read_var(key_message, "");
+                if (int.TryParse(brightnessStr, out int brightness))
+                {
+
+                    #region 调整范围
+                    string BrightnessOrder;
+                    if (brightness < 0)
+                    {
+                        brightness = 0;
+                    }
+                    else if (brightness > 255)
+                    {
+                        brightness = 255;
+                    }
+
+                    #endregion 调整范围
+
+
+                    if (brightness == 0)
+                    {
+                        BrightnessOrder = "S000F000F000F000FC#";
+                    }
+                    else
+                    {
+                        BrightnessOrder = "S" + brightness.ToString("000") + "T" + brightness.ToString("000") + "T" + brightness.ToString("000") + "T" + brightness.ToString("000") + "T" + "C#";
+
+                    }
+
+                    SendStringData(BrightnessOrder);
+                    Thread.Sleep(10);
+                    Close();
+                }
+                else
+                {
+
+                }
+            }
+            
+
+        }
+        public bool Init()
+        {
+            LightRS232Device = new SerialPort();
+            LightRS232Device.PortName = key_com;
+            LightRS232Device.BaudRate = Convert.ToInt32(key_baudrate);
+            LightRS232Device.Parity = Parity.None;
+            LightRS232Device.DataBits = 8;
+            LightRS232Device.StopBits = StopBits.One;
+            try
+            {
+                LightRS232Device.Open();
+                return true;
+                //LightRS232Device.DataReceived += new SerialDataReceivedEventHandler(Com_LightReceived);//绑定事件
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+                return false;
+                //LightRS232Device.DataReceived -= new SerialDataReceivedEventHandler(Com_LightReceived);//删除事件
+            }
+        }
+        public void Close()
+        {
+            try
+            {
+                LightRS232Device.Close();
+                LightRS232Device.Dispose();
+            }
+            catch (Exception)
+            {
+                //throw;
+            }
+        }
+        public bool SendStringData(string str)
+        {
+            try
+            {
+                if (LightRS232Device.IsOpen)
+                {
+                    try
+                    {
+                        LightRS232Device.BaseStream.Write(System.Text.Encoding.UTF8.GetBytes(str), 0, str.Length); // 使用BaseStream的Write方法发送数据
+                        LightRS232Device.BaseStream.Flush(); // 确保数据被发送
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                    }
+                }
+                else
+                {
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+                return false;
+            }
+
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+}

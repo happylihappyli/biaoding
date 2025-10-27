@@ -1,0 +1,162 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Three.Net.Core;
+using Three.Net.Math;
+
+namespace Common_Robot2
+{
+    public class C_Robot
+    {
+        //D再xy平面的的投影是Z
+        //默认是安川机械臂参数
+        public double arm_oz = 155;//155mm
+        public double arm_dz = 0;// 450;//D的高度
+
+        public double arm_c2d = 614;//614mm
+
+        public double arm_bc = 640;
+        public double arm_cc2 = 200;
+
+        /// <summary>
+        /// Math.Sqrt(arm_bc * arm_bc + arm_cc2 * arm_cc2);
+        /// 640 200  对角线 ,勾股定理
+        /// </summary>
+        public double arm_bc2 = 670.52218; //mm 
+
+        public double tools_len = 215 + 100;//工具坐标215mm
+
+        public Vector3[] bottom_L = new Vector3[7];// 旋转轴的坐标，最后一轴用来计算吸盘的方向，有些吸盘不是对称的
+        public Vector3[] obj_rotate = new Vector3[7];// 旋转轴的方向
+
+        public bool rotate7=true;//是否要计算第七轴
+
+        public void Rotate(int index, double add2)
+        {
+            float add = (float)add2;
+
+            if (rotate7)
+            {
+                for (var i = index + 1; i < 7; i++)
+                {
+                    obj_rotate[i].ApplyAxisAngle(obj_rotate[index], add);
+                    Vector3 bTmp = new Vector3(bottom_L[i].x, bottom_L[i].y, bottom_L[i].z);
+                    bTmp.Subtract(bottom_L[index]);
+                    bTmp.ApplyAxisAngle(obj_rotate[index], add);
+                    bTmp.Add(bottom_L[index]);
+                    bottom_L[i] = bTmp;
+                }
+            }
+            else
+            {
+                for (var i = index + 1; i < 6; i++)
+                {
+                    obj_rotate[i].ApplyAxisAngle(obj_rotate[index], add);
+                    Vector3 bTmp = new Vector3(bottom_L[i].x, bottom_L[i].y, bottom_L[i].z);
+                    bTmp.Subtract(bottom_L[index]);
+                    bTmp.ApplyAxisAngle(obj_rotate[index], add);
+                    bTmp.Add(bottom_L[index]);
+                    bottom_L[i] = bTmp;
+                }
+            }
+        }
+
+        public void ini_anchuan_static()
+        {
+            //D再xy平面的的投影是Z
+            this.arm_oz = 155;//155mm
+            this.arm_dz = 0;// 450;//D的高度
+
+            this.arm_c2d = 614;//614mm
+            this.arm_bc = 640;
+            this.arm_cc2 = 200;
+
+            //mm Math.Sqrt(200 * 200 + 640 * 640);//200 640 对角线
+            this.arm_bc2 = Math.Sqrt(arm_bc* arm_bc+arm_cc2* arm_cc2);// 670.52218; 
+
+            this.tools_len = 215 + 100;// 215 + 100;//工具坐标215mm
+        }
+
+
+        public void ini_estun_static()
+        {
+            //D再xy平面的的投影是Z
+            this.arm_oz = 260;//155mm
+            this.arm_dz = 0;// 450;//D的高度
+
+            this.arm_c2d = 945;//614mm
+            this.arm_bc2 = 1025; //mm Math.Sqrt(200 * 200 + 640 * 640);//200 640 对角线
+
+            this.tools_len = 0;// 215 + 100;//工具坐标 mm
+
+        }
+
+        public void init_robot(double oz, double dz,double c2d,double bc,double cc2,double tools_len)
+        {
+
+            //D再xy平面的的投影是Z
+            this.arm_oz = oz;//155mm
+            this.arm_dz = dz;// 450;//D的高度
+
+            this.arm_c2d = c2d;//614mm
+
+
+            this.arm_bc = bc;// 640mm
+            this.arm_cc2 = cc2;// 200mm
+
+            //mm Math.Sqrt(200 * 200 + 640 * 640);//200 640 对角线
+            this.arm_bc2 = Math.Sqrt(arm_bc * arm_bc + arm_cc2 * arm_cc2);// 670.52218; 
+            //this.arm_bc2 = b2c; //mm Math.Sqrt(200 * 200 + 640 * 640);//200 640 对角线
+
+            this.tools_len = tools_len;// 215 + 100;//工具坐标 mm
+        }
+
+
+
+
+        public void ini_estun()
+        {
+            bottom_L[0] = new Vector3(0, 0, 0);//轴1的中心
+            obj_rotate[0] = new Vector3(0, 0, -1);//, 0);//L1旋转的向量,和安川相反
+
+            bottom_L[1] = new Vector3(2.6f, 0, 0);//轴2的中心
+            obj_rotate[1] = new Vector3(0, 1, 0);//L2旋转的向量
+
+            bottom_L[2] = new Vector3(2.6f, 0, 9.45f);//轴3的中心
+            obj_rotate[2] = new Vector3(0, 1, 0);//L3旋转的向量,和安川相反
+
+            bottom_L[3] = new Vector3(2.6f, 0, 9.45f);//轴4的中心 estun机械臂，这里假设轴4是锁定的
+            obj_rotate[3] = new Vector3(-1, 0, 0);//L4旋转的向量
+
+            bottom_L[4] = new Vector3(12.85f, 0, 9.45f);//轴5的中心
+            obj_rotate[4] = new Vector3(0, -1, 0);//L5旋转的向量
+
+            bottom_L[5] = new Vector3(15.10f, 0, 9.45f);//轴6的中心
+            obj_rotate[5] = new Vector3(-1, 0, 0);//L6旋转的向量
+        }
+
+        public void ini_anchuang()
+        {
+            bottom_L[0] = new Vector3(0, 0, 0);//轴1的中心
+            obj_rotate[0] = new Vector3(0, 0, 1);//, 0);//L1旋转的向量
+
+            bottom_L[1] = new Vector3(1.55f, 0, 0);//轴2的中心
+            obj_rotate[1] = new Vector3(0, 1, 0);//L2旋转的向量
+
+            bottom_L[2] = new Vector3(1.55f, 0, 6.14f);//轴3的中心
+            obj_rotate[2] = new Vector3(0, -1, 0);//L3旋转的向量
+
+            bottom_L[3] = new Vector3(1.55f, 0, 8.14f);//轴4的中心
+            obj_rotate[3] = new Vector3(-1, 0, 0);//L4旋转的向量
+
+            bottom_L[4] = new Vector3(7.95f, 0, 8.14f);//轴5的中心
+            obj_rotate[4] = new Vector3(0, -1, 0);//L5旋转的向量
+
+            bottom_L[5] = new Vector3(8.95f, 0, 8.14f);//轴6的中心
+            obj_rotate[5] = new Vector3(-1, 0, 0);//L6旋转的向量
+        }
+
+    }
+}

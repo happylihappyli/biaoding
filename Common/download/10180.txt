@@ -1,0 +1,126 @@
+﻿using System.Text;
+using Common_Robot2;
+
+namespace Test1
+{
+    public class W_TCP_Server_Send2 : C_Node
+    {
+        public string encode = "GBK";
+        public string base64 = "";//iAEABwAE
+        public string tcp_server = "";
+        public string hex = ""; //hex = "88,01,00,07,00,04";
+        public string end = "";
+
+        private string _msg = "";
+        public string msg { get => _msg; set => _msg = value; }
+
+        public string confirm="1";//=1代表许需要确认
+
+        private string? _key_step = "";
+
+        public string? key_step { get => _key_step; set => _key_step = value; }
+
+        public W_TCP_Server_Send2(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            Main.WriteLine(this, "Start");
+
+            string str_confirm = this.read_string(this.confirm);
+            if (str_confirm=="1")
+            {
+                FrmDialog dlg = new FrmDialog();
+                dlg.title = "确认消息";
+                dlg.msg =this.Name+ "\r\n要发送给设备或机械臂吗";
+                if (dlg?.ShowDialog() ==DialogResult.Yes)
+                {
+                    this.Next_Step = Node_Next.True;
+                }
+                else
+                {
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+            }
+
+            if (tcp_server != "")
+            {
+                key_step = (string?)this.read_var("#" + tcp_server, "string");
+            }
+            //Main.WriteLine(this," 开始运行！");
+            I_TCP? pServer  = (I_TCP?)Main.get_ui_from_parent_vars_steps(space, key_ui);
+            if (pServer == null)
+            {
+                MessageBox.Show(this.Name + "没有这个控件");
+                return;
+            }
+
+
+            
+
+            if (hex != "")
+            {
+                string hex2 = this.read_string(hex);
+                hex2 = hex2.Replace(",", "");
+                hex2 = hex2.Replace(" ", "");
+                if (hex2 == "")
+                {
+                    Main.WriteLine(this,"hex2=空！");
+                    return;
+                }
+                byte[] gbk = Main.hext_to_byte(hex2);
+
+                Main.WriteLine(this, "===========================TCP Send="+hex2+" T="+pTrain?.get_ID());
+                pServer?.Send(null, gbk);
+            }
+            else if (base64 != "")
+            {
+                byte[] gbk = Tools.Base64Decode(base64);
+                pServer?.Send(null, gbk);
+            }
+            else
+            {
+                //S_TTS.speak_async(this.Name);
+                string msg2 = this.read_string(this.msg);
+                if (msg2 == "" || msg2 == null)
+                {
+                    Main.WriteLine(this,"msg=空！");
+                    S_TTS.speak_async("坐标为空！");
+                    this.Next_Step = Node_Next.False;
+                    return;
+                }
+                if (end != "")
+                {
+                    string end2 = end;
+                    end2= end2.Replace("\\r", "\r");
+                    end2 = end2.Replace("\\n", "\n");
+                    msg2 += end2;
+                }
+                Main.WriteLine(this, "-------" + this.msg + "=" + msg2);
+                byte[] gbk = Encoding.GetEncoding(encode).GetBytes(msg2);
+                pServer?.Send(null, gbk);
+            }
+            this.Next_Step = Node_Next.True;
+            //Main.WriteLine(this, " 运行完毕！");
+        }
+
+        public override void init()
+        {
+            
+        }
+    }
+
+
+}

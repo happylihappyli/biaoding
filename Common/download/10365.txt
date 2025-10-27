@@ -1,0 +1,95 @@
+﻿using Common_Robot2;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Test1
+{
+    public class E_Menu_Event : C_Node
+    {
+        public ToolStripMenuItem menu = null;
+        public string key_ui = "";
+
+        public E_Menu_Event(string name, C_Space space_parent, C_Space space) : base(name,space_parent, space)
+        {
+        }
+
+
+        public override void init()
+        {
+
+
+            if (space.vars_step.ContainsKey(this.Name) == false)
+            {
+                MessageBox.Show("没有找打这个事件：" + this.Name);
+                return;
+            }
+            E_Menu_Event? pEvent = (E_Menu_Event?)space.vars_step[this.Name];
+
+            pEvent?.init_event();
+        }
+
+        public void init_event()
+        {
+            if (key_ui == "")
+            {
+                MessageBox.Show(Name + "key_ui == null ! " + Name);
+                return;
+            }
+
+
+            if (space.vars_menu.ContainsKey("menu/" + key_ui) == false)
+            {
+
+                if (space.vars_ui.ContainsKey(key_ui))
+                {
+                    S_Menu_Item pButton = (S_Menu_Item)space.vars_ui[key_ui];
+                    if (pButton.menu != null)
+                    {
+                        pButton.menu.Click += new EventHandler(Button_Click);
+                    }
+                }
+                else
+                {
+                    //MessageBox.Show(Name + "没有这个 key_ui=" + key_ui);
+                    //可能是另一种菜单设计方式的菜单
+                    return;
+                }
+            }
+            else
+            {
+                C_Menu_Item pItem = space.vars_menu["menu/" + key_ui];
+                menu = pItem.menu_item;
+                if (menu != null)
+                {
+                    menu.Click += new EventHandler(Button_Click);
+                }
+            }
+        }
+
+        public void Button_Click(object? sender, EventArgs e)
+        {
+            Main.WriteLine(this,  " MenuClick " + this.GetType().Name);
+
+            Random rnd = new Random();
+            string id = "Menu_" + rnd.Next(100);
+            pTrain = new C_Train(id);
+            Run(pTrain);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+        }
+
+    }
+}

@@ -1,0 +1,52 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    //保存INI文件
+    public class File_Save_Ini : C_Node
+    {
+        public string file = "";
+        public string str_save = "";
+
+        public File_Save_Ini(string name, C_Space space_parent, C_Space space) :
+            base(name, space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            string file2 = file;
+            file2 = this.read_string(file2);
+
+            file2 = file2.Replace(".\\", Application.StartupPath + "\\");
+            file2 = file2.Replace("./", Application.StartupPath + "\\");
+
+
+            IniFile myIni = new IniFile(file2);
+
+            JArray pArray = JArray.Parse(this.code);
+            for (var i = 0; i < pArray.Count; i++)
+            {
+                JObject pItem = (JObject)pArray[i];
+
+                var section = pItem.GetValue("section").ToString();
+                var key = pItem.GetValue("key").ToString();
+                var value = pItem.GetValue("value").ToString();
+
+                string value2 = this.read_string(value); // space.tools.var_read(pTrain, this, value);
+                myIni.WriteString(section, key, value2);
+
+            }
+        }
+    }
+}

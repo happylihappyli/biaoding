@@ -1,0 +1,112 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class D_Draw_Rect : C_Node
+    {
+
+        public string draw_color = "red";
+        public string pic_read = "camera1";
+        public string pic_save = "";
+
+        public string data_in = "";
+        public string data_out = "";
+
+        public string key_rect = "";
+        public string key_read1 = "";
+        public string key_read2 = "";
+
+
+        public string pen_width = "3";
+
+
+
+        public D_Draw_Rect(string name, C_Space space_parent, C_Space space) 
+            : base(name,space_parent, space)
+        {
+
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            if (data_in != "")
+            {
+                pic_read = data_in;
+            }
+
+            if (data_out != "")
+            {
+                pic_save = data_out;
+            }
+
+            C_Point3D? p1 = null;
+            C_Point3D? p2 = null;
+
+            if (this.read_var(this.key_rect, "C_Rect") == null)
+            {
+                p1 = (C_Point3D?)this.read_var(key_read1, "C_Point3D");
+                p2 = (C_Point3D?)this.read_var(key_read2, "C_Point3D");
+            }
+            else
+            {
+                C_Rect? pRect = (C_Rect?)this.read_var(this.key_rect, "C_Rect");
+                p1 = new C_Point3D(pRect.pPoint1.x, pRect.pPoint1.y, 0);
+                p2 = new C_Point3D(pRect.pPoint2.x, pRect.pPoint2.y, 0);
+            }
+
+
+            if (this.read_var(pic_read, "Bitmap") == null)
+            {
+                MessageBox.Show("pic_read=null "+ pic_read + "==" + Name);
+                return;
+            }
+            Bitmap? pBitmapRGB = (Bitmap?)this.read_var(pic_read, "Bitmap");
+
+            Bitmap pBitmapTmp=Main.CopyBmp(pBitmapRGB);
+
+            if (pBitmapTmp != null) 
+            {
+                lock (pBitmapTmp)
+                {
+                    int width = pBitmapTmp.Width;
+                    int height = pBitmapTmp.Height;
+                    Bitmap bmpSave = new Bitmap(width, height);
+                    Graphics g = Graphics.FromImage(bmpSave);
+                    g.DrawImage(pBitmapTmp,
+                        new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                                (int)space.vars.draw_offset_y_tuyang,
+                            pBitmapTmp.Width - (int)space.vars.draw_offset_x_tuyang,
+                            pBitmapTmp.Height - (int)space.vars.draw_offset_y_tuyang),
+                        new Rectangle(0, 0, pBitmapTmp.Width, pBitmapTmp.Height),
+                        GraphicsUnit.Pixel);
+
+                    if (draw_color == "") draw_color = "red";
+                    Pen pPen = new Pen(ColorTranslator.FromHtml(draw_color), int.Parse(pen_width));
+                    if (p1==null || p2 == null)
+                    {
+                        return;
+                    }
+                    float w = (float)(p2.x - p1.x);
+                    float h = (float)(p2.y - p1.y);
+
+                    g.DrawRectangle(pPen, p1.x, p1.y, w, h);
+
+                    this.save_var(pic_save, "Bitmap", bmpSave);
+                }
+            }
+
+        }
+    }
+}

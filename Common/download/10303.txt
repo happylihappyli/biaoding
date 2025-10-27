@@ -1,0 +1,36 @@
+﻿using Common_Robot2;
+using System.Drawing.Imaging;
+
+namespace Test1
+{
+    public class Img_To_Base64 : C_Node
+    {
+
+        public string key_bitmap = "";
+        public string key_base64 = "";
+
+        public Img_To_Base64(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            Bitmap bmp = (Bitmap)this.read_var(key_bitmap, "Bitmap");
+            MemoryStream ms = new MemoryStream();
+            bmp.Save(ms, ImageFormat.Jpeg);
+            byte[] byteImage = ms.ToArray();
+            string SigBase64 = Convert.ToBase64String(byteImage); // Get Base64
+            this.save_var(key_base64, "string", SigBase64);
+
+        }
+    }
+}

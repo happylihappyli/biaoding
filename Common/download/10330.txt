@@ -1,0 +1,50 @@
+﻿using Common_Robot;
+
+namespace Test1
+{
+    public class W_TCP_Server_One_Close:C_Node
+    {
+        public string control_step = "";
+
+        public W_TCP_Server_One_Close(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            if (space.vars.vars_step.ContainsKey(control_step)==false)
+            {
+                S_TTS.speak_async(this.Name + " 没有这个模块！模块名称，"+ control_step);
+                return;
+            }
+            W_TCP_Server_One server =  (W_TCP_Server_One)space.vars.vars_step[control_step];
+
+            if (server == null)
+            {
+                S_TTS.speak_async(this.Name+" 关闭 Socket ");
+
+                return;
+            }
+
+
+            for (var i = 0; i < server.clients.Count; i++)
+            {
+                server.clients[i].client.Close();
+            }
+            server.clients.Clear();
+        }
+
+    }
+
+
+}

@@ -1,0 +1,235 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using Newtonsoft.Json.Linq;
+using System.Text;
+
+namespace Test1
+{
+    public class D_Draw_Outline : C_Node
+    {
+        //public string key_boxs = "";
+        public string key_read = "";
+        public string key_save = "";
+
+        public string img1 = "";
+        public string img2 = "";
+        public string color = "";
+        public string draw_scale = "0.5";
+        public string key_list_data="";
+
+        public D_Draw_Outline(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+
+            if (img1 != "")
+            {
+                key_read = img1;
+            }
+
+            if (img2 != "")
+            {
+                key_save = img2;
+            }
+
+            draw_outline(pTrain, this);
+        }
+
+
+
+        public void draw_outline(I_Train pTrain,C_Node pNode)
+        {
+            if (pTrain == null) return;
+
+            Bitmap pBitmapRGB = (Bitmap)space.read_vars(pTrain, pNode, key_read, "Bitmap");
+            List<C_Data> list_data = (List<C_Data>)space.read_vars(pTrain, pNode, this.key_list_data, "List<C_Data>");
+
+            if (pBitmapRGB != null)
+            {
+                lock (pBitmapRGB)
+                {
+                    int width = pBitmapRGB.Width;
+                    int height = pBitmapRGB.Height;
+                    Bitmap a = new Bitmap(width, height);
+                    Graphics g = Graphics.FromImage(a);
+                    g.DrawImage(pBitmapRGB,
+                        new Rectangle((int)space.vars.draw_offset_x_tuyang,
+                                (int)space.vars.draw_offset_y_tuyang,
+                            pBitmapRGB.Width - (int)space.vars.draw_offset_x_tuyang,
+                            pBitmapRGB.Height - (int)space.vars.draw_offset_y_tuyang),
+                        new Rectangle(0, 0, pBitmapRGB.Width, pBitmapRGB.Height),
+                        GraphicsUnit.Pixel);
+
+
+                    if (list_data != null)
+                    {
+                        for (var i = 0; i < list_data.Count; i++)
+                        {
+                            C_Data pData = list_data[i];
+                            JObject pItem = pData.JObject;
+
+                            if (pData.bFilter)
+                            {
+                                string strLine = "";
+                                if (pData.bFilter_Angle)
+                                {
+                                    strLine += "A:"+pData.planet.z_faxiangliang.normalize().ToString()+":";
+                                }
+                                if (pData.bFilter_Collision) strLine += "C";
+                                if (pData.bFilter_Size) strLine += "S";
+                                if (pData.bFilter_UnEven) strLine += "U";
+                                draw_ploygen(g, new Pen(Color.Yellow, 3), pItem, i, true, strLine, pData.Label);
+                            }
+                            else
+                            {
+                                if (pItem.GetValue("label").ToString().IndexOf("_intact") > 0)
+                                {
+                                    draw_ploygen(g, new Pen(Color.Green, 3), pItem, i, true,"", pData.Label);
+                                }
+                                else
+                                {
+                                    draw_ploygen(g, new Pen(Color.Red, 3), pItem, i, true, "", pData.Label);
+                                }
+                            }
+
+                        }
+                    }
+
+                    space.save_vars(pTrain, pNode, key_save, "Bitmap", a);
+                }
+            }
+        }
+
+
+        public void draw_ploygen(
+            Graphics g, Pen pPen, JObject pItem, int index, bool draw_text = true,
+            string strLine="",string label="")
+        {
+            if (pItem == null) return;
+
+
+            FontFamily fontFamily = new FontFamily("Arial");
+            Font font = new Font(fontFamily, 16, FontStyle.Regular, GraphicsUnit.Pixel);
+            {
+                JArray pJArray;
+
+                {
+                    pJArray = (JArray)pItem.SelectToken("vertex");
+                }
+
+                if (pJArray == null) return;
+
+                if (draw_text)
+                {
+                    (C_Point3D pCenter, string draw_string) = draw_frame(pPen, g, pJArray);
+
+                    if (strLine == "")
+                    {
+                        strLine = "@" + index+":"+label;
+                    }
+                    else
+                    {
+                        strLine = "@" + index +" "+strLine;
+                    }
+
+                    g.DrawString(strLine, font, Brushes.Yellow, pCenter.x, pCenter.y + 30);
+                }
+            }
+        }
+
+
+
+        public List<C_Point3D> scale_move(JArray pJArray, bool bModify = true)
+        {
+            List<C_Point3D> list = new List<C_Point3D>();
+            for (int i = 0; i < pJArray.Count; i++)
+            {
+                int num = (int)pJArray[i][0];
+                int num2 = (int)pJArray[i][1];
+                if (bModify)
+                {
+                    num = (int)Math.Round((double)num / space.vars.draw_scale_tuyang + space.vars.draw_offset_x_tuyang);
+                    num2 = (int)Math.Round((double)num2 / space.vars.draw_scale_tuyang + space.vars.draw_offset_y_tuyang);
+                }
+
+                C_Point3D item = new C_Point3D(num, num2, 0f);
+                list.Add(item);
+            }
+
+            return list;
+        }
+
+        public (C_Point3D, string) draw_frame(Pen pPen, Graphics g, JArray pJArray, bool bModify = true)
+        {
+            StringBuilder content = new StringBuilder();
+            space.vars.draw_scale_tuyang = double.Parse(draw_scale);
+            List<C_Point3D> Points = scale_move(pJArray, bModify);
+
+            double sum_x = 0;
+            double sum_y = 0;
+            int x0 = 0;
+            int y0 = 0;
+            for (var j = 0; j < Points.Count; j++)
+            {
+                int x1 = (int)Points[j].x;
+                int y1 = (int)Points[j].y;
+                sum_x += x1;
+                sum_y += y1;
+
+                if (j > 0)
+                {
+                    g.DrawLine(pPen, new System.Drawing.Point(x0, y0), new System.Drawing.Point(x1, y1));
+                }
+                x0 = x1;
+                y0 = y1;
+            }
+
+            int x = (int)Points[0].x;
+            int y = (int)Points[0].y;
+
+            g.DrawLine(pPen, new System.Drawing.Point(x0, y0), new System.Drawing.Point(x, y));
+
+            C_Point3D p1 = new C_Point3D(sum_x / Points.Count, sum_y / Points.Count, 0);
+
+
+            for (var j = 0; j < Points.Count; j++)
+            {
+                int x1 = (int)((int)Points[j].x - p1.x);
+                int y1 = (int)((int)Points[j].y - p1.y);
+                if (j > 0)
+                {
+                    if (j == Points.Count - 1)
+                    {
+                        content.Append("L" + x1 + " " + y1 + "z");
+                    }
+                    else
+                    {
+                        content.Append("L" + x1 + " " + y1 + " ");
+                    }
+                }
+                else
+                {
+                    content.Append("M" + x1 + " " + y1 + " ");
+                }
+            }
+
+
+            return (p1, content.ToString());
+        }
+
+        public override void init()
+        {
+        }
+    }
+}

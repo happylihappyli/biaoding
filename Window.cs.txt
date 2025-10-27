@@ -1,0 +1,339 @@
+﻿using Common_Robot;
+using LearnOpenTK.Common;
+using OpenTK.Graphics.OpenGL;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using System.Text;
+using System.Web;
+
+namespace Test1
+{
+    public class Window : GameWindow
+    {
+
+
+        C_Space space = new C_Space();
+        C_Space space2 = new C_Space();
+        C_Space space3 = new C_Space();
+        public string unload_step = "";
+        public bool bEnv = false;
+
+
+
+        // 创建三角形的顶点。这些列在标准化设备坐标 (NDC=normalized device coordinates) 中
+        // 在NDC中，(0, 0)是屏幕的中心。
+        // 负X坐标向左移动，正X坐标向右移动。
+        // 负Y坐标移动到底部，正Y坐标移动到顶部。
+        // OpenGL仅支持3D渲染，因此要创建平面三角形，Z坐标将保留为0。
+        private readonly float[] _vertices =
+        {
+            -0.5f, -0.5f, 0.0f, // Bottom-left vertex
+             0.5f, -0.5f, 0.0f, // Bottom-right vertex
+             0.0f,  0.5f, 0.0f, // Top vertex
+             
+            -0.3f, -0.5f, 0.0f, // Bottom-left vertex
+             0.7f, -0.5f, 0.0f, // Bottom-right vertex
+             0.2f,  0.5f, 0.0f, // Top vertex
+        };
+
+        // 这些是 OpenGL 对象的句柄。句柄是一个整数，表示对象所在的位置
+        // 显卡。将它们视为有点像指针；我们不能直接对它们做任何事情，但我们可以
+        // 将它们发送到需要它们的 OpenGL 函数。
+
+        // What these objects are will be explained in OnLoad.
+        private int _vertexBufferObject;
+
+        private int _vertexArrayObject;
+
+        // 这个类是着色器的包装器，它可以帮助我们管理它。
+        // 着色器类的代码位于 Common 项目中。
+        // 着色器是什么以及它们的用途将在本教程后面解释。
+        private Shader _shader;
+
+        public Window(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings)
+            : base(gameWindowSettings, nativeWindowSettings)
+        {
+        }
+
+
+		//===模块===
+
+
+		public void set_input(C_Space space, string name, string from,bool true_false=true)
+		{
+			var p1 = space.vars.vars_step[name];
+			var p2 = space.vars.vars_step[from];
+			p1.init_input(p2, true_false);
+		}
+		
+        public void load_init(C_Space space_parent,C_Space space,string space_name){
+				//===初始化===
+				space.vars.bClosingWindows = false;
+				space.vars.bAutoMode = true;
+				Task.Run(() => {
+					space.检查步骤状态();
+				});
+        }
+
+
+        // 初始化 OpenGL.
+        protected override void OnLoad()
+        {
+            base.OnLoad();
+
+
+            EncodingProvider provider = CodePagesEncodingProvider.Instance;
+            Encoding.RegisterProvider(provider);
+
+            string name = Environment.MachineName;
+            string strFile = Application.StartupPath + "\\set_" + name + ".ini";
+            if (File.Exists(strFile) == false)
+            {
+                string file1 = Application.StartupPath + "\\set.ini";
+                if (File.Exists(file1))
+                    File.Copy(file1, strFile);
+            }
+
+            IniFile myIni = new IniFile(strFile);
+            string serial = myIni.ReadString("main", "serial", "");
+
+            //C_Space_Load.form1 = this;
+
+            m1.Path_Main = Application.StartupPath;
+
+            Label pLabel = new Label();
+
+            Console.WriteLine("x 正在加载数据");
+            //pLabel.Text = "正在加载数据...";
+            //pLabel.Location = new Point(200, 200);
+            //this.Controls.Add(pLabel);
+
+            space.console.pLog = (ILog)Logger.GetInstance(space);
+            space2.console.pLog = (ILog)Logger.GetInstance(space2);
+            space3.console.pLog = (ILog)Logger.GetInstance(space3);
+
+            S_Form pNode = new S_Form("Form1", space, space2);
+            space.vars.save_vars(null, pNode, "#serial", "string", serial);
+
+            space2.vars.save_vars(null, pNode, "#serial", "string", serial);
+
+            Task.Run(() =>
+            {
+                space2.vars.copy_from(space, pNode);
+                try
+                {
+                    Console.WriteLine("x 正在env");
+                    //env(space, space2, "env", "");
+                    Console.WriteLine("x end env");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString());
+                    Console.WriteLine(ex.ToString());
+                }
+
+                //if (this.bEnv)
+                {
+                    int iCount = 0;
+                    while (space2.finished == false)
+                    {
+                        iCount++;
+                        if (iCount > 30)
+                        {
+                            break;
+                        }
+                        Thread.Sleep(100);
+                    }
+                    space2.vars.bClosingWindows = true;
+                    space.vars.copy_from(space2, pNode);
+                }
+
+
+                try
+                {
+                    space3.vars.save_vars(null, pNode, "#serial", "string", serial);
+                    space3.vars.copy_from(space, pNode);
+                    Console.WriteLine("x 正在load_init");
+                    load_init(space, space3, "main");
+                    Console.WriteLine("x end load_init");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString());
+                    Console.WriteLine(ex.ToString());
+                }
+
+
+
+            });
+
+
+
+            // 这将是我们清除背景后的背景颜色，采用标准化颜色。
+            // 标准化颜色映射在0.0到1.0的范围内，0.0代表黑色，1.0代表
+            // 该通道的最大可能值。
+            // 这是深绿色。
+            GL.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+
+            // 我们需要将顶点发送到显卡，以便 OpenGL 可以使用它们。
+            // 为此，我们需要创建所谓的顶点缓冲区对象 (VBO=Vertex Buffer Object)。
+            // 这些允许您将一堆数据上传到缓冲区，并将缓冲区发送到显卡。
+            // 这实际上同时发送了所有顶点。
+            // 首先，我们需要创建一个缓冲区。该函数返回它的句柄，但截至目前，它是空的。
+            _vertexBufferObject = GL.GenBuffer();
+
+            // 现在，绑定缓冲区。 OpenGL使用一种全局状态，所以调用这个之后，
+            // 以后所有修改 VBO 的调用都将应用于此缓冲区，直到绑定另一个缓冲区为止。
+            // 第一个参数是一个枚举，指定我们要绑定的缓冲区类型。 VBO 是一个ArrayBuffer。
+            // 缓冲区有多种类型，但目前只需要 VBO。
+            // 第二个参数是缓冲区的句柄。
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBufferObject);
+
+            // 最后，将顶点上传到缓冲区。
+            // 参数：
+            // 数据应该发送到哪个缓冲区。
+            // 正在发送多少数据，以字节为单位。通常可以将其设置为数组的长度乘以 sizeof(array type)。
+            // 顶点本身。
+            // 如何使用缓冲区，以便 OpenGL 可以将数据写入 GPU 上正确的内存空间。
+            // 绘制有三种不同的 BufferUsageHints：
+            // StaticDraw：此缓冲区在最初上传后很少（如果有的话）更新。
+            // DynamicDraw：该缓冲区在初次上传后会频繁更改。
+            // StreamDraw：该缓冲区将在每一帧上发生变化。
+            // 写入正确的内存空间很重要！一般来说，你只需要 StaticDraw，
+            // 但一定要针对您的用例使用正确的。
+            GL.BufferData(BufferTarget.ArrayBuffer, _vertices.Length * sizeof(float), _vertices, BufferUsageHint.StaticDraw);
+
+            // 关于我们刚刚加载数据的缓冲区，值得注意的一件事是它没有任何结构。它只是一堆浮点数（实际上只是字节）。
+            // opengl 驱动程序不知道应如何解释该数据或应如何将其划分为顶点。为了做到这一点，opengl 引入了一个想法
+            // 顶点数组对象 (VAO=Vertex Array Obejct)，其任务是跟踪哪些部分或哪些缓冲区对应于哪些数据。在此示例中，我们要设置 VAO，以便
+            // 它告诉 opengl 我们想要将 12 个字节解释为 3 个浮点数，并使用它将缓冲区划分为顶点。
+            // 为此，我们生成并绑定一个 VAO（看起来与创建和绑定 VBO 非常相似，但它们是不同的！）。
+            _vertexArrayObject = GL.GenVertexArray();
+            GL.BindVertexArray(_vertexArrayObject);
+
+            // 现在，我们需要设置顶点着色器如何解释 VBO 数据；您可以向其发送几乎任何 C 数据类型（以及一些非 C 数据类型）。
+            // 虽然这使它们非常灵活，但这意味着我们必须指定如何将数据映射到着色器的输入变量。
+
+            // 为此，我们使用 GL.VertexAttribPointer 函数
+            // 这个函数有两个工作，告诉opengl数据的格式，同时也将当前数组缓冲区与VAO关联起来。
+            // 这意味着在此调用之后，我们已将此属性设置为当前数组缓冲区中的源数据，并以我们指定的方式解释它。
+            // 参数：
+            // 输入变量在着色器中的位置。顶点着色器中的layout(location = 0)行显式地将其设置为0。
+            // 有多少元素将被发送到变量。在本例中，每个顶点有 3 个浮点数。
+            // 元素集的数据类型，在本例中为 float。
+            // 数据是否应转换为标准化设备坐标。在这种情况下，false，因为那已经完成了。
+            // 步幅；这是一个顶点的最后一个元素与下一个顶点的第一个元素之间的字节数。在本例中为 3 * sizeof(float)。
+            // 偏移量；这是为了找到第一个顶点的第一个元素而应该跳过的字节数。截至目前为 0。
+            // 目前，步幅和偏移量只是被掩盖了，但是当我们进入纹理坐标时，它们将被更详细地显示。
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
+
+            // Enable variable 0 in the shader.
+            GL.EnableVertexAttribArray(0);
+
+            // 我们已经完成了顶点，但是应该如何将其转换为最终图像的像素？
+            // 现代 OpenGL 使这个管道变得非常自由，给我们很大的自由度来决定如何将顶点转换为像素。
+            // 缺点是我们实际上还需要两个程序！这些被称为“着色器”。
+            // 着色器是运行在 GPU 上的小程序。 OpenGL 使用它们来处理顶点到像素的管道。
+            // 查看 Common 中的 Shader 类，了解我们如何创建着色器，以及对着色器如何工作的更深入解释。
+            //shader.vert和shader.frag包含实际的着色器代码。
+            _shader = new Shader("D:\\Projects\\csharp\\test_d3d\\Shaders\\shader.vert", "D:\\Projects\\csharp\\test_d3d\\Shaders\\shader.frag");
+
+            // Now, enable the shader.
+            // Just like the VBO, this is global, so every function that uses a shader will modify this one until a new one is bound instead.
+            _shader.Use();
+
+            // Setup is now complete! Now we move to the OnRenderFrame function to finally draw the triangle.
+        }
+
+        // Now that initialization is done, let's create our render loop.
+        protected override void OnRenderFrame(FrameEventArgs e)
+        {
+            base.OnRenderFrame(e);
+
+            // 这将使用您之前设置的 GL.ClearColor 清除图像。
+            // OpenGL提供了几种不同类型的可以渲染的数据。
+            // 您可以通过使用多个位标志来清除多个缓冲区。
+            // 然而，我们只修改颜色，所以我们只需要清除 ColorBufferBit 即可。
+            GL.Clear(ClearBufferMask.ColorBufferBit);
+
+            // 要在 OpenGL 中绘制对象，通常就像绑定着色器一样简单，
+            // 设置着色器uniforms（此处未完成，将在以后的教程中展示）
+            // 绑定VAO,
+            // 然后调用OpenGL函数进行渲染。
+
+            // Bind the shader
+            _shader.Use();
+
+            // Bind the VAO
+            GL.BindVertexArray(_vertexArrayObject);
+
+
+            // 然后调用我们的绘图函数。
+            // 在本教程中，我们将使用 GL.DrawArrays，这是一个非常简单的渲染函数。
+            // 参数：
+            // 原始类型；顶点代表什么样的几何基元。
+            // OpenGL 曾经支持许多不同的基元类型，但几乎所有类型仍然受支持
+            // 是三角形的某种变体。由于我们只想要一个三角形，因此我们使用三角形。
+            // 起始索引；这只是您要绘制的数据的开始。 0 这里。
+            // 你想要绘制多少个顶点。 6 为 6/3个三角形。
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+
+            // OpenTK 窗口就是所谓的“双缓冲”。本质上，窗口管理两个缓冲区。
+            // 一个被渲染，而另一个当前在窗口中显示。
+            // 这可以避免屏幕撕裂，如果在显示时修改缓冲区，则可能会出现屏幕撕裂的情况。
+            // 绘制完成后，调用该函数交换缓冲区。如果不这样做，它将不会显示您渲染的内容。
+            SwapBuffers();
+
+        }
+
+        protected override void OnUpdateFrame(FrameEventArgs e)
+        {
+            base.OnUpdateFrame(e);
+
+            var input = KeyboardState;
+
+            if (input.IsKeyDown(OpenTK.Windowing.GraphicsLibraryFramework.Keys.Escape))
+            {
+                Close();
+            }
+        }
+
+        protected override void OnResize(ResizeEventArgs e)
+        {
+            base.OnResize(e);
+
+            // 当窗口大小调整时，我们必须调用 GL.Viewport 来调整 OpenGL 视口的大小以匹配新的大小。
+            // 如果我们不这样做，NDC 将不再正确。
+            GL.Viewport(0, 0, Size.X, Size.Y);
+        }
+
+        // 现在，进行清理。
+        // 退出应用程序时通常不应该清理 opengl 资源，
+        // 因为当应用程序退出时，这是由驱动程序和操作系统处理的。
+        //
+        // 删除opengl资源是有原因的，但退出应用程序不是其中之一。
+        // 这里提供这个作为 opengl 中如何完成资源清理的参考，但是
+        // 退出应用程序时不应执行此操作。
+        //
+        // 适合清理的地方是：删除不存在的纹理
+        // 无论出于何种原因，使用时间更长（例如，加载不使用纹理的新场景）。
+        // 这将释放可用于新纹理的视频 RAM (VRAM)。
+        //
+        // 接下来的章节将不会有此代码。
+        protected override void OnUnload()
+        {
+            // Unbind all the resources by binding the targets to 0/null.
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.BindVertexArray(0);
+            GL.UseProgram(0);
+
+            // 删除所有的资源
+            GL.DeleteBuffer(_vertexBufferObject);
+            GL.DeleteVertexArray(_vertexArrayObject);
+
+            GL.DeleteProgram(_shader.Handle);
+
+            base.OnUnload();
+        }
+    }
+}

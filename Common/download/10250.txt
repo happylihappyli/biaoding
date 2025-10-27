@@ -1,0 +1,87 @@
+﻿using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    public class S_Gen_Complex_Box : C_Node
+    {
+        public string container = "";
+        public string key_data = "";
+
+        public S_Gen_Complex_Box(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            string line_space = space.tools.var_read(pTrain, this, this.container);
+
+            C_Block_Space container = new C_Block_Space(line_space);
+            generate_complex(container);
+        }
+
+        public void generate_complex(C_Block_Space container)
+        {
+
+            //回字形
+            C_Block_Data pBlockData = (C_Block_Data)space.read_vars(pTrain, this, this.key_data, "C_Block_Data");
+
+
+            pBlockData.block_list_complex = new List<C_Block_Complex>();
+
+            for (var i = 0; i < pBlockData.block_list.Count; i++)
+            {
+                C_Block_Simple item = pBlockData.block_list[i];
+                
+                C_Block_Complex pBlock2 = new C_Block_Complex(item.box_type, item.x_len, item.y_len, item.z_len);
+                C_Block_Simple px = item.Clone(item.box_type);
+                px.pos = new C_Point3D(0, 0, 0);
+                pBlock2.blocks.Add(px);
+                pBlockData.block_list_complex.Add(pBlock2);
+
+
+                int www = item.x_len + item.y_len;
+                if (item.x_len > item.y_len)
+                {
+                    //回字形
+
+                    if (www <= container.x_len &&
+                        www <= container.y_len &&
+                        item.z_len <= container.z_len)
+                    {
+                        C_Block_Complex pBlock = new C_Block_Complex(item.box_type, www, www, item.z_len);
+                        C_Block_Simple p1 = item.Clone(item.box_type);
+                        p1.pos = new C_Point3D(0, 0, 0);
+                        pBlock.blocks.Add(p1);
+
+                        C_Block_Simple p2 = item.Clone(item.box_type);
+                        p1.pos = new C_Point3D(item.y_len, item.x_len, 0);
+                        pBlock.blocks.Add(p2);
+
+                        C_Block_Simple p3 = item.Roate90.Clone(item.box_type);
+                        p3.pos = new C_Point3D(0, item.y_len, 0);
+                        pBlock.blocks.Add(p3);
+
+
+                        C_Block_Simple p4 = item.Roate90.Clone(item.box_type);
+                        p4.pos = new C_Point3D(item.x_len, 0, 0);
+                        pBlock.blocks.Add(p4);
+
+                        pBlockData.block_list_complex.Add(pBlock);
+                    }
+                }
+            }
+
+        }
+    }
+}

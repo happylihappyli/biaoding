@@ -1,0 +1,121 @@
+﻿
+using Common_Robot2;
+using ConverxHull;
+
+
+namespace Test1
+{
+    //根据抓取位置，设置一个立方体，过滤点云
+    public class S_Filter_By_Cube: C_Node
+    {
+        //"key_list_data",List CData 变量","var_type":"List<C_Data>",
+        public string key_list_data = "";
+        //"key_list_data_save",处理后的List CData 变量","var_type":"List<C_Data>",
+        public string key_list_data_save = "";
+        //"min_dxdydz",min点相对于A的,dx,dy,dz","var_type":"string",
+        public string min_dxdydz = "";
+        //"max_dxdydz",max点相对于A的,dx,dy,dz","var_type":"string",
+        public string max_dxdydz = "";
+        //"key_cloud",点云变量","var_type":"string",
+        public string key_cloud="";
+        //最少点云个数，比如3，那么大于3个都会被过滤","var_type":"string",
+        public string min = "0";
+
+        public override void init()
+        {
+
+        }
+
+        public S_Filter_By_Cube(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+
+            List<C_Point3D>? cloud1 = (List<C_Point3D>?)this.read_var(this.key_cloud, "List<C_Point3D>");
+            List<C_Data>? list_data3 = (List<C_Data>?)this.read_var(this.key_list_data, "List<C_Data>");
+
+            if (list_data3 == null || list_data3?.Count == 0)
+            {
+                Main.WriteLine(this, "要处理的对象为空！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            if (cloud1 == null || cloud1?.Count == 0)
+            {
+                Main.WriteLine(this, "点云为空！");
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+
+            List<C_Data> list_new=new List<C_Data>();
+            for(var i=0;i<list_data3?.Count;i++)
+            {
+                C_Data p1 = list_data3[i];
+
+                C_Point3D A = p1.planet.arm_a;
+
+                string[] strSplit= min_dxdydz.Split(',');
+                
+                double x1 = double.Parse(strSplit[0]);
+                double y1 = double.Parse(strSplit[1]);
+                double z1 = double.Parse(strSplit[2]);
+
+                C_Point3D min = A.add(new C_Point3D(x1, y1, z1));
+
+                strSplit = max_dxdydz.Split(',');
+
+                double x2 = double.Parse(strSplit[0]);
+                double y2 = double.Parse(strSplit[1]);
+                double z2 = double.Parse(strSplit[2]);
+
+                C_Point3D max = A.add(new C_Point3D(x2, y2, z2));
+                
+                Main.WriteLine("x=" + min.x + "," + max.x);
+                Main.WriteLine("y=" + min.y + "," + max.y);
+                Main.WriteLine("z=" + min.z + "," + max.z);
+
+                List<C_Point3D> cloud2 = Main.cloud_filter(cloud1, "x", min.x, max.x);
+                List<C_Point3D> cloud3 = Main.cloud_filter(cloud2, "y", min.y, max.y);
+                List<C_Point3D> cloud4 = Main.cloud_filter(cloud3, "z", min.z, max.z);
+
+                this.save_var("_min", "C_Point3D", min);
+                this.save_var("_max", "C_Point3D", max);
+
+                
+                Main.save_cloud("D:\\cloud\\GID\\" + p1.Group_ID + "_@.txt", p1.list_3D_Point_arm);
+
+                if (cloud4.Count> 0)
+                {
+                    
+                }
+                else
+                {
+                    list_new.Add(p1);
+                    Main.WriteLine(this," add GID="+p1.Group_ID);
+                }
+            }
+
+            if (list_new.Count == 0)
+            {
+                Main.WriteLine(this, "list_new.Count == 0！");
+                this.Next_Step = Node_Next.False;
+            }
+            else
+            {
+                Main.WriteLine(this, "list_new.Count >0 ");
+                this.save_var(this.key_list_data_save, "List<C_Data>", list_new);
+                this.Next_Step = Node_Next.True;
+            }
+        }
+
+    }
+}

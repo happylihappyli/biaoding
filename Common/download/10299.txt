@@ -1,0 +1,48 @@
+﻿using Common_Robot2;
+
+namespace Test1
+{
+    public class S_Cmd_Send : C_Node
+    {
+        public S_Cmd pCmd = null;
+        public string key_step = "";
+        public string command = "";
+        public string wait = "100";
+
+
+        public S_Cmd_Send(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override void init()
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            S_Cmd? pCmd = (S_Cmd?)space.vars_step[this.key_step];
+
+            string command2 = this.read_string(command);
+            pCmd?.Send(command2);
+
+            //if (this.wait != "")
+            //{
+            //    Thread.Sleep(int.Parse(this.wait));
+            //}
+            
+            Thread.Sleep(300);
+            pCmd?.Send("cd");
+
+        }
+
+    }
+
+    
+}

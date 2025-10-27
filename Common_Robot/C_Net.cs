@@ -1,0 +1,970 @@
+﻿
+using Newtonsoft.Json.Linq;
+using Renci.SshNet;
+using Renci.SshNet.Sftp;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Text;
+using Test1;
+
+namespace Common_Robot2
+{
+    public class C_Net
+    {
+        SshClient? client;
+        ForwardedPortDynamic port;
+
+        SecureTransfer? st = null;
+        C_Space? space;
+        public C_Net(C_Space? space)
+        {
+            this.space = space;
+        }
+
+
+        public enum MessageClass
+        {
+            DebugMsg = 0,
+            InformationMsg = 1,
+            WarningMsg = 2,
+            ErrorMsg = 3,
+        }
+
+        string hosts = "";
+        string user = "";
+        string connect_handle;
+        public C_Check pCheck;
+
+        string password = "";
+        int ftp_port = 22;
+        string dir = "";
+
+        public Task ftp_list(
+            string hosts,
+            int ftp_port,
+            string user, string password,
+            string dir)
+        {
+            this.hosts = hosts;
+            this.user = user;
+            this.password = password;
+            this.ftp_port = ftp_port;
+            this.dir = dir;
+            //this.callback = callback;
+
+            ftp_list_sub();
+
+            //Thread p = new Thread(ftp_list_sub);
+            //p.Start();
+            return Task.CompletedTask;
+        }
+
+
+        public void ftp_list_sub()
+        {
+            string strReturn = "";
+            SecureTransfer.SSHTransferProtocol Protocol = SecureTransfer.SSHTransferProtocol.SFTP;
+
+            try
+            {
+                st = new SecureTransfer(hosts, user, ftp_port, Protocol);
+
+                st.Connect(password);
+
+                switch (Protocol)
+                {
+                    case SecureTransfer.SSHTransferProtocol.SFTP:
+                        st.asyncCallback = AsyncCallback;
+                        break;
+                }
+
+                strReturn = st.List_File(dir);
+            }
+            catch (Exception ex)
+            {
+                //pFrmApp.JS_Function(this.callback_error, ex.ToString());
+
+                string msg = ex.ToString();
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(pCheck, "error", "密码错误", 0, 0));
+
+                st?.Disconnect();
+                st?.Dispose();
+            }
+
+            if (Event_SendMsg != null)
+                Event_SendMsg(new C_Msg(pCheck, "ftp_list_result", strReturn, 0, 0));
+
+            //pFrmApp.Call_Event(callback, "", strReturn);
+        }
+
+
+        public string http_post(string url, string data)
+        {
+            string strReturn = "";
+            //strReturn = S_Net.http_post("", url, data, "POST", "utf-8", "");
+            return strReturn;
+        }
+
+        public void ftp_upload(
+            string hosts,
+            int port,
+            string user,
+            string password,
+            string private_file,
+            string local_file, string remotefile)
+        {
+
+            //this.callback_status = callback_status;
+            //this.callback_error = callback_error;
+            //this.callback_finished = callback_finished;
+            SecureTransfer.SSHTransferProtocol Protocol = SecureTransfer.SSHTransferProtocol.SFTP;
+
+            try
+            {
+                st = new SecureTransfer(hosts, user,
+                    port, Protocol, local_file, remotefile);
+                if (private_file == "")
+                {
+                    st.Connect(password);
+                }
+                else
+                {
+                    st.Connect2(private_file);
+                }
+
+                switch (Protocol)
+                {
+                    case SecureTransfer.SSHTransferProtocol.SFTP:
+                        st.asyncCallback = AsyncCallback;
+                        break;
+                }
+
+
+                Start_Upload();
+
+                //var t = new Thread(Start_Upload);
+                //t.SetApartmentState(ApartmentState.STA);
+                //t.IsBackground = true;
+                //t.Start();
+            }
+            catch (Exception ex)
+            {
+                //pFrmApp.JS_Function(this.callback_error, ex.ToString());
+
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(pCheck, "error", ex.ToString(), 0, 0));
+
+                st?.Disconnect();
+                st?.Dispose();
+            }
+        }
+
+
+        public Task ftp_download(
+            string hosts,
+            int port,
+            string user,
+            string password, string private_file,
+            string source_file, string dest_file)
+        {
+
+            //this.callback_status = callback_status;
+            //this.callback_error = callback_error;
+            //this.callback_finished = callback_finished;
+
+            SecureTransfer.SSHTransferProtocol Protocol = SecureTransfer.SSHTransferProtocol.SFTP;
+
+            try
+            {
+                st = new SecureTransfer(
+                    hosts, user, port, Protocol,
+                    source_file, dest_file);
+
+                if (private_file == "")
+                {
+                    st.Connect(password);
+                }
+                else
+                {
+                    st.Connect2(private_file);
+                }
+
+                switch (Protocol)
+                {
+                    case SecureTransfer.SSHTransferProtocol.SFTP:
+                        st.asyncCallback = AsyncCallback;
+                        break;
+                }
+
+                Start_Download();
+            }
+            catch (Exception ex)
+            {
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(pCheck, "error", ex.ToString(), 0, 0));
+
+                //pFrmApp.JS_Function(this.callback_error, ex.ToString());
+                st?.Disconnect();
+                st?.Dispose();
+            }
+
+            return Task.CompletedTask;
+        }
+
+
+        public void com_init(string port)
+        {
+            //pFrmApp.Com_Init(port);
+        }
+
+
+        public void com_close()
+        {
+            //pFrmApp.Com_Close();
+        }
+
+
+        public void com_send_command(string command)
+        {
+            //pFrmApp.Com_Send_Command(command);
+        }
+
+
+        //SshClient client;
+        //ForwardedPortDynamic port;
+
+
+        public void ssh_tunnel_dynamic_by_private_file(C_Node pNode, string IP, string user, string file, uint iPort)
+        {
+            PrivateKeyFile pFile = new PrivateKeyFile(file, "");
+            client = new SshClient(IP, user, pFile);
+            client.KeepAliveInterval = new TimeSpan(0, 0, 5);
+            client.ConnectionInfo.Timeout = new TimeSpan(0, 0, 20);
+            client.Connect();
+
+            if (client.IsConnected)
+            {
+                try
+                {
+                    port = new ForwardedPortDynamic("127.0.0.1", iPort);
+                    client.AddForwardedPort(port);
+                    port.Start();
+                }
+                catch (Exception ex)
+                {
+                    CommonMain.WriteLine(ex.ToString());
+                }
+            }
+
+        }
+
+        public void ssh_connect2(
+            string host, int ssh_port,
+            string user, string password,
+            string handle)
+        {
+            this.host = host;
+            this.ssh_port = ssh_port;
+
+            this.user = user;
+            this.password = password;
+
+            this.connect_handle = handle;
+            //this.callback_ssh_connect = callback_ssh_connect;
+            //this.callback_ssh_connect_error = callback_ssh_connect_error;
+
+            Thread p = new Thread(ssh_connect_thread2);
+            p.Start();
+        }
+
+        private void ssh_connect_thread2()
+        {
+            client = new SshClient(host, this.ssh_port, user, password);
+            try
+            {
+                client.Connect();
+            }
+            catch (Exception ex)
+            {
+                Send_Event("error", ex.ToString(), 0, 0);
+                //pFrmApp.pUI.msg(ex.ToString());
+                //pFrmApp.Call_Event(this.callback_ssh_connect_error, "", ex.ToString());
+            }
+
+            //pFrmApp.Call_Event( "", this.connect_handle, "");
+            Send_Event("ssh.connected", "", 0, 0);
+        }
+
+        public void Send_Event(
+            string strType,
+            string strMsg, int value, int max)
+        {
+            if (Event_SendMsg != null)
+            {
+                Event_SendMsg(
+                    new C_Msg(pCheck, strType, strMsg, value, max)
+                    );
+            }
+
+        }
+
+        private int ssh_port = 22;
+
+        public void ssh_connect(
+            string host, int ssh_port, string user,
+            string private_file,
+            string handle)
+        {
+            //pFrmApp.pUI.alert("ssh ip=", host);
+            this.private_file = private_file;
+            this.host = host;
+            this.ssh_port = ssh_port;
+
+            this.connect_handle = handle;
+            this.user = user;
+
+            ssh_connect_thread();
+
+        }
+
+
+        public Task ssh_connect(
+            string host, int ssh_port, string user, string password)
+        {
+            //pFrmApp.pUI.alert("ssh ip=", host);
+            this.private_file = "";// private_file;
+
+            this.user = user;
+            this.password = password;
+            this.host = host;
+            this.ssh_port = ssh_port;
+
+            ssh_connect_thread2();
+
+            return Task.CompletedTask;
+        }
+
+
+        private void ssh_connect_thread()
+        {
+            PrivateKeyFile pFile = new PrivateKeyFile(private_file);// "D:\\Net\\Web\\id_rsa");
+            client = new SshClient(host, this.ssh_port, user, pFile); //"robot6.funnyai.com"
+
+            try
+            {
+                client.Connect();
+            }
+            catch (Exception ex)
+            {
+
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(pCheck, "error", ex.ToString(), 0, 0));
+
+                //pFrmApp.Call_Event("sys_ssh_connected_error", this.connect_handle, ex.ToString());
+            };
+
+            if (Event_SendMsg != null)
+                Event_SendMsg(new C_Msg(pCheck, "sys_ssh_connected", "", 0, 0));
+
+
+            //pFrmApp.Call_Event("sys_ssh_connected", this.connect_handle, "");
+        }
+
+        StreamReader? reader = null;
+        ShellStream? stream = null;
+
+        public class ssh_command
+        {
+            public string handle = "";
+            public string type = "";
+            public string command = "";
+            public string expect = "";
+            public ssh_command(
+                string handle,
+                string type, string command, string expect)
+            {
+                this.handle = handle;
+                this.type = type;
+                this.command = command;
+                this.expect = expect;
+            }
+        }
+
+
+        private ArrayList pCommands = new ArrayList();
+        private ArrayList pExpects = new ArrayList();
+        public Thread? p_ssh_thread = null;
+
+
+        public Task ssh_stream()//string callback_ssh_run,string callback_ssh_finished)
+        {
+            this.ssh_init();
+
+            pCommands.Add(new ssh_command("", "init", "", ""));
+
+            //this.callback_ssh_run = callback_ssh_run;
+            //this.callback_ssh_finished = callback_ssh_finished;
+
+            if (p_ssh_thread != null)
+            {
+                p_ssh_thread.Interrupt();// .Abort();
+            }
+            ssh_thread();
+
+            //Thread p = new Thread(ssh_thread);
+            //p.Start();
+
+            return Task.CompletedTask;
+        }
+
+        public void ssh_stream_command(string type, string cmd)
+        {
+            //this.ssh_wait = wait_second;
+            pCommands.Add(new ssh_command("", type, cmd, ""));
+        }
+
+        public void ssh_stream_command(string handle, string cmd, int wait_second)
+        {
+            this.ssh_wait = wait_second;
+            pCommands.Add(new ssh_command(handle, "cmd", cmd, ""));
+        }
+
+        public void ssh_stream_expect(
+            string handle,
+            string expect, string cmd, int wait_second)
+        {
+
+            this.ssh_wait = wait_second;
+            string expect2 = expect;
+            if (expect.StartsWith("@"))
+            {
+                expect2 = expect.Substring(1);
+            }
+            else
+            { //新建一个expects
+                pCommands.Add(new ssh_command(handle, "expect", cmd, expect2));
+                pExpects.Clear();
+            }
+
+            pExpects.Add(new ssh_command(handle, "expect", cmd, expect2));
+
+        }
+
+
+        public void ssh_stream_result(int wait_second)
+        {
+            this.ssh_wait = wait_second;
+            pCommands.Add(
+                new ssh_command("", "result", "", ""));
+
+        }
+
+        private void ssh_thread()
+        {
+            do
+            {
+                Thread.Sleep(500);
+                ssh_command? pCommand;
+                if (pCommands.Count > 0)
+                {
+                    pCommand = (ssh_command?)pCommands[0];
+                    pCommands.RemoveAt(0);
+                    switch (pCommand?.type)
+                    {
+                        case "init":
+                            ssh_init();
+                            break;
+                        case "cmd":
+                            {
+                                if (stream != null)
+                                {
+                                    if (client!=null && client.IsConnected)
+                                    {
+                                        stream.WriteLine(pCommand.command);
+                                        int count = 0;
+                                        do
+                                        {
+                                            Thread.Sleep(1000);
+                                            count += 1;
+                                            if (count > this.ssh_wait)
+                                            {
+                                                break;
+                                            }
+                                        } while (true);
+                                    }
+                                    else
+                                    {
+                                        Send_Event("ssh.error", "not connected", 0, 0);
+                                    }
+
+                                    //pFrmApp.Call_Event("",pCommand.handle,"");
+                                }
+                                else
+                                {
+                                    Main.WriteLine("stream == null !");
+                                }
+                            }
+                            break;
+                        case "expect":
+                            {
+                                if (reader != null)
+                                {
+                                    StringBuilder answer;
+                                    int count = 0;
+                                    do
+                                    {
+                                        Thread.Sleep(1000);
+                                        count += 1;
+                                        answer = ReadStream(reader);
+                                        string line = answer.ToString();
+                                        Main.WriteLine(line);
+                                        if (line.IndexOf(pCommand.expect) > -1)
+                                        {
+                                            stream?.WriteLine(pCommand.command);
+                                            //pFrmApp.Call_Event(this.callback_ssh_finished, pCommand.handle, line);
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            //pFrmApp.Call_Event(this.callback_ssh_run, "", line);
+                                        }
+                                        if (count > this.ssh_wait)
+                                        {
+                                            break;
+                                        }
+                                    } while (true);
+                                }
+                            }
+                            break;
+                        case "result":
+                            ssh_result();
+                            break;
+                        default:
+                            break;
+                    }
+                    if (pCommand?.type == "result")
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        StringBuilder answer = ReadStream(reader);
+                        var line = answer.ToString();
+                        if (line != "")
+                        {
+                            Main.WriteLine(line);
+                            Send_Event("ssh.result", line, 0, 0);
+                        }
+                    }
+                }
+            } while (true);
+
+            client?.Disconnect();
+            Main.WriteLine("finished");
+        }
+
+        private void ssh_result()
+        {
+            int count = 0;
+            StringBuilder answer;
+            do
+            {
+                Thread.Sleep(1000);
+                count += 1;
+
+                answer = ReadStream(reader);
+
+                if (count > this.ssh_wait)
+                {
+                    if (answer.Length == 0)
+                    {
+                        Send_Event("ssh.finished", "", 0, 0);
+                        break;
+                    }
+                }
+                var line = answer.ToString();
+                if (line != "")
+                {
+                    Send_Event("ssh.result", line, 0, 0);
+                }
+
+            } while (true);
+        }
+
+        private void ssh_init()
+        {
+            ConcurrentDictionary<Renci.SshNet.Common.TerminalModes, uint> termkvp = new ConcurrentDictionary<Renci.SshNet.Common.TerminalModes, uint>();
+            termkvp.TryAdd(Renci.SshNet.Common.TerminalModes.ECHO, 53);
+            if (client != null)
+            {
+                if (client.IsConnected)
+                {
+                    stream = client.CreateShellStream("xterm", 255, 50, 800, 600, 1024, termkvp);
+
+                    reader = new StreamReader(stream);
+
+                    var answer = ReadStream(reader);
+                    answer.ToString();
+                }
+                else
+                {
+                    Send_Event("ssh.error", "ssh没有连接", 0, 0);
+                }
+            }
+        }
+
+
+
+        public void ssh_run(string ssh_comand, string callback_ssh_run)
+        {
+            this.ssh_strCommand = ssh_comand;
+            this.callback_ssh_run = callback_ssh_run;
+
+            Thread p = new Thread(ssh_run_loop2);
+            p.Start();
+        }
+
+
+        private void ssh_run_loop2()
+        {
+            ssh_init();
+            if (client != null)
+            {
+                if (client.IsConnected)
+                {
+                    sendCommand(stream, this.ssh_strCommand);
+                }
+            }
+        }
+
+        private void sendCommand(ShellStream? stream, string customCMDs)
+        {
+            customCMDs = customCMDs.Replace("\r\n", "\n");
+
+            string[] strSplit = customCMDs.Split('\n');
+            stream?.WriteLine(strSplit[0]);
+
+            for (int i = 1; i < strSplit.Length; i++)
+            {
+                if (strSplit[i].Contains("\t"))
+                {
+                    string[] strSplit2 = strSplit[i].Split('\t');
+
+                    var line1 = stream?.Expect(strSplit2[0]);
+                    //pFrmApp.Call_Event(callback_ssh_run, "", line1);
+                    stream.WriteLine(strSplit2[1]);
+                }
+                else
+                {
+                    var line1 = stream?.Expect("#");
+                    //pFrmApp.Call_Event(callback_ssh_run, "", line1);
+                    stream?.WriteLine(strSplit[i]);
+                }
+            }
+
+
+            StringBuilder answer;
+            do
+            {
+                Thread.Sleep(1000);
+                answer = ReadStream(reader);
+                if (answer.Length == 0)
+                {
+                    //pFrmApp.Call_Event(callback_ssh_run, "break length=0");
+                    break;
+                }
+                //pFrmApp.Call_Event(callback_ssh_run, "", answer.ToString());
+
+            } while (true);
+        }
+
+
+        private StringBuilder ReadStream(StreamReader? reader)
+        {
+            StringBuilder result = new StringBuilder();
+            if (reader == null) return result;
+
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                result.AppendLine(line);
+            }
+
+            return result;
+        }
+
+
+        public void ssh_disconnect()
+        {
+            if (client != null)
+                client.Disconnect();
+        }
+
+        public void ssh_tunnel_dynamic_by_password(C_Node pNode,string IP, string user, string password, uint iPort)
+        {
+
+            client = new SshClient(IP, user, password);
+            client.KeepAliveInterval = new TimeSpan(0, 0, 5);
+            client.ConnectionInfo.Timeout = new TimeSpan(0, 0, 20);
+            client.Connect();
+
+            if (client.IsConnected)
+            {
+                try
+                {
+                    port = new ForwardedPortDynamic("127.0.0.1", iPort);
+                    client.AddForwardedPort(port);
+                    port.Start();
+                }
+                catch (Exception ex)
+                {
+                    Main.WriteLine(ex.ToString());
+                }
+            }
+        }
+
+        public void ssh_tunnel_stop()
+        {
+            port.Stop();
+            port.Dispose();
+            client?.Disconnect();
+            client?.Dispose();
+        }
+
+
+        private void AsyncCallback(IAsyncResult ar)
+        {
+            //if ("".Equals(callback_error) == false) {
+            //    pFrmApp.JS_Function(this.callback_error, ar.ToString());
+            //}
+        }
+
+
+        public delegate void SendMsg(C_Msg pMsg);
+
+        public event SendMsg Event_SendMsg;
+        public Task Start_Download()
+        {
+            try
+            {
+                st.Download();
+
+                if (st.Protocol == SecureTransfer.SSHTransferProtocol.SFTP)
+                {
+                    SftpFileAttributes att = st.SftpClt.GetAttributes(st.SrcFile);
+                    var fileSize = att.Size;
+
+                    while (!st.async_download_result.IsCompleted)
+                    {
+                        var max = fileSize > int.MaxValue
+                            ? Convert.ToInt32(fileSize / 1024)
+                            : Convert.ToInt32(fileSize);
+
+                        var cur = fileSize > int.MaxValue
+                            ? Convert.ToInt32(st.async_download_result.DownloadedBytes / 1024)
+                            : Convert.ToInt32(st.async_download_result.DownloadedBytes);
+                        //Show_Progress(cur, max);
+                        if (Event_SendMsg != null)
+                            Event_SendMsg(new C_Msg(pCheck, "progress", "", cur, max));
+                        Thread.Sleep(100);
+                    }
+                }
+                st.End_Download();
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(pCheck, "传输完毕", "", 100, 100));
+
+                //pFrmApp.JS_Function(this.callback_finished, "传输完毕");
+                //st.Disconnect();
+                //st.Dispose();
+            }
+            catch (Exception ex)
+            {
+                if (Event_SendMsg != null)
+                    Event_SendMsg(new C_Msg(this.pCheck, "错误", ex.ToString(), 100, 100));
+
+                //pFrmApp.JS_Function(this.callback_error, ex.ToString());
+                //st?.Disconnect();
+                //st?.Dispose();
+            }
+            return Task.CompletedTask;
+        }
+
+        private void Start_Upload()
+        {
+            //try {
+            st.Upload();
+            if (st.Protocol == SecureTransfer.SSHTransferProtocol.SFTP)
+            {
+                var fi = new FileInfo(st.SrcFile);
+                while (!st.async_upload_result.IsCompleted)
+                {
+                    var max = fi.Length > int.MaxValue
+                        ? Convert.ToInt32(fi.Length / 1024)
+                        : Convert.ToInt32(fi.Length);
+
+                    var cur = fi.Length > int.MaxValue
+                        ? Convert.ToInt32(st.async_upload_result.UploadedBytes / 1024)
+                        : Convert.ToInt32(st.async_upload_result.UploadedBytes);
+
+                    if (Event_SendMsg != null)
+                        Event_SendMsg(new C_Msg(pCheck, "progress", "", cur, max));
+
+                    //Show_Progress(cur, max);
+
+                    Thread.Sleep(50);
+                }
+            }
+
+            st.End_Upload();
+            if (Event_SendMsg != null)
+                Event_SendMsg(new C_Msg(pCheck, "传输完毕", "", 100, 100));
+
+            //pFrmApp.JS_Function(this.callback_finished, "传输完毕");
+            //st.Disconnect();
+            //st.Dispose();
+            //} catch (Exception ex) {
+            //pFrmApp.JS_Function(this.callback_error, ex.ToString());
+            //}
+        }
+
+
+        private int maxVal;
+        private int curVal;
+        private string private_file;
+        private string host;
+        private string ssh_strCommand;
+
+        //private string ssh_command;
+        private string callback_ssh_run;
+        //private string callback_ssh_finished;
+        //private string callback_ssh_connect_error;
+        private int ssh_wait;
+
+        //private string ssh_type;
+        //private string ssh_expect;
+
+        private delegate void SetStatusCB();
+
+        //private void SetStatus() {
+        //    int a = 100 * curVal / maxVal;
+        //    pFrmApp.JS_Function(this.callback_status, curVal + ","+ maxVal);
+        //}
+
+
+        private void Show_Progress(int transferredBytes, int totalBytes)
+        {
+            maxVal = totalBytes;
+            curVal = transferredBytes;
+
+            //SetStatus();
+        }
+
+
+
+        public void Send_Msg(string Type, string strJSON)
+        {
+
+            JObject jObject = JObject.Parse(strJSON);
+            //Task.Run(async () =>
+            //{
+            //    //await pFrmApp.client.EmitAsync(Type, jObject);
+            //});
+        }
+
+        public void Send_Msg(string Type, string strFrom, string strTo, string data)
+        {
+
+            var pObj = new
+            {
+                type = "",
+                from = strFrom,
+                to = strTo,
+                message = data
+            };
+            //Task.Run(async () =>
+            //{
+            //    //await pFrmApp.client.EmitAsync("chat_event", pObj);
+            //});
+
+
+        }
+
+
+        public void Socket_Init(
+            string url,
+            string callback_Connect,
+            string callback_DisConnect,
+            string callback_chat_event,
+            string callback_system_event)
+        {
+
+            //pFrmApp.Init(url, callback_Connect, callback_DisConnect, callback_chat_event, callback_system_event);
+        }
+
+        public void Socket_Connect()
+        {
+            //    if (pFrmApp.client.Connected == false)
+            //    {
+            //        Task.Run(async () => {
+            //            await pFrmApp.client.ConnectAsync();
+            //        });
+            //    }
+        }
+
+        public bool Socket_Connected()
+        {
+            return false;// pFrmApp.client.Connected;
+
+            //if (pFrmApp.client.Connected == SocketIOClient.SocketIOState.Closed) {
+            //    return false;
+            //} else if (pFrmApp.client.State == SocketIOClient.SocketIOState.Connected) {
+
+            //    return true;
+            //} else {
+            //    return true;
+            //}
+        }
+
+        public string http_get(string url, string encode = "utf-8")
+        {
+            return "";
+            //return S_Net.Http(url, "GET", "", encode);
+        }
+
+
+        public string http_get_ref(string url, string encode, string reference)
+        {
+            return "";
+            //return S_Net.Http(url, "GET", "", encode, reference);
+        }
+
+
+        public string Set_Proxy(string ip, string port)
+        {
+            return "";
+            //if (Proxies.SetProxy(ip + ":" + port))
+            //{
+            //    return "已设置代理：" + ip + ":" + port;
+            //}
+            //else
+            //{
+            //    return "设置代理失败. 原因：无效IP和端口.";
+            //}
+        }
+
+
+        public string UnSet_Proxy()
+        {
+            return "";
+            //if (Proxies.UnsetProxy())
+            //{
+            //    return "已取消代理.";
+            //}
+            //else
+            //{
+            //    return "取消代理失败.";
+            //}
+        }
+    }
+}

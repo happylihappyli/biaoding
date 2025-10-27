@@ -1,0 +1,63 @@
+﻿
+using Common_Robot2;
+using System.Drawing.Imaging;
+
+
+namespace Test1
+{
+    //{"type":"mod","name":"Cal_Height_Filter","desc":"抓取高度过滤","inPorts": ["in"],"outPorts": ["true","false"],"image_url": "","image": "","content":"说明信息"}
+    public class Cal_Height_Filter: C_Node
+    {
+        //{"name":"z_max","type":"one_line","tips":"z最大值","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string z_max = "";
+        //{"name":"z_min","type":"one_line","tips":"z最小值","var_type":"string","required":"1","var":"0","type_group":"","help": ""}
+        public string z_min = "";
+        //{"name":"key_planet","type":"one_line","tips":"抓取面变量","var_type":"string","required":"1","var":"1","C_Planet_Catch":"","help": ""}
+        public string key_planet = "";
+
+
+        public override void init()
+        {
+
+        }
+
+        public Cal_Height_Filter(string name, C_Space space_parent, C_Space space) :
+            base(name,space_parent, space)
+        {
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        public void run_sub_main()
+        {
+            double db_z_max = double.Parse(this.read_string(this.z_max));
+            double db_z_min = double.Parse(this.read_string(this.z_min));
+
+            C_Planet_Catch? pCatch = (C_Planet_Catch?)this.read_var(this.key_planet, "C_Planet_Catch");
+            if (pCatch == null)
+            {
+                S_TTS.speak_async(this.Name + " key planet 读取为空！");
+                return;
+            }
+
+            if (pCatch.arm_a.z > db_z_max)
+            {
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            else if (pCatch.arm_a.z < db_z_min)
+            {
+                this.Next_Step = Node_Next.False;
+                return;
+            }
+            this.Next_Step = Node_Next.True;
+
+
+        }
+
+    }
+}

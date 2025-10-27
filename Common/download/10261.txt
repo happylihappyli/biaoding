@@ -1,0 +1,981 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using B2_File.Funny;
+using B2_Treap.Funny;
+using Common_Robot;
+using Funny;
+using OuelletConvexHull;
+using System.Collections;
+using System.IO;
+using System.Windows.Forms;
+using Common_Robot2;
+using ConverxHull;
+
+namespace Test1
+{
+    /// <summary>
+    /// 一种码垛的方式
+    /// </summary>
+    public class C_Method
+    {
+        public int x_count = 2;
+        public int y_count = 3;
+
+        public List<int>[,] grid_height = new List<int>[120 + 30, 120 + 30];
+        //grid_height[0,0]=5 代表 [0,1)-[0,1)-[0,5)已经被占用
+
+        public int[,] grid_height2 = new int[120 + 30, 120 + 30];//平滑后存储的
+
+        public int[,] grid_height_max = new int[120 + 30, 120 + 30];
+        //grid_height_max[0,0]是统计 grid_height_max[0,0]-grid_height_max[pBox.x_len-1，pBox.y_len-1] 最大值
+
+
+        public int[,] grid_height_column = new int[120 + 30, 120 + 30];
+        //统计每一列的最大值。
+
+        public ArrayList pBoxs = new ArrayList();//盒子的集合，
+        public int max_old = 0;//最高高度,旧的
+        public int max_old_index = 0;//最高高度，旧的，盒子个数
+
+
+        int max = 0;//最高高度
+        int min = 0;//可以放盒子的空间的最低高度
+        public ArrayList dna = null;
+        public int iStart = 0;//开始变异的位置
+        public C_Method parent;
+        public C_Space space;
+        public float thickness_x = 2;// //周围的间隙 x 方向 单位cm
+        public float thickness_y = 2;// //周围的间隙 y 方向 单位cm
+        private int wucha = 4;//高度相差 wucha=3cm 就认为是平的
+
+        public string grid_print()
+        {
+            StringBuilder pStr = new StringBuilder();
+            pStr.Append("grid_print \r\n");
+            for (var i = 0; i < 150; i++)
+            {
+                pStr.Append(i + "\t");
+                for (var j = 0; j < 150; j++)
+                {
+                    if (this.grid_height[i, j] == null)
+                    {
+                        pStr.Append(",");
+                    }
+                    else
+                    {
+                        pStr.Append(this.grid_height[i, j] + ",");
+                    }
+                }
+                pStr.Append("\r\n");
+            }
+            return pStr.ToString();
+        }
+
+
+
+        public string grid_print2()
+        {
+            StringBuilder pStr = new StringBuilder();
+            pStr.Append("grid_print \r\n");
+            for (var i = 0; i < 150; i++)
+            {
+                pStr.Append(i + "\t");
+                for (var j = 0; j < 150; j++)
+                {
+                    pStr.Append(this.grid_height2[i, j] + ",");
+                }
+                pStr.Append("\r\n");
+            }
+            return pStr.ToString();
+        }
+
+
+        public string grid_print_max()
+        {
+            StringBuilder pStr = new StringBuilder();
+            pStr.Append("grid_print_max \r\n");
+            for (var i = 0; i < 150; i++)
+            {
+                pStr.Append(i + "\t");
+                for (var j = 0; j < 150; j++)
+                {
+                    pStr.Append(this.grid_height_max[i, j] + ",");
+                }
+                pStr.Append("\r\n");
+            }
+            return pStr.ToString();
+        }
+
+
+        public string grid_print_column()
+        {
+            StringBuilder pStr = new StringBuilder();
+            pStr.Append("grid_print_column \r\n");
+            for (var i = 0; i < 150; i++)
+            {
+                pStr.Append(i + "\t");
+                for (var j = 0; j < 150; j++)
+                {
+                    pStr.Append(this.grid_height_column[i, j] + ",");
+                }
+                pStr.Append("\r\n");
+            }
+            return pStr.ToString();
+        }
+
+        public C_Method(C_Method pMethod, C_Space space,
+                    float thickness_x, float thickness_y,
+                    int x_count, int y_count)
+        {
+            this.space = space;
+            this.thickness_x = thickness_x;
+            this.thickness_y = thickness_y;
+            this.x_count = x_count;
+            this.y_count = y_count;
+
+            if (pMethod == null) return;
+            for (var i = 0; i < 120 + 30; i++)
+            {
+                for (var j = 0; j < 120 + 30; j++)
+                {
+                    grid_height[i, j] = pMethod.grid_height[i, j];
+                }
+            }
+            this.max = pMethod.max;
+            this.parent = pMethod;
+        }
+
+        public int max_height()
+        {
+            return max;//最高的盒子高度
+        }
+        public int min_height()
+        {
+            return min;//可以放盒子的空间的最低高度
+        }
+
+        override
+        public string ToString()
+        {
+            return " max_old_index=" + this.max_old_index
+                + ", max_height=" + this.max_height();
+        }
+
+
+        public int Boxs_Count()
+        {
+            if (parent != null)
+            {
+                return this.pBoxs.Count + parent.Boxs_Count();
+            }
+            else
+            {
+                return this.pBoxs.Count;
+            }
+        }
+
+        public int get_box_z_index_from_index(double z1, double z_len)
+        {
+            return (int)Math.Round((z1 + 0.0) / z_len);// pBox.z_len);
+        }
+
+        public void save_grid_heigh2()
+        {
+            if (1 == 2)
+            {
+                using (StreamWriter file = new StreamWriter(@"D:\grid_height2.txt", false))
+                {
+                    for (var j = 0; j < grid_height2.GetLength(1); j++)
+                    {
+                        for (var i = 0; i < grid_height2.GetLength(0); i++)
+                        {
+                            file.Write(grid_height2[i, j] + ",");
+                        }
+                        file.Write("\r\n");
+                    }
+                }
+            }
+        }
+
+
+
+        /// <summary>
+        /// box_height 这里是毫米
+        /// </summary>
+        /// <param name="pNode"></param>
+        /// <param name="pTrain"></param>
+        /// <param name="key_save"></param>
+        /// <param name="list_boxs"></param>
+        /// <param name="Palletize"></param>
+        /// <param name="x_max"></param>
+        /// <param name="y_max"></param>
+        /// <param name="box_height"></param>
+        /// <returns></returns>
+        public C_Box 搜索放置位置2(
+            C_Node pNode,
+            I_Train pTrain,
+            string key_save,
+            List<string> list_boxs,
+            S_Palletizing Palletize, int x_max, int y_max, int box_height)
+        {
+            List<C_Box> list_return = new List<C_Box>();
+            C_Box pBox = null;
+
+            save_grid_heigh2();
+
+            for (var i = 0; i < list_boxs.Count; i++)
+            {
+                string line = list_boxs[i];
+                pBox = new C_Box(i + "", "0," + line);
+
+                int index_x0 = (int)Math.Round((pBox.pos.x + pBox.x_len * 0.2) / 10);
+                int index_x1 = (int)Math.Round((pBox.pos.x + pBox.x_len * 0.8) / 10);
+                int index_y0 = (int)Math.Round((pBox.pos.y + pBox.y_len * 0.2) / 10);
+                int index_y1 = (int)Math.Round((pBox.pos.y + pBox.y_len * 0.8) / 10);
+
+                int z1 = m1.计算当前区域的高度(grid_height2, index_x0, index_x1, index_y0, index_y1);
+
+                pBox.z_index = z1;//3cm
+
+                {
+                    pBox.pos.x -= int.Parse(Palletize.palletize_x_len) * 10 / 2;
+                    pBox.pos.y -= int.Parse(Palletize.palletize_y_len) * 10 / 2;
+                    pBox.pos.z = (z1 * 10 + box_height) ;
+
+                    list_return.Add(pBox);
+                }
+            }
+
+            space.save_vars(pTrain, pNode, key_save, "List<C_Box>", list_return);
+
+            if (list_return.Count > 0)
+            {
+                sort_list_return(Palletize, list_return, pBox.z_len);
+                return list_return[0];
+            }
+            return null;
+        }
+
+
+
+        //public C_Box 搜索放置位置(
+        //    C_Node pNode,
+        //    C_Train pTrain,
+        //    string key_save,
+        //    List<string> list_boxs, 
+        //    S_Palletizing2 Palletize, int x_max, int y_max, int height)
+        //{
+        //    List<C_Box> list_return = new List<C_Box>();
+        //    List<C_Box> list_error = new List<C_Box>();
+        //    C_Box pBox = null;
+
+        //    save_grid_heigh2();
+
+        //    for (var i = 0; i < list_boxs.Count; i++)
+        //    {
+        //        string line = list_boxs[i];
+        //        pBox = new C_Box(i + "", "0," + line);
+
+        //        int index_x0 = (int)Math.Round((pBox.pos.x + pBox.x_len * 0.2) / 10);
+        //        int index_x1 = (int)Math.Round((pBox.pos.x + pBox.x_len * 0.8) / 10);
+        //        int index_y0 = (int)Math.Round((pBox.pos.y + pBox.y_len * 0.2) / 10);
+        //        int index_y1 = (int)Math.Round((pBox.pos.y + pBox.y_len * 0.8) / 10);
+
+        //        int z1 = m1.计算当前区域的高度(grid_height2, index_x0, index_x1, index_y0, index_y1);
+
+        //        pBox.z_index = z1;//3cm
+
+        //        if (pBox.z_index <= height + 3)
+        //        {
+        //            pBox.pos.x -= int.Parse(Palletize.palletize_x_len) * 10 / 2;
+        //            pBox.pos.y -= int.Parse(Palletize.palletize_y_len) * 10 / 2;
+        //            pBox.pos.z += height * 10;
+
+        //            list_return.Add(pBox);
+        //        }
+        //        else
+        //        {
+        //            Console.WriteLine("已经有盒子");//已经有盒子
+        //            list_error.Add(pBox);
+        //        }
+        //    }
+
+        //    space.vars.save_vars(pTrain, pNode, key_save, "List<C_Box>", list_return);
+
+        //    if (list_return.Count > 0)
+        //    {
+        //        sort_list_return2(Palletize, list_return, pBox.z_len);
+        //        return list_return[0];
+        //    }
+        //    return null;
+        //}
+
+
+        public C_Box 搜索放置位置_z(
+            C_Node pNode,
+            C_Box pBox, S_Palletizing Palletize, int x_max, int y_max)
+        {
+            //save_grid_heigh2();
+
+            try
+            {
+                int z1 = m1.计算当前区域的高度(grid_height2, 0, 120, 0, 120);
+
+                int k0 = get_box_z_index_from_index(z1, pBox.z_len);
+                if (k0 == 0) k0 = 1;
+
+
+                C_Box pReturn = search_position(pNode,k0, pBox, Palletize);
+                if (pReturn != null) return pReturn;
+
+                int k = k0 + 1;
+                pReturn = search_position(pNode, k, pBox, Palletize);
+                if (pReturn != null) return pReturn;
+
+                MessageBox.Show("第二次搜索有错误！");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+
+            return null;
+        }
+
+        public C_Box search_position(C_Node pNode, int k0, C_Box pBox, S_Palletizing Palletize)
+        {
+            List<C_Box> list_return = new List<C_Box>();
+            float x1, z1;
+            if (k0 % 2 == 1)
+            {
+                space.save_vars(null,pNode, "#put_angle", "double", "90");
+                for (var i = 0; i < x_count; i++)
+                {
+                    x1 = i * (pBox.x_len + thickness_x * 2) + thickness_x + pBox.x_len / 2;
+                    for (var j = 0; j < y_count; j++)
+                    {
+                        float y1 = j * (pBox.y_len + thickness_y * 2) + thickness_y + pBox.y_len / 2;
+                        if (x1 < 120 && y1 < 120)
+                        {
+                            z1 = m1.计算当前区域的高度(grid_height2,
+                                    (int)(x1 - pBox.x_len * 0.4), (int)(x1 + pBox.x_len * 0.4),
+                                    (int)(y1 - pBox.y_len * 0.4), (int)(y1 + pBox.y_len * 0.4));
+                            int z_index = get_box_z_index_from_index(z1, pBox.z_len);
+                            z1 = pBox.z_len * z_index;// +pBox.z_len/2;
+                            space.console.WriteLine(i + "," + j + "," + z_index + "," + x1 + "," + y1 + "," + z1, Level_Enum.Info, pNode.log_index,pNode.Name);
+                            if (z_index == k0 - 1 && z_index < k0)
+                            {
+                                list_return.Add(
+                                    new C_Box(i + "," + j, i, j, z_index, pBox.Type, pBox.x_len, pBox.y_len, pBox.z_len, x1, y1, z1)
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                space.save_vars(null,pNode, "#put_angle", "double", "0");
+                //y_len,x_len 交换一下
+                for (var i = 0; i < y_count; i++)
+                {
+                    x1 = i * (pBox.y_len + thickness_y * 2) + thickness_y + pBox.y_len / 2;
+                    for (var j = 0; j < x_count; j++)
+                    {
+
+                        float y1 = j * (pBox.x_len + thickness_x * 2) + thickness_x + pBox.x_len / 2;
+                        if (x1 < 120 && y1 < 120)
+                        {
+                            z1 = m1.计算当前区域的高度(grid_height2,
+                                    (int)(x1 - pBox.y_len * 0.4), (int)(x1 + pBox.y_len * 0.4),
+                                    (int)(y1 - pBox.x_len * 0.4), (int)(y1 + pBox.x_len * 0.4));
+
+                            int z_index = get_box_z_index_from_index(z1, pBox.z_len);
+                            z1 = pBox.z_len * z_index;
+                            space.console.WriteLine(i + "," + j + "," + z_index + "," + x1 + "," + y1 + "," + z1, Level_Enum.Info, pNode.log_index, pNode.Name);
+                            if (z_index == k0 - 1 && z_index < k0)
+                            {
+                                list_return.Add(
+                                    new C_Box(i + "," + j, i, j, z_index, pBox.Type, pBox.x_len, pBox.y_len, pBox.z_len, x1, y1, z1)
+                                );
+                            }
+                            else
+                            {
+                                //Console.WriteLine("test");
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            if (list_return.Count > 0)
+            {
+                sort_list_return(Palletize, list_return, pBox.z_len);
+                return list_return[0];
+            }
+            return null;
+        }
+
+
+        public void sort_list_return(S_Palletizing Palletize, List<C_Box> list_return, double box_height)
+        {
+
+            list_return.Sort((a, b) =>
+            {
+                //这里单位是cm
+                C_Point3D a1_tray = new C_Point3D(a.pos.x, a.pos.y, a.pos.z + box_height);
+                C_Point3D a1 = Palletize.tray_to_arm(a1_tray);
+
+                C_Point3D b1_tray = new C_Point3D(b.pos.x, b.pos.y, b.pos.z + box_height);
+                C_Point3D b1 = Palletize.tray_to_arm(b1_tray);
+
+
+                if (Math.Abs(a1.z-b1.z)<100)
+                {
+                    if (Math.Abs(a1.y - b1.y) < 100)
+                    {
+                        return Math.Sign(a1.x - b1.x);
+                    }
+                    else
+                    {
+                        return Math.Sign(a1.y - b1.y);
+                    }
+                }
+                else
+                {
+                    return Math.Sign(a1.z - b1.z);
+                }
+            });
+
+        }
+
+
+        public Polygon ConvexHull(List<C_Point3D> pList, bool v)
+        {
+            Polygon currentPolygon = new Polygon();
+
+            int n = pList.Count;
+            C_Point3D[] points = new C_Point3D[n];
+            for (int j = 0; j < n; j++)
+            {
+                points[j] = pList[j];
+            }
+
+            var windowsPoints = points.Select(
+                p => new ConverxHull.Point(p.x, p.y)).ToList();
+            //stopwatch.Restart();
+            var ouelletConvexHull = new OuelletConvexHull.ConvexHull(windowsPoints);
+            ouelletConvexHull.CalcConvexHull(ConvexHullThreadUsage.OnlyOne);
+            //stopwatch.Stop();
+            //ouelletTotalTime += stopwatch.Elapsed;
+            var ouelletAsVertices = ouelletConvexHull.GetResultsAsArrayOfPoint()
+                .Select(p => new Vertex(p.X, p.Y)).ToList();
+
+            for (var i = 0; i < ouelletAsVertices.Count; i++)
+            {
+                var p1 = ouelletAsVertices[i];
+            }
+
+            //Graphics e2 = Graphics.FromImage(pictureBox1.Image);
+            for (var i = 0; i < ouelletAsVertices.Count - 1; i++)
+            {
+                var p1 = ouelletAsVertices[i];
+                var p2 = ouelletAsVertices[i + 1];
+                //e2.DrawLine(new Pen(Color.Red), (float)p1.X, (float)p1.Y, (float)p2.X, (float)p2.Y);
+                currentPolygon.AddPoint(new System.Drawing.Point((int)p1.X, (int)p1.Y));
+
+            }
+            currentPolygon.CompletePolygon = true;
+            return currentPolygon;
+        }
+
+        private int 查找列最大值(int y1, int x_min, int x_max)
+        {
+            int max = 0;
+            for (int x = x_min; x <= x_max; x++)
+            {
+                if (grid_height_column[x, y1] > max)
+                {
+                    max = grid_height_column[x, y1];
+                }
+            }
+            return max;
+        }
+
+
+
+
+
+        public int 查找区域比当前位置大的数值(
+            int[,] grid_height2,
+            int x_min, int x_max, int y_min, int y_max, int max, int count_min = 10)
+        {
+            Treap<C_Count> pTreap = new Treap<C_Count>();
+            for (int x1 = x_min; x1 < x_max + 1; x1++)
+            {
+                for (int y1 = y_min; y1 < y_max + 1; y1++)
+                {
+                    int v = grid_height2[x1, y1];
+
+                    C_Count pCount = pTreap.find(new C_Key_Value(v));
+                    if (pCount == null)
+                    {
+                        pCount = new C_Count();
+                        pCount.key = v;
+                        pCount.count = 1;
+                        pTreap.insert(new C_Key_Value(v), pCount);
+                    }
+                    else
+                    {
+                        pCount.count += 1;
+                    }
+
+
+                    if (grid_height2[x1, y1] > max)
+                    {
+                        max = grid_height2[x1, y1];
+                    }
+                }
+            }
+
+            TreapEnumerator p = pTreap.Elements(false);
+            while (p.HasMoreElements())
+            {
+                C_Count pCount = (C_Count)p.NextElement();
+                if (pCount.count > count_min) return pCount.key;
+            }
+            return 0;
+        }
+
+
+        public List<C_Point3D> 查找所有高度为z的点(C_Box pBox, int x1, int y1, int z)
+        {
+            var pList = new List<C_Point3D>();
+
+
+            int x1_min = (int)(x1 - pBox.x_len * 0.4 - thickness_x);
+            int x1_max = (int)(x1 + pBox.x_len * 0.4 + thickness_x);
+
+
+            int y1_min = (int)(y1 - pBox.y_len * 0.4 - thickness_y);
+            int y1_max = (int)(y1 + pBox.y_len * 0.4 + thickness_y);
+
+            try
+            {
+                for (int xx = Math.Max(0, x1_min); xx < x1_max; xx += 1)
+                {
+                    for (int yy = Math.Max(0, y1_min); yy < y1_max; yy += 1)
+                    {
+                        if (Math.Abs(z - grid_height2[xx, yy]) <= wucha)//wucha cm的误差忽略
+                        {
+                            pList.Add(new C_Point3D(xx, yy, 0));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+            return pList;
+        }
+
+        public bool 判断放盒子区域是否有高度大于z的(C_Box pBox, int x1, int y1, int z)
+        {
+            bool bError = false;
+
+
+            var x1_max = x1 + pBox.x_len + thickness_x * 2;
+            var y1_max = y1 + pBox.y_len + thickness_y * 2;
+            for (int xx = x1; xx < x1_max; xx += 1)
+            {
+                for (int yy = y1; yy < y1_max; yy += 1)
+                {
+                    if (grid_height2[xx, yy] > z + wucha)
+                    {
+                        y1 = yy;
+                        bError = true;
+                        break;
+                    }
+                }
+                if (bError)
+                {
+                    break;
+                }
+            }
+            return bError;
+        }
+
+
+        /// <summary>
+        /// =true 代表是稳定的
+        /// </summary>
+        /// <param name="min_distance"></param>
+        /// <param name="z"></param>
+        /// <param name="x1"></param>
+        /// <param name="x1_max"></param>
+        /// <param name="y1"></param>
+        /// <param name="y1_max"></param>
+        /// <returns></returns>
+        //public bool 判断是否稳定(
+        //    int min_distance,
+        //    int z,
+        //    int x1, int x1_max,
+        //    int y1, int y1_max)
+        //{
+
+        //    if (grid_height[x1, y1] == z && grid_height[x1 + 1, y1 + 1] == z)
+        //    {
+        //        if (grid_height[x1, y1_max - 1] == z && grid_height[x1 + 1, y1_max - 2] == z)
+        //        {
+        //            if (grid_height[x1_max - 1, y1] == z && grid_height[x1_max - 2, y1 + 1] == z)
+        //            {
+        //                if (grid_height[x1_max - 1, y1_max - 1] == z && grid_height[x1_max - 2, y1_max - 2] == z)
+        //                {
+        //                    return true;
+        //                }
+        //            }
+        //        }
+        //    }
+        //    return false;
+        //}
+
+        /// <summary>
+        /// =true 代表是稳定的
+        /// </summary>
+        /// <param name="min_distance"></param>
+        /// <param name="z"></param>
+        /// <param name="x1"></param>
+        /// <param name="x1_max"></param>
+        /// <param name="y1"></param>
+        /// <param name="y1_max"></param>
+        /// <returns></returns>
+        public bool 判断是否稳定_zzz(
+        int min_distance,
+        int z,
+        int x1, int x1_max,
+        int y1, int y1_max)
+        {
+            double x_center = (x1 + x1_max) / 2;
+            double y_center = (y1 + y1_max) / 2;
+
+            int x_min = get_min_x(z, x1, x1_max, y1, y1_max);
+            if (x_center - x_min < min_distance) return false;
+
+            int x_max = get_max_x(z, x1, x1_max, y1, y1_max);
+            if (x_max - x_center < min_distance) return false;
+
+            int y_min = get_min_y(z, x1, x1_max, y1, y1_max);
+            if (y_center - y_min < min_distance) return false;
+
+            int y_max = get_max_y(z, x1, x1_max, y1, y1_max);
+            if (y_max - y_center < min_distance) return false;
+
+            double dbDistance = left_top_distance(z,
+                x_min, y_min, x_center, y_center, x1, x1_max, y1, y1_max); ;
+            if (dbDistance < min_distance) return false;
+
+            dbDistance = right_top_distance(z,
+                x_max, y_min, x_center, y_center, x1, x1_max, y1, y1_max); ;
+            if (dbDistance < min_distance) return false;
+
+            dbDistance = left_bottom_distance(z,
+                x_min, y_min, x_center, y_center, x1, x1_max, y1, y1_max); ;
+            if (dbDistance < min_distance) return false;
+
+            dbDistance = right_bottom_distance(z,
+                x_max, y_max, x_center, y_center, x1, x1_max, y1, y1_max); ;
+            if (dbDistance < min_distance) return false;
+
+            return true;
+        }
+
+        public double right_bottom_distance(int z,
+            int x_max, int y_max,
+            double x_center, double y_center,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+            int p1_x = x_max;
+            int p1_y = get_right_bottom(z, x_max, y1, y1_max);
+
+            int p2_x = get_bottom_right(z, y_max, x1, x1_max);
+            int p2_y = y_max;
+
+            C_Point3D p1 = new C_Point3D(p1_x, p1_y, 0);
+            C_Point3D p2 = new C_Point3D(p2_x, p2_y, 0);
+            C_Point3D p3 = new C_Point3D(x_center, y_center, 0);
+
+            return 求P3到P1_P2的距离(p1, p2, p3);
+        }
+
+        public double left_bottom_distance(int z,
+            int x_min, int y_max,
+            double x_center, double y_center,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+
+            int p1_x = x_min;
+            int p1_y = get_left_bottom(z, x_min, y1, y1_max);
+
+            int p2_x = get_bottom_left(z, y_max, x1, x1_max);
+            int p2_y = y_max;
+
+            C_Point3D p1 = new C_Point3D(p1_x, p1_y, 0);
+            C_Point3D p2 = new C_Point3D(p2_x, p2_y, 0);
+            C_Point3D p3 = new C_Point3D(x_center, y_center, 0);
+
+            return 求P3到P1_P2的距离(p1, p2, p3);
+        }
+
+
+        public double left_top_distance(
+            int z,
+            int x_min, int y_min,
+            double x_center, double y_center,
+            int x1, int x1_max,
+            int y1, int y1_max)
+        {
+
+            int p1_x = x_min;
+            int p1_y = get_left_top(z, x_min, y1, y1_max);
+
+            int p2_x = get_top_left(z, y_min, x1, x1_max);
+            int p2_y = y_min;
+
+            C_Point3D p1 = new C_Point3D(p1_x, p1_y, 0);
+            C_Point3D p2 = new C_Point3D(p2_x, p2_y, 0);
+            C_Point3D p3 = new C_Point3D(x_center, y_center, 0);
+
+            return 求P3到P1_P2的距离(p1, p2, p3);
+        }
+        public double right_top_distance(
+            int z,
+            int x_max, int y_min,
+            double x_center, double y_center,
+            int x1, int x1_max,
+            int y1, int y1_max)
+        {
+
+            int p1_x = x_max;
+            int p1_y = get_right_top(z, x_max, y1, y1_max);
+
+            int p2_x = get_top_right(z, y_min, x1, x1_max);
+            int p2_y = y_min;
+
+            C_Point3D p1 = new C_Point3D(p1_x, p1_y, 0);
+            C_Point3D p2 = new C_Point3D(p2_x, p2_y, 0);
+            C_Point3D p3 = new C_Point3D(x_center, y_center, 0);
+
+            return 求P3到P1_P2的距离(p1, p2, p3);
+        }
+
+        public int get_bottom_right(int z, int y_max, int x1, int x1_max)
+        {
+
+            for (var xx = x1_max - 1; xx >= x1; --xx)
+            {
+                if (grid_height2[xx, y_max] == z)
+                {
+                    return xx;
+                }
+            }
+            return -1;
+        }
+
+        public int get_right_bottom(int z, int x_max, int y1, int y1_max)
+        {
+            for (var yy = y1_max - 1; yy >= y1; --yy)
+            {
+                if (grid_height2[x_max, yy] == z)
+                {
+                    return yy;
+                }
+            }
+            return -1;
+        }
+
+        public int get_right_top(int z, int x_max, int y1, int y1_max)
+        {
+            for (var yy = y1; yy < y1_max; ++yy)
+            {
+                if (grid_height2[x_max, yy] == z)
+                {
+                    return yy;
+                }
+            }
+            return -1;
+        }
+        public int get_top_right(int z, int y_min, int x1, int x1_max)
+        {
+            for (var xx = x1_max - 1; xx >= x1; --xx)
+            {
+                if (grid_height2[xx, y_min] == z)
+                {
+                    return xx;
+                }
+            }
+            return -1;
+        }
+
+        public int get_top_left(int z, int y_min, int x1, int x1_max)
+        {
+            for (var xx = x1; xx < x1_max; ++xx)
+            {
+                if (grid_height2[xx, y_min] == z)
+                {
+                    return xx;
+                }
+            }
+            return -1;
+        }
+
+        public int get_left_top(int z, int x_min, int y1, int y1_max)
+        {
+            for (var yy = y1; yy < y1_max; ++yy)
+            {
+                if (grid_height2[x_min, yy] == z)
+                {
+                    return yy;
+                }
+            }
+            return -1;
+        }
+
+
+        public int get_bottom_left(int z, int y_max, int x1, int x1_max)
+        {
+            for (var xx = x1; xx < x1_max; ++xx)
+            {
+                if (grid_height2[xx, y_max] == z)
+                {
+                    return xx;
+                }
+            }
+            return -1;
+        }
+
+        public int get_left_bottom(int z, int x_min, int y1, int y1_max)
+        {
+            for (var yy = y1_max - 1; yy >= y1; --yy)
+            {
+                if (grid_height2[x_min, yy] == z)
+                {
+                    return yy;
+                }
+            }
+            return -1;
+        }
+
+        public double 求P3到P1_P2的距离(C_Point3D p1, C_Point3D p2, C_Point3D p3)
+        {
+            if (p1.x == p2.x && p1.y == p2.y)
+            {
+                return p3.subtract(p1).length();
+            }
+            var p2p1 = p2.subtract(p1).normalize();
+            var p3p1 = p3.subtract(p1);
+            var len = p2p1.dotProduct(p3p1);
+            var v1 = p2p1.scale(len);//p3在p2p1上的投影
+            var v2 = p3p1.subtract(v1);//p3到p2p1的距离
+            return v2.length();
+        }
+
+        public int get_min_x(int z,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+            for (var xx = x1; xx < x1_max; ++xx)
+            {
+                for (var yy = y1; yy < y1_max; ++yy)
+                {
+                    if (grid_height2[xx, yy] == z)
+                    {
+                        return xx;
+                    }
+                }
+            }
+            return x1_max;
+        }
+
+        public int get_max_x(int z,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+            for (var xx = x1_max - 1; xx >= x1; --xx)
+            {
+                for (var yy = y1; yy < y1_max; ++yy)
+                {
+                    if (grid_height2[xx, yy] == z)
+                    {
+                        return xx;
+                    }
+                }
+            }
+            return x1;
+        }
+
+
+        public int get_min_y(int z,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+            for (var yy = y1; yy < y1_max; ++yy)
+            {
+                for (var xx = x1; xx < x1_max; ++xx)
+                {
+                    if (grid_height2[xx, yy] == z)
+                    {
+                        return yy;
+                    }
+                }
+            }
+            return x1_max;
+        }
+
+        public int get_max_y(int z,
+            int x1, int x1_max, int y1, int y1_max)
+        {
+            for (var yy = y1_max - 1; yy >= y1; --yy)
+            {
+                for (var xx = x1; xx < x1_max; ++xx)
+                {
+                    if (grid_height2[xx, yy] == z)
+                    {
+                        return yy;
+                    }
+                }
+            }
+            return x1;
+        }
+
+        public void save(string file)
+        {
+            StreamWriter pSW = S_File_Text.Write_Begin(file, false);
+
+            for (var i = 0; i < pBoxs.Count; i++)
+            {
+                C_Box pBox = (C_Box)pBoxs[i];
+                pSW.WriteLine(pBox.x_len + "," + pBox.y_len + "," + pBox.z_len + "," + pBox.pos.x + "," + pBox.pos.y + "," + pBox.pos.z);
+
+            }
+
+            C_Method parent_tmp = parent;
+            while (parent_tmp != null)
+            {
+                ArrayList pBoxs2 = parent_tmp.pBoxs;
+                for (var i = 0; i < pBoxs2.Count; i++)
+                {
+                    C_Box pBox = (C_Box)pBoxs2[i];
+                    pSW.WriteLine(pBox.x_len + "," + pBox.y_len + "," + pBox.z_len + "," + pBox.pos.x + "," + pBox.pos.y + "," + pBox.pos.z);
+
+                }
+                parent_tmp = parent_tmp.parent;
+            }
+            pSW.Close();
+        }
+
+    }
+
+}
+

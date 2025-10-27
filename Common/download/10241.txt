@@ -1,0 +1,55 @@
+﻿using Common_Robot2;
+using ConverxHull;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Windows.Media.Playback;
+
+namespace Test1
+{
+    public class D_Image_To_Byte : C_Node
+    {
+        public string key_read = "2d_pic";
+        public string key_save = "";
+        public string key_save_width = "";
+        public string key_save_height = "";
+
+        public D_Image_To_Byte(string name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public void init()
+        {
+
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+
+        public void run_sub_main()
+        {
+            Bitmap bmp = (Bitmap)this.read_var(this.key_read, "Bitmap");
+
+            BitmapData bmp_data = bmp.LockBits(
+                new Rectangle(System.Drawing.Point.Empty, bmp.Size), 
+                ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);  // 锁定位图
+            byte[] buffer = new byte[bmp_data.Stride * bmp_data.Height];  // 缓冲区，用来装载位图数据
+            Marshal.Copy(bmp_data.Scan0, buffer, 0, buffer.Length);  // 复制位图数据
+
+            this.save_var(this.key_save,"byte[]", buffer);
+
+            this.save_var(this.key_save_width, "double", bmp.Width);
+            this.save_var(this.key_save_height, "double", bmp.Height);
+
+            //Console.WriteLine(buffer.Length);
+        }
+
+    }
+}

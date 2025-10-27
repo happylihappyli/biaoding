@@ -1,0 +1,98 @@
+﻿using Common_Robot2;
+using Newtonsoft.Json.Linq;
+
+namespace Test1
+{
+    public class S_Sucker_Init : C_Node
+    {
+        public string json = "";
+        public string key_sucker = "";
+        public string keys = "a,b,c,d";
+
+        public S_Sucker_Init(string Name, C_Space space_parent, C_Space space) :
+            base(space_parent, space)
+        {
+            this.Name = Name;
+            space.vars_step.Add(Name, this);
+        }
+
+        public override Task run_sub()
+        {
+            run_sub_main();
+            return Task.CompletedTask;
+        }
+
+        private void run_sub_main()
+        {
+            json = this.read_string(this.json);
+
+            C_Sucker sucker = new C_Sucker();
+
+            JObject main;
+
+            try
+            {
+                main = JObject.Parse(json);
+
+                string[] split = this.keys.Split(",");
+
+                for (var k = 0; k < split.Length; k++)
+                {
+                    string key = split[k];
+                    JObject item = (JObject)main[key];
+
+                    float x_scale = float.Parse(item["x_scale"].ToString());
+                    float y_scale = float.Parse(item["y_scale"].ToString());
+
+                    JArray arr = (JArray)item["data"];
+                    for (var i = 0; i < arr.Count; i++)
+                    {
+                        JObject obj = (JObject)arr[i];
+
+                        float x = float.Parse(obj["x"].ToString()) * x_scale;
+                        float y = float.Parse(obj["y"].ToString()) * y_scale;
+
+                        string region = get_region_from_key(key);
+                        C_Cup cup = new C_Cup(x, y, 0, region);
+                        sucker.add(region, cup);
+                    }
+                }
+
+                this.save_var(this.key_sucker, "C_Sucker", sucker);
+
+            }
+            catch(Exception ex)
+            {
+                Main.WriteLine(this,ex.ToString());
+                S_TTS.speak_async("吸盘数据有问题!");
+            }
+
+        }
+
+        public string get_region_from_key(string key)
+        {
+            if (key == "a")
+            {
+                return "0";
+            }else if (key == "b")
+            {
+                return "1";
+            }
+            else if (key == "c")
+            {
+                return "2";
+            }
+            else if (key == "d")
+            {
+                return "3";
+            }
+            return "-1";
+        }
+
+        public void init()
+        {
+        }
+    }
+
+    
+}
