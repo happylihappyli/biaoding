@@ -1,5 +1,6 @@
 ﻿using ConverxHull;
 using MathNet.Numerics.LinearAlgebra.Double;
+using NAudio.Wave.SampleProviders;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -14,6 +15,7 @@ namespace Test1
 {
     public partial class FrmMain : Form
     {
+        C_Camera_TuYang camera1 = new C_Camera_TuYang();
         public FrmMain()
         {
             InitializeComponent();
@@ -21,8 +23,7 @@ namespace Test1
 
         private void button1_Click(object sender, EventArgs e)
         {
-            string strFile = textBox1.Text;// "D:\\data\\camera123.txt";
-            C_Camera_TuYang camera1 = new C_Camera_TuYang();
+            string strFile = comboBox1.Text;
 
             if (File.Exists(strFile) == false)
             {
@@ -35,10 +36,6 @@ namespace Test1
                 string name = Path.GetFileName(strFile);
                 Main.speak_async(name);
             }
-
-            //this.save_var("%file", "string", strFile);
-
-            //camera1.file = strFile;
 
             C_Point3D p1;
             C_Point3D p2;
@@ -59,9 +56,27 @@ namespace Test1
                 Main.计算标定数据误差(null, strFile, m1, p1, p2);
             }
 
-            tx_output.Text=p1.ToString()+"\r\n"+
+            tx_output.Text = p1.ToString() + "\r\n" +
                 p2.ToString() + "\r\n" +
                 m1.ToMatrixString();
+        }
+
+        private void b_convert_Click(object sender, EventArgs e)
+        {
+            C_Point3D p1 = new C_Point3D(tx_camera.Text, ",", false);
+            C_Point3D p2 =  Main_Robot.摄像头坐标转到机械臂坐标(camera1, p1);
+
+            tx_robot.Text = p2.ToString();
+
+            C_Point3D A = (p2 - new C_Point3D(0, 49, 0));
+            A.digits = 2;
+            tx_falan.Text = A.ToString();
+
+            C_Point3D B = (A - new C_Point3D(0, 79.5, 0));
+            tx_b.Text = B.ToString();
+
+            C_Point3D p7 = (A - new C_Point3D(0, 0, 100));
+            tx_p7.Text = p7.ToString();
         }
     }
 }

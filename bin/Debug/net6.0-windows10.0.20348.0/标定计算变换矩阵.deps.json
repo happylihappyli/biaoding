@@ -39,21 +39,21 @@
           "NAudio.WinMM": "2.1.0.0",
           "pcammls_cs": "0.0.0.0",
           "Three.Net": "1.0.0.0",
-          "runtimepack.Microsoft.Windows.SDK.NET.Ref": "10.0.20348.31"
+          "runtimepack.Microsoft.Windows.SDK.NET.Ref": "10.0.20348.55"
         },
         "runtime": {
           "标定计算变换矩阵.dll": {}
         }
       },
-      "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.20348.31": {
+      "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.20348.55": {
         "runtime": {
           "Microsoft.Windows.SDK.NET.dll": {
-            "assemblyVersion": "10.0.20348.24",
-            "fileVersion": "10.0.20348.31"
+            "assemblyVersion": "10.0.20348.38",
+            "fileVersion": "10.0.20348.55"
           },
           "WinRT.Runtime.dll": {
-            "assemblyVersion": "2.0.0.0",
-            "fileVersion": "2.0.4.44211"
+            "assemblyVersion": "2.1.0.0",
+            "fileVersion": "2.2.0.48161"
           }
         }
       },
@@ -619,7 +619,7 @@
       "serviceable": false,
       "sha512": ""
     },
-    "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.20348.31": {
+    "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.20348.55": {
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
