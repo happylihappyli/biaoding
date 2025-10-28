@@ -2,9 +2,6 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
-    <Compile Update="CalibrationPanel.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Update="Common\Class\Notification\Notification.cs">
       <SubType>Form</SubType>
     </Compile>

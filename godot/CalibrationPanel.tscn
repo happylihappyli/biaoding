@@ -15,7 +15,7 @@ script = ExtResource("1")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 43.0
+offset_bottom = 431.0
 grow_horizontal = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
@@ -36,5 +36,6 @@ text = "加载标定文件"
 
 [node name="TextEdit" type="TextEdit" parent="VBoxContainer"]
 layout_mode = 2
+size_flags_vertical = 3
 
 [connection signal="pressed" from="VBoxContainer/HBoxContainer/button1" to="." method="_on_button_1_pressed"]
