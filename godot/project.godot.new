@@ -1,0 +1,21 @@
+config_version=5
+
+[application]
+
+config/name="Camera Calibration Tool"
+config/icon="res://icon.svg"
+run/main_scene="res://Main.tscn"
+
+[display]
+
+window/size/width=800
+window/size/height=600
+window/title="相机标定工具"
+
+[rendering]
+
+renderer/rendering_method=gl_compatibility
+
+[editor_plugins]
+
+enabled=[]
