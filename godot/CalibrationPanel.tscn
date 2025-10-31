@@ -34,8 +34,24 @@ text = "D:/camera_robot.txt"
 layout_mode = 2
 text = "加载标定文件"
 
+[node name="HBoxContainer2" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+text = "相机坐标："
+
+[node name="camera_xyz" type="LineEdit" parent="VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Convert" type="Button" parent="VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+text = "转换"
+
 [node name="TextEdit" type="TextEdit" parent="VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 
 [connection signal="pressed" from="VBoxContainer/HBoxContainer/button1" to="." method="_on_button_1_pressed"]
+[connection signal="pressed" from="VBoxContainer/HBoxContainer2/Convert" to="." method="_on_convert_pressed"]

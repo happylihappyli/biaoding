@@ -3,3 +3,8 @@
 /obj
 /godot/.bv_ws
 *.tmp
+/svd/obj
+/svd/SvdAlgorithm/obj
+/svd/SvdAlgorithm/bin
+/svd/SvdTest/bin
+/svd/SvdTest/obj

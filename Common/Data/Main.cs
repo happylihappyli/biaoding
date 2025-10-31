@@ -2079,21 +2079,14 @@ namespace Test1
             d[0, 0] = a1;
             d[0, 1] = a2;
             d[0, 2] = a3;
-            //d[0, 3] = m1;
             d[1, 0] = a4;
             d[1, 1] = a5;
             d[1, 2] = a6;
-            //d[1, 3] = m2;
             d[2, 0] = a7;
             d[2, 1] = a8;
             d[2, 2] = a9;
-            //d[2, 3] = m3;
-            //d[3, 0] = 0;
-            //d[3, 1] = 0;
-            //d[3, 2] = 0;
-            //d[3, 3] = 1;
 
-            //camera1.M_Rotate = DenseMatrix.OfArray(d);//坐标变换矩阵
+
             DenseMatrix M_Rotate = DenseMatrix.OfArray(d);//坐标变换矩阵
             return (p1_center, p2_center, M_Rotate);
         }

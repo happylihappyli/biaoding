@@ -4,6 +4,10 @@ var combo_box1: LineEdit
 var tx_output: TextEdit
 var button1: Button
 
+var p1_center:Vector3
+var p2_center:Vector3
+var M_Rotate:Basis
+
 # 类定义需要在extends语句之后，不能嵌套在其他类中
 class Point3D:
 	var x: float = 0.0
@@ -202,6 +206,16 @@ func _on_button_1_pressed() -> void:
 			
 			tx_output.text += "\n\n3D中心点: [%.6f, %.6f, %.6f]" % [params[12], params[13], params[14]]
 			tx_output.text += "\n2D中心点: [%.6f, %.6f, %.6f]" % [params[15], params[16], params[17]]
+			
+			M_Rotate.x = Vector3(params[0], params[3], params[6])
+			M_Rotate.y = Vector3(params[1], params[4], params[7])
+			M_Rotate.z = Vector3(params[2], params[5], params[8])
+			
+			p1_center=Vector3(params[12], params[13], params[14])
+			p2_center=Vector3(params[15], params[16], params[17])
+			print(M_Rotate)
+			print(p1_center)
+			print(p2_center)
 		else:
 			# 兼容处理12个参数的情况
 			tx_output.text += "\n\n旋转矩阵: "
@@ -818,3 +832,30 @@ func read_calibration_file(params: Array) -> Dictionary:
 			   str(_m1) + "," + str(m2) + "," + str(m3))
 	
 	return result
+
+func Convert_Matrix(pPoint: Vector3,M_Rotate: Basis, p1_center:Vector3,p2_center:Vector3) -> Vector3:
+
+	# 创建相对坐标向量
+	var relative_vec = Vector3(
+		pPoint.x - p1_center.x,
+		pPoint.y - p1_center.y,
+		pPoint.z - p1_center.z
+	)
+	
+	# 假设 M_Rotate 是一个 Basis（3x3 旋转矩阵）
+	var rotated = M_Rotate.transposed() * relative_vec
+	
+	var pPoint2 = Vector3(
+		rotated.x + p2_center.x,
+		rotated.y + p2_center.y,
+		rotated.z + p2_center.z
+	)
+	return pPoint2
+	
+	
+func _on_convert_pressed() -> void:
+	var line=$VBoxContainer/HBoxContainer2/camera_xyz.text;
+	var split=line.split(",")
+	var xyz:Vector3=Vector3(float(split[0]),float(split[1]),float(split[2]))
+	var result=Convert_Matrix(xyz,M_Rotate,p1_center,p2_center)
+	$VBoxContainer/TextEdit.text=str(result.x)+","+str(result.y)+","+str(result.z);

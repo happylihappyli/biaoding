@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../mathnet-numerics-master/mathnet-numerics-master"
+		}
+	],
+	"settings": {}
+}
