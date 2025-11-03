@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cuva61gbf17gm"]
+
+[ext_resource type="Script" uid="uid://cej7ylss1uesx" path="res://svd_example.gd" id="1_8h4ds"]
+
+[node name="SVDExample" type="Node"]
+script = ExtResource("1_8h4ds")
