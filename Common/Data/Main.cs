@@ -1987,20 +1987,20 @@ namespace Test1
 
             streamReader?.Close();
 
-            C_Point3D c_Point3D = new C_Point3D(num / (double)num7, num2 / (double)num7, num3 / (double)num7);
-            C_Point3D c_Point3D2 = new C_Point3D(num4 / (double)num7, num5 / (double)num7, num6 / (double)num7);
+            C_Point3D point1 = new C_Point3D(num / (double)num7, num2 / (double)num7, num3 / (double)num7);
+            C_Point3D point2 = new C_Point3D(num4 / (double)num7, num5 / (double)num7, num6 / (double)num7);
             double[,] array2 = new double[arrayList.Count, 3];
             double[,] array3 = new double[arrayList.Count, 3];
             for (int i = 0; i < arrayList.Count; i++)
             {
-                C_Point3D c_Point3D3 = arrayList[i];
-                C_Point3D c_Point3D4 = arrayList2[i];
-                array2[i, 0] = c_Point3D3.x - c_Point3D.x;
-                array2[i, 1] = c_Point3D3.y - c_Point3D.y;
-                array2[i, 2] = c_Point3D3.z - c_Point3D.z;
-                array3[i, 0] = c_Point3D4.x - c_Point3D2.x;
-                array3[i, 1] = c_Point3D4.y - c_Point3D2.y;
-                array3[i, 2] = c_Point3D4.z - c_Point3D2.z;
+                C_Point3D point3 = arrayList[i];
+                C_Point3D point4 = arrayList2[i];
+                array2[i, 0] = point3.x - point1.x;
+                array2[i, 1] = point3.y - point1.y;
+                array2[i, 2] = point3.z - point1.z;
+                array3[i, 0] = point4.x - point2.x;
+                array3[i, 1] = point4.y - point2.y;
+                array3[i, 2] = point4.z - point2.z;
             }
 
             DenseMatrix denseMatrix = DenseMatrix.OfArray(array2);
@@ -2018,7 +2018,7 @@ namespace Test1
             };
             Matrix<double> other2 = DenseMatrix.OfArray(array4);
             Matrix<double> matrix3 = matrix2.Multiply(other2).Multiply(u.Transpose()).Transpose();
-            C_Point3D c_Point3D5 = c_Point3D2-(c_Point3D);
+            C_Point3D point5 = point2-(point1);
             return new double[18]
             {
                 matrix3[0, 0],
@@ -2030,15 +2030,15 @@ namespace Test1
                 matrix3[2, 0],
                 matrix3[2, 1],
                 matrix3[2, 2],
-                c_Point3D5.x,
-                c_Point3D5.y,
-                c_Point3D5.z,
-                c_Point3D.x,
-                c_Point3D.y,
-                c_Point3D.z,
-                c_Point3D2.x,
-                c_Point3D2.y,
-                c_Point3D2.z
+                point5.x,
+                point5.y,
+                point5.z,
+                point1.x,
+                point1.y,
+                point1.z,
+                point2.x,
+                point2.y,
+                point2.z
             };
         }
 

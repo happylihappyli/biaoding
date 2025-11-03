@@ -15,14 +15,17 @@
     <Compile Remove="Common\*\*.bak" />
     <Compile Remove="Common\*\*\*.bak" />
     <Compile Remove="Common\download\**" />
+    <Compile Remove="svd\**" />
     <EmbeddedResource Remove="Frms\**" />
     <EmbeddedResource Remove="Common\*\*.bak" />
     <EmbeddedResource Remove="Common\*\*\*.bak" />
     <EmbeddedResource Remove="Common\download\**" />
+    <EmbeddedResource Remove="svd\**" />
     <None Remove="Frms\**" />
     <None Remove="Common\*\*.bak" />
     <None Remove="Common\*\*\*.bak" />
     <None Remove="Common\download\**" />
+    <None Remove="svd\**" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Common\Data\C_Block_Complex3.cs" />

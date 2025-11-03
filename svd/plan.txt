@@ -1,0 +1,3 @@
+参考E:\github\mathnet-numerics-master\mathnet-numerics-master\src
+里面代码，复制里面的代码即可，矩阵svd算法提取到目录：
+E:\github\biaoding\svd

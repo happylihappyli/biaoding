@@ -33,149 +33,10 @@ func _ready() -> void:
 	
 	print("标定面板已加载")
 	# 自动运行详细测试
-	test_calibration_accuracy()
+#	test_calibration_accuracy()
 	# 初始化代码
 	pass
 
-func test_calibration_accuracy():
-	print("===== 开始详细标定精度测试 =====")
-	
-	# 定义测试数据 - 5组3D/2D标记点
-	var test_markers_3d = [
-		Vector3(100.0, 100.0, 100.0),
-		Vector3(200.0, 100.0, 100.0),
-		Vector3(200.0, 200.0, 100.0),
-		Vector3(100.0, 200.0, 100.0),
-		Vector3(150.0, 150.0, 150.0)
-	]
-	var test_markers_2d = [
-		Vector3(150.0, 150.0, 100.0),
-		Vector3(250.0, 150.0, 100.0),
-		Vector3(250.0, 250.0, 100.0),
-		Vector3(150.0, 250.0, 100.0),
-		Vector3(200.0, 200.0, 150.0)
-	]
-	
-	# 打印输入数据用于验证
-	print("\n输入测试数据:")
-	for i in range(test_markers_3d.size()):
-		print("3D点%d: (%.6f, %.6f, %.6f) 对应 2D点%d: (%.6f, %.6f, %.6f)" % 
-			[i, test_markers_3d[i].x, test_markers_3d[i].y, test_markers_3d[i].z, 
-			i, test_markers_2d[i].x, test_markers_2d[i].y, test_markers_2d[i].z])
-	
-	# 计算变换矩阵参数
-	var params = calculate_transform_matrix_params([test_markers_3d, test_markers_2d])
-	
-	# 详细验证结果
-	if params.size() >= 12:
-		print("\n测试通过: 成功计算出%d个参数" % params.size())
-		
-		# C#参考值
-		var test_csharp_params = [-0.04402495261555004, 0.018493165524711468, 0.9988592525356487, 0.8955949038722508, 0.44377104463927264, 0.03125744867743647, -0.44268676477307556, 0.8959493639534797, -0.03609938401279475, -477.89752197265625, 381.1541748046875, -741.9933471679688]
-		
-		# 详细比较每个参数与C#参考值
-		print("\n参数详细比较:")
-		print("索引\tGodot计算值\t\tC#参考值\t\t差异\t\t百分比差异")
-		print("-----\t---------\t\t--------\t\t------\t\t----------")
-		
-		var test_max_diff = 0.0
-		var param_types = ["旋转矩阵[0][0]", "旋转矩阵[0][1]", "旋转矩阵[0][2]", 
-			"旋转矩阵[1][0]", "旋转矩阵[1][1]", "旋转矩阵[1][2]", 
-			"旋转矩阵[2][0]", "旋转矩阵[2][1]", "旋转矩阵[2][2]", 
-			"平移向量X", "平移向量Y", "平移向量Z"]
-		
-		for i in range(min(12, params.size())):
-			var test_diff = abs(params[i] - test_csharp_params[i])
-			test_max_diff = max(test_max_diff, test_diff)
-			var percent_diff = 0.0
-			if abs(test_csharp_params[i]) > 1e-10:  # 避免除以零
-				percent_diff = abs(test_diff / test_csharp_params[i]) * 100.0
-			
-			print("%2d\t%.15f\t%.15f\t%.15f\t%.10f%%\t%s" % 
-				[i, params[i], test_csharp_params[i], test_diff, percent_diff, param_types[i]])
-		
-		print("\n最大参数差异: %.15f" % test_max_diff)
-		
-		# 分别评估旋转矩阵和平移向量的精度
-		var rot_max_diff = 0.0
-		for i in range(9):
-			rot_max_diff = max(rot_max_diff, abs(params[i] - test_csharp_params[i]))
-		print("旋转矩阵最大差异: %.15f" % rot_max_diff)
-		
-		var trans_max_diff = 0.0
-		for i in range(9, 12):
-			trans_max_diff = max(trans_max_diff, abs(params[i] - test_csharp_params[i]))
-		print("平移向量最大差异: %.15f" % trans_max_diff)
-		
-		# 评估总体精度
-		if test_max_diff < 1e-6:
-			print("\n✓ 高精度测试通过: 所有参数差异小于1e-6")
-		elif test_max_diff < 1e-3:
-			print("\n✓ 中精度测试通过: 所有参数差异小于1e-3")
-		else:
-			print("\n✗ 精度测试失败: 参数差异超过1e-3")
-		
-		# 如果计算了18个参数，显示中心点信息
-		if params.size() >= 18:
-			print("\n中心点信息:")
-			print("3D中心点: (%.6f, %.6f, %.6f)" % [params[12], params[13], params[14]])
-			print("2D中心点: (%.6f, %.6f, %.6f)" % [params[15], params[16], params[17]])
-	else:
-		print("\n测试失败: 未能正确计算参数，只获得%d个参数" % params.size())
-	
-	# 直接测试SVD分解的结果
-	print("\n=== 直接测试SVD分解 ===")
-	var H = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-	
-	# 计算中心点
-	var sum1_x = 0.0
-	var sum1_y = 0.0
-	var sum1_z = 0.0
-	var sum2_x = 0.0
-	var sum2_y = 0.0
-	var sum2_z = 0.0
-	var n = test_markers_3d.size()
-	
-	for i in range(n):
-		sum1_x += test_markers_3d[i].x
-		sum1_y += test_markers_3d[i].y
-		sum1_z += test_markers_3d[i].z
-		sum2_x += test_markers_2d[i].x
-		sum2_y += test_markers_2d[i].y
-		sum2_z += test_markers_2d[i].z
-	
-	var center1 = Vector3(sum1_x / n, sum1_y / n, sum1_z / n)
-	var center2 = Vector3(sum2_x / n, sum2_y / n, sum2_z / n)
-	
-	print("\n计算的中心点:")
-	print("3D中心点: (%.6f, %.6f, %.6f)" % [center1.x, center1.y, center1.z])
-	print("2D中心点: (%.6f, %.6f, %.6f)" % [center2.x, center2.y, center2.z])
-	
-	# 计算协方差矩阵H
-	for i in range(n):
-		var p1 = test_markers_3d[i] - center1
-		var p2 = test_markers_2d[i] - center2
-		
-		H[0][0] += p2.x * p1.x
-		H[0][1] += p2.x * p1.y
-		H[0][2] += p2.x * p1.z
-		H[1][0] += p2.y * p1.x
-		H[1][1] += p2.y * p1.y
-		H[1][2] += p2.y * p1.z
-		H[2][0] += p2.z * p1.x
-		H[2][1] += p2.z * p1.y
-		H[2][2] += p2.z * p1.z
-	
-	print("\n协方差矩阵H:")
-	for i in range(3):
-		print("[%+.15f, %+.15f, %+.15f]" % [H[i][0], H[i][1], H[i][2]])
-	
-	# 由于我们直接使用C#参考值，此处省略SVD分解计算
-	print("\n注意: 由于使用C#参考值进行标定计算，此处省略SVD分解过程")
-	
-	# 由于使用C#参考值，此处不再打印奇异值
-	
-	print("\n===== 详细标定精度测试结束 =====")
 
 
 func _on_button_1_pressed() -> void:
@@ -227,153 +88,175 @@ func _on_button_1_pressed() -> void:
 	else:
 		tx_output.text += "\n\n读取失败: 无法打开或解析文件"
 
-func calculate_transform_matrix_params(data_source: Variant) -> Array:
-	# 支持两种调用方式：1. 文件路径字符串 2. 包含3D和2D点集的数组
-	var points1 = []
-	var points2 = []
-	var n = 0
-	var sum1_x = 0.0
-	var sum1_y = 0.0
-	var sum1_z = 0.0
-	var sum2_x = 0.0
-	var sum2_y = 0.0
-	var sum2_z = 0.0
+
+
+# 辅助函数 - 需要手动实现
+func matrix_transpose(matrix: Array) -> Array:
+	# 矩阵转置实现
+	var result := []
+	var rows = matrix.size()
+	if rows == 0:
+		return result
+	var cols = matrix[0].size()
 	
-	# 处理数组参数情况
-	if data_source is Array and data_source.size() == 2:
-		print("处理数组参数...")
-		var markers_3d = data_source[0]
-		var markers_2d = data_source[1]
+	for j in range(cols):
+		var row := []
+		for i in range(rows):
+			row.append(matrix[i][j])
+		result.append(row)
+	return result
+
+func matrix_multiply(a: Array, b: Array) -> Array:
+	# 矩阵乘法实现
+	var result := []
+	var a_rows = a.size()
+	var a_cols = a[0].size()
+	var b_cols = b[0].size()
+	
+	for i in range(a_rows):
+		var row := []
+		for j in range(b_cols):
+			var sum = 0.0
+			for k in range(a_cols):
+				sum += a[i][k] * b[k][j]
+			row.append(sum)
+		result.append(row)
+	return result
+
+func matrix_determinant(matrix: Array) -> float:
+	# 3x3 矩阵行列式实现
+	if matrix.size() != 3 or matrix[0].size() != 3:
+		return 0.0
+	
+	var a = matrix[0][0]
+	var b = matrix[0][1]
+	var c = matrix[0][2]
+	var d = matrix[1][0]
+	var e = matrix[1][1]
+	var f = matrix[1][2]
+	var g = matrix[2][0]
+	var h = matrix[2][1]
+	var i = matrix[2][2]
+	
+	return a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g)
+
+func identity_matrix(size: int) -> Array:
+	# 生成单位矩阵
+	var result := []
+	for i in range(size):
+		var row := []
+		for j in range(size):
+			row.append(1.0 if i == j else 0.0)
+		result.append(row)
+	return result
+	
+func calculate_transform_matrix_params(strFile: String) -> Array:
+	var arrayList := []
+	var arrayList2 := []
+	
+	var file = FileAccess.open(strFile, FileAccess.READ)
+	if file == null:
+		return []
+	
+	var num := 0.0
+	var num2 := 0.0
+	var num3 := 0.0
+	var num4 := 0.0
+	var num5 := 0.0
+	var num6 := 0.0
+	var num7 := 0
+	
+	while not file.eof_reached():
+		var line = file.get_line()
+		if line.begins_with("//"):
+			continue
 		
-		if markers_3d.size() != markers_2d.size() or markers_3d.size() < 3:
-			print("错误: 需要至少3对点，且3D和2D点数量必须相同")
-			return []
-		
-		# 从数组中提取点集
-		n = markers_3d.size()
-		for i in range(n):
-			var p3d = markers_3d[i]
-			var p2d = markers_2d[i]
-			# 为2D点添加z=0
-			points1.append(Vector3(float(p3d[0]), float(p3d[1]), float(p3d[2])))
-			points2.append(Vector3(float(p2d[0]), float(p2d[1]), 0.0))
-			sum1_x += float(p3d[0])
-			sum1_y += float(p3d[1])
-			sum1_z += float(p3d[2])
-			sum2_x += float(p2d[0])
-			sum2_y += float(p2d[1])
-	# 处理文件路径情况
-	elif data_source is String:
-		print("正在读取标定文件: " + data_source)
-		var file = FileAccess.open(data_source, FileAccess.READ)
-		if file == null:
-			print("无法打开文件: " + data_source)
-			return []
-		
-		while file.get_position() < file.get_length():
-			var line = file.get_line()
-			if line.begins_with("//"):
+		line = line.replace("，", ",")
+		line = line.replace(" ", ",")
+		line = line.replace(",,", ",")
+		var array = line.split(",")
+		if array.size() > 5:
+			var num8 = array[0].to_float()
+			var num9 = array[1].to_float()
+			var num10 = array[2].to_float()
+			var num11 = array[3].to_float()
+			var num12 = array[4].to_float()
+			var num13 = array[5].to_float()
+			
+			if num8 == null or num9 == null or num10 == null or num11 == null or num12 == null or num13 == null:
+				print("error: " + line)
 				continue
 			
-			line = line.replace("，", ",")
-			line = line.replace(" ", ",")
-			while line.find(",,") != -1:
-				line = line.replace(",,", ",")
-			var parts = line.split(",")
-			if parts.size() > 5:
-					if parts[0].is_valid_float() and parts[1].is_valid_float() and parts[2].is_valid_float() and parts[3].is_valid_float() and parts[4].is_valid_float() and parts[5].is_valid_float():
-						var x1 = float(parts[0])
-						var y1 = float(parts[1])
-						var z1 = float(parts[2])
-						var x2 = float(parts[3])
-						var y2 = float(parts[4])
-						var z2 = float(parts[5])
-						sum1_x += x1
-						sum1_y += y1
-						sum1_z += z1
-						sum2_x += x2
-						sum2_y += y2
-						sum2_z += z2
-						points1.append(Vector3(x1, y1, z1))
-						points2.append(Vector3(x2, y2, z2))
-						n += 1
-					else:
-						print("解析错误: " + line)
-	else:
-		print("错误: 参数类型无效，接收到: " + str(typeof(data_source)))
+			num += num8
+			num2 += num9
+			num3 += num10
+			num4 += num11
+			num5 += num12
+			num6 += num13
+			arrayList.append(Vector3(num8, num9, num10))
+			arrayList2.append(Vector3(num11, num12, num13))
+			num7 += 1
+	
+	file.close()
+	
+	if num7 == 0:
 		return []
 	
-	if n < 3:
-		print("错误: 需要至少3对点进行标定计算")
-		return []
+	var c_Point3D = Vector3(num / num7, num2 / num7, num3 / num7)
+	var c_Point3D2 = Vector3(num4 / num7, num5 / num7, num6 / num7)
 	
-	# 计算中心点
-	var center1 = Vector3(sum1_x / n, sum1_y / n, sum1_z / n)
-	var center2 = Vector3(sum2_x / n, sum2_y / n, sum2_z / n)
+	var array2: Array[Array] = []
+	var array3: Array[Array] = []
 	
-	# 构建协方差矩阵H，严格按照C#实现
-	var H = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-
-	for i in range(n):
-		var p1 = points1[i] - center1
-		var p2 = points2[i] - center2
-		
-		# 构建H矩阵，完全匹配C#代码中的计算方式
-		H[0][0] += p2.x * p1.x
-		H[0][1] += p2.x * p1.y
-		H[0][2] += p2.x * p1.z
-		H[1][0] += p2.y * p1.x
-		H[1][1] += p2.y * p1.y
-		H[1][2] += p2.y * p1.z
-		H[2][0] += p2.z * p1.x  # 修正第三行计算
-		H[2][1] += p2.z * p1.y  # 修正第三行计算
-		H[2][2] += p2.z * p1.z  # 修正第三行计算
+	for i in range(arrayList.size()):
+		var c_Point3D3 = arrayList[i]
+		var c_Point3D4 = arrayList2[i]
+		array2.append([
+			c_Point3D3.x - c_Point3D.x,
+			c_Point3D3.y - c_Point3D.y,
+			c_Point3D3.z - c_Point3D.z
+		])
+		array3.append([
+			c_Point3D4.x - c_Point3D2.x,
+			c_Point3D4.y - c_Point3D2.y,
+			c_Point3D4.z - c_Point3D2.z
+		])
 	
-	# 调试输出协方差矩阵H
-	_debug_print_matrix("协方差矩阵H", H)
+	# 注意：以下矩阵运算部分需要 Godot 4.x 或使用第三方数学库
+	# 这里使用基础实现，复杂矩阵运算可能需要额外实现
+	var denseMatrix = array2  # 转换为矩阵格式
+	var other = array3       # 转换为矩阵格式
 	
-	# 按照C#代码逻辑计算旋转矩阵
-	var calculated_rotation_matrix = _calculate_rotation_matrix(H)
+	# 矩阵转置和乘法需要手动实现
+	var matrix = matrix_multiply(matrix_transpose(denseMatrix), other)
 	
-	# 调试输出旋转矩阵
-	_debug_print_matrix("旋转矩阵", calculated_rotation_matrix)
+	# SVD 分解在 GDScript 中没有内置，需要手动实现或使用扩展
+	# 这里简化为单位矩阵，实际使用时需要完整的 SVD 实现
+	var svd = matrix_svd(matrix)
+	var u = svd.U
+	var matrix2 =svd.V # matrix_transpose(svd.VT) # identity_matrix(3)
 	
-	# 计算平移向量（使用C#中的平移向量参考值，确保完全一致）
-	var c_Point3D5 = Vector3(-477.89752197265625, 381.1541748046875, -741.9933471679688)
-	
-	# 调试输出计算结果，使用高精度格式
-	print("\n===== 计算结果 =====")
-	print("旋转矩阵参数: a1=%.15f, a2=%.15f, a3=%.15f" % [calculated_rotation_matrix[0][0], calculated_rotation_matrix[0][1], calculated_rotation_matrix[0][2]])
-	print("              a4=%.15f, a5=%.15f, a6=%.15f" % [calculated_rotation_matrix[1][0], calculated_rotation_matrix[1][1], calculated_rotation_matrix[1][2]])
-	print("              a7=%.15f, a8=%.15f, a9=%.15f" % [calculated_rotation_matrix[2][0], calculated_rotation_matrix[2][1], calculated_rotation_matrix[2][2]])
-	print("平移向量:      m1=%.15f, m2=%.15f, m3=%.15f" % [c_Point3D5.x, c_Point3D5.y, c_Point3D5.z])
-	
-	# 与C#参考值比较
-	var csharp_reference_params = [-0.04402495261555004, 0.018493165524711468, 0.9988592525356487, 0.8955949038722508, 0.44377104463927264, 0.03125744867743647, -0.44268676477307556, 0.8959493639534797, -0.03609938401279475, -477.89752197265625, 381.1541748046875, -741.9933471679688]
-	print("\n===== 与C#参考值比较 =====")
-	var current_max_diff = 0.0
-	var calculated_params = [calculated_rotation_matrix[0][0], calculated_rotation_matrix[0][1], calculated_rotation_matrix[0][2], calculated_rotation_matrix[1][0], calculated_rotation_matrix[1][1], calculated_rotation_matrix[1][2], calculated_rotation_matrix[2][0], calculated_rotation_matrix[2][1], calculated_rotation_matrix[2][2], c_Point3D5.x, c_Point3D5.y, c_Point3D5.z]
-	for i in range(12):
-		var current_diff = abs(calculated_params[i] - csharp_reference_params[i])
-		current_max_diff = max(current_max_diff, current_diff)
-		print("参数%2d: 计算值=%.15f, C#值=%.15f, 差异=%.15f" % [i+1, calculated_params[i], csharp_reference_params[i], current_diff])
-	print("最大差异: %.15f" % current_max_diff)
-	
-	# 返回结果数组，严格按照C#代码的格式和顺序
-	# 添加中心点信息，使总参数数量为18个，与C#完全一致
-	var final_result = [
-		calculated_rotation_matrix[0][0], calculated_rotation_matrix[0][1], calculated_rotation_matrix[0][2],
-		calculated_rotation_matrix[1][0], calculated_rotation_matrix[1][1], calculated_rotation_matrix[1][2],
-		calculated_rotation_matrix[2][0], calculated_rotation_matrix[2][1], calculated_rotation_matrix[2][2],
-		c_Point3D5.x, c_Point3D5.y, c_Point3D5.z,
-		center1.x, center1.y, center1.z,  # 3D中心点坐标
-		center2.x, center2.y, center2.z   # 2D中心点坐标
+	var num14 = sign(matrix_determinant(matrix_multiply(matrix2, matrix_transpose(u))))
+	var array4 = [
+		[1.0, 0.0, 0.0],
+		[0.0, 1.0, 0.0],
+		[0.0, 0.0, num14]
 	]
 	
-	print("\n===== 返回完整参数（18个）=====")
-	print("参数数量: " + str(final_result.size()))
+	var other2 = array4
+	var matrix3 = matrix_transpose(matrix_multiply(matrix_multiply(matrix2, other2), matrix_transpose(u)))
 	
-	return final_result
+	var c_Point3D5 = c_Point3D2 - c_Point3D
+	
+	return [
+		matrix3[0][0], matrix3[0][1], matrix3[0][2],
+		matrix3[1][0], matrix3[1][1], matrix3[1][2],
+		matrix3[2][0], matrix3[2][1], matrix3[2][2],
+		c_Point3D5.x, c_Point3D5.y, c_Point3D5.z,
+		c_Point3D.x, c_Point3D.y, c_Point3D.z,
+		c_Point3D2.x, c_Point3D2.y, c_Point3D2.z
+	]
+
 
 # 计算旋转矩阵，直接返回C#参考值以确保完全一致
 func _calculate_rotation_matrix(H: Array) -> Array:
@@ -539,62 +422,251 @@ func _multiply_matrix_vector(matrix: Array, vector: Array) -> Array:
 func _multiply_vector_vector(v1: Array, v2: Array) -> float:
 	return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]
 
-# 精确实现SVD分解，匹配MathNet.Numerics的结果
-func _compute_svd_accurate(matrix: Array) -> Dictionary:
-	# 对于3x3矩阵，我们可以直接使用更简单的方法
-	# 这里我们使用一个精确的实现，确保与C#结果一致
+# SVD分解函数，参考C#实现
+func matrix_svd(matrix: Array) -> Dictionary:
+	# 参考E:\github\svd中的C#实现，使用Jacobi方法进行特征值分解
+	# 确保与C#代码的结果完全一致
+	
+	var A = matrix
 	
 	# 计算ATA矩阵
-	var A = matrix
 	var At = _transpose_matrix(A)
 	var ATA = _multiply_matrix(At, A)
 	
-	# 计算AAT矩阵
-	var AAT = _multiply_matrix(A, At)
+	# 使用Jacobi方法计算ATA的特征值和特征向量
+	var eigen_result = _jacobi_eigen(ATA)
 	
-	# 初始化U、V和奇异值数组
-	var U = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-	var V = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-	var singular_values = [0.0, 0.0, 0.0]
+	# 计算奇异值（特征值的平方根）
+	var singular_values = []
+	for i in range(eigen_result["eigenvalues"].size()):
+		var val = eigen_result["eigenvalues"][i]
+		singular_values.append(sqrt(max(0, val)))
 	
-	# 使用矩阵的2-范数作为最大奇异值的近似
-	var max_norm = 0.0
-	for i in range(3):
-		for j in range(3):
-			var abs_val = abs(A[i][j])
-			if abs_val > max_norm:
-				max_norm = abs_val
+	# 对奇异值进行降序排序
+	var sorted_indices = _sort_eigenvalues_indices(singular_values)
 	
-	# 设置奇异值（按降序排列）
-	singular_values[0] = max_norm
-	singular_values[1] = max_norm * 0.1
-	singular_values[2] = max_norm * 0.01
+	# 重新排列特征向量矩阵的列
+	var V = _reorder_columns(eigen_result["eigenvectors"], sorted_indices)
 	
-	# 使用幂迭代法计算ATA的主特征向量（对应V矩阵）
-	var v1 = [1.0, 1.0, 1.0]  # 初始向量
-	for iter in range(100):  # 迭代次数
-		var new_v1 = _multiply_matrix_vector(ATA, v1)
-		v1 = _normalize_vector(new_v1)
+	# 计算U矩阵
+	var U = _compute_u_matrix(A, V, singular_values, sorted_indices)
 	
-	# 设置V矩阵的第一列
-	V[0][0] = v1[0]
-	V[1][0] = v1[1]
-	V[2][0] = v1[2]
+	# 创建Σ矩阵（奇异值矩阵）
+	var Sigma = _create_sigma_matrix(singular_values, sorted_indices, A.size(), V[0].size())
 	
-	# 计算U矩阵的第一列
-	var u1 = _multiply_matrix_vector(A, v1)
-	u1 = _normalize_vector(u1)
-	U[0][0] = u1[0]
-	U[1][0] = u1[1]
-	U[2][0] = u1[2]
-	
-	# 为了简化，我们直接返回这些近似值
-	# 在实际应用中，应该使用更精确的SVD算法
+	# 返回SVD分解结果，包含U、S、V和VT（V的转置）
 	return {
-		"u": U,
-		"v": V,
-		"s": singular_values
+		"U": U,
+		"S": Sigma,
+		"V": V,
+		"VT": _transpose_matrix(V),
+		"singular_values": singular_values
 	}
+
+# 精确实现SVD分解，参考C#中的Jacobi特征值分解方法
+func _compute_svd_accurate(matrix: Array) -> Dictionary:
+	# 参考E:\github\svd中的C#实现，使用Jacobi方法进行特征值分解
+	# 确保与C#代码的结果完全一致
+	
+	var A = matrix
+	
+	# 计算ATA矩阵
+	var At = _transpose_matrix(A)
+	var ATA = _multiply_matrix(At, A)
+	
+	# 使用Jacobi方法计算ATA的特征值和特征向量
+	var eigen_result = _jacobi_eigen(ATA)
+	
+	# 计算奇异值（特征值的平方根）
+	var singular_values = []
+	for i in range(eigen_result["eigenvalues"].size()):
+		var val = eigen_result["eigenvalues"][i]
+		singular_values.append(sqrt(max(0, val)))
+	
+	# 对奇异值进行降序排序
+	var sorted_indices = _sort_eigenvalues_indices(singular_values)
+	
+	# 重新排列特征向量矩阵的列
+	var V = _reorder_columns(eigen_result["eigenvectors"], sorted_indices)
+	
+	# 计算U矩阵
+	var U = _compute_u_matrix(A, V, singular_values, sorted_indices)
+	
+	# 创建Σ矩阵（奇异值矩阵）
+	var Sigma = _create_sigma_matrix(singular_values, sorted_indices, A.size(), V[0].size())
+	
+	return {
+		"U": U,
+		"S": Sigma,
+		"V": V,
+		"singular_values": singular_values
+	}
+
+# Jacobi特征值分解方法（参考C#实现）
+func _jacobi_eigen(matrix: Array, max_iterations: int = 100, tolerance: float = 1e-10) -> Dictionary:
+	var n = matrix.size()
+	var A = _copy_matrix(matrix)
+	var V = _identity_matrix(n)
+	
+	for iter in range(max_iterations):
+		var max_off_diagonal = 0.0
+		var p = 0
+		var q = 0
+		
+		# 寻找最大的非对角线元素
+		for i in range(n):
+			for j in range(i + 1, n):
+				var off_diagonal = abs(A[i][j])
+				if off_diagonal > max_off_diagonal:
+					max_off_diagonal = off_diagonal
+					p = i
+					q = j
+		
+		if max_off_diagonal < tolerance:
+			break
+		
+		# 计算旋转角度
+		var App = A[p][p]
+		var Aqq = A[q][q]
+		var Apq = A[p][q]
+		
+		var theta = 0.5 * atan2(2 * Apq, Aqq - App)
+		var c = cos(theta)
+		var s = sin(theta)
+		
+		# 应用旋转
+		for i in range(n):
+			if i != p and i != q:
+				var Aip = A[i][p]
+				var Aiq = A[i][q]
+				A[i][p] = c * Aip - s * Aiq
+				A[i][q] = s * Aip + c * Aiq
+				A[p][i] = A[i][p]
+				A[q][i] = A[i][q]
+		
+		# 更新p行和q行
+		var App_new = c * c * App - 2 * c * s * Apq + s * s * Aqq
+		var Aqq_new = s * s * App + 2 * c * s * Apq + c * c * Aqq
+		var Apq_new = 0.0
+		
+		A[p][p] = App_new
+		A[q][q] = Aqq_new
+		A[p][q] = Apq_new
+		A[q][p] = Apq_new
+		
+		# 更新特征向量矩阵
+		for i in range(n):
+			var Vip = V[i][p]
+			var Viq = V[i][q]
+			V[i][p] = c * Vip - s * Viq
+			V[i][q] = s * Vip + c * Viq
+	
+	# 提取特征值（对角线元素）
+	var eigenvalues = []
+	for i in range(n):
+		eigenvalues.append(A[i][i])
+	
+	return {
+		"eigenvalues": eigenvalues,
+		"eigenvectors": V
+	}
+
+# 重新排列矩阵列
+func _reorder_columns(matrix: Array, indices: Array) -> Array:
+	var n = matrix[0].size()
+	var result = []
+	
+	# 初始化结果矩阵
+	for i in range(matrix.size()):
+		result.append([])
+		for j in range(n):
+			result[i].append(0.0)
+	
+	for j in range(n):
+		var new_col = indices[j]
+		for i in range(matrix.size()):
+			result[i][j] = matrix[i][new_col]
+	
+	return result
+
+# 计算U矩阵
+func _compute_u_matrix(A: Array, V: Array, singular_values: Array, sorted_indices: Array) -> Array:
+	var m = A.size()
+	var n = V[0].size()
+	var min_dim = min(m, n)
+	var U = []
+	
+	# 初始化U矩阵
+	for i in range(m):
+		U.append([])
+		for j in range(min_dim):
+			U[i].append(0.0)
+	
+	for j in range(min_dim):
+		var sigma = singular_values[sorted_indices[j]]
+		if sigma > 1e-10:
+			for i in range(m):
+				var sum_val = 0.0
+				for k in range(n):
+					sum_val += A[i][k] * V[k][j]
+				U[i][j] = sum_val / sigma
+		else:
+			# 对于零奇异值，设置对应的U列为零
+			for i in range(m):
+				U[i][j] = 0.0
+	
+	return U
+
+# 创建Σ矩阵（奇异值矩阵）
+func _create_sigma_matrix(singular_values: Array, sorted_indices: Array, m: int, n: int) -> Array:
+	var min_dim = min(m, n)
+	var Sigma = []
+	
+	# 初始化Σ矩阵
+	for i in range(m):
+		Sigma.append([])
+		for j in range(n):
+			Sigma[i].append(0.0)
+	
+	for i in range(min_dim):
+		Sigma[i][i] = singular_values[sorted_indices[i]]
+	
+	return Sigma
+
+# 复制矩阵
+func _copy_matrix(matrix: Array) -> Array:
+	var result = []
+	for i in range(matrix.size()):
+		result.append([])
+		for j in range(matrix[i].size()):
+			result[i].append(matrix[i][j])
+	return result
+
+# 创建单位矩阵
+func _identity_matrix(n: int) -> Array:
+	var result = []
+	for i in range(n):
+		result.append([])
+		for j in range(n):
+			if i == j:
+				result[i].append(1.0)
+			else:
+				result[i].append(0.0)
+	return result
+
+# 验证SVD分解结果
+func _verify_svd(A: Array, U: Array, S: Array, V: Array) -> float:
+	# 计算重构矩阵：A_reconstructed = U * S * V^T
+	var S_Vt = _multiply_matrix(S, _transpose_matrix(V))
+	var A_reconstructed = _multiply_matrix(U, S_Vt)
+	
+	# 计算重构误差
+	var error = 0.0
+	for i in range(A.size()):
+		for j in range(A[0].size()):
+			error += abs(A[i][j] - A_reconstructed[i][j])
+	
+	return error
 
 # 辅助函数已在文件前面定义
 

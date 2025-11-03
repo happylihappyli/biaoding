@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../mathnet-numerics-master/mathnet-numerics-master"
+		},
+		{
+			"path": "../svd"
 		}
 	],
 	"settings": {}
